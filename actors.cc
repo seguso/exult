@@ -2078,9 +2078,6 @@ void Actor::set_effective_alignment(int newalign) {
 void Actor::paint() {
 	const int flag = GAME_BG ? Obj_flags::bg_dont_render : Obj_flags::dont_render;
 	if (cheat.in_map_editor() || !(flags & (1L << flag))) {
-		if (gwin->queue_rotate_local_object(this)) {
-			return;
-		}
 		int xoff;
 		int yoff;
 		gwin->get_shape_location(this, xoff, yoff);
