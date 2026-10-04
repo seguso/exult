@@ -24,12 +24,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef INCL_FONTGEN
 #define INCL_FONTGEN
-#ifdef HAVE_FREETYPE2
+
+#include <memory>
+
+class Shape_file;
+
+#if defined(HAVE_FREETYPE2) || defined(_WIN32)
 
 class Shape;
 
 bool Gen_font_shape(
 		Shape* shape, const char* fontfile, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1);
 
-#endif /* HAVE_FREETYPE2 */
+// Build a runtime Shape font from a TTF/system font. On Windows, fontfile
+// may be empty for an installed family; when non-empty it is loaded privately
+// for the duration of glyph generation. family is required on Windows.
+std::unique_ptr<Shape_file> Gen_runtime_font_shape(
+		const char* fontfile, const char* family, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1);
+
+#endif /* HAVE_FREETYPE2 || _WIN32 */
 #endif /* INCL_FONTGEN */
