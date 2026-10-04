@@ -629,6 +629,14 @@ void Game_window::paint_lerped(int factor) {
 		factor = 0x10000;
 	}
 
+	// Smooth-camera experiment: keep the visual camera on the native pixel
+	// grid, but expose every intermediate pixel between two logical 8-pixel
+	// tile scroll positions. This deliberately avoids sub-pixel sampling (and
+	// therefore pixel-art shimmer) while reducing the old tile-sized visual
+	// jump to one game pixel at a time.
+	const int camera_pixel_step = (factor * c_tilesize + 0x8000) / 0x10000;
+	factor = (camera_pixel_step * 0x10000) / c_tilesize;
+
 	const int saved_scrolltx = scrolltx;
 	const int saved_scrollty = scrollty;
 
