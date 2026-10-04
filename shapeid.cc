@@ -105,7 +105,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	// Gen_shadow adds one pixel on every side, so subtract two from the
 	// original font's total height to keep the final outlined result close to
 	// Exult's existing conversation text size.
-	int pixels = std::max(5, fonts->get_text_height(0) - 2);
+	int pixels = std::max(5, fonts->get_text_height(0) - 3);
 	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
 	pixels = std::clamp(pixels, 5, 32);
 
@@ -632,7 +632,20 @@ int Shape_manager::paint_conversation_text_box(
 		gwin->get_win()->fill_translucent8(0, w, h, x, y, xforms[shading]);
 	}
 	auto font = get_conversation_font();
-	return font ? font->paint_text_box(gwin->get_win()->get_ib8(), text, x, y, w, h, vert_lead, pbreak, center, cursor) : 0;
+	if (!font) {
+		return 0;
+	}
+
+	// Keep the classic conversation line cadence even when the replacement
+	// font has taller Win32 metrics. The old call sites pass -1 to tighten
+	// the built-in font by one pixel; reproduce that same final line height.
+	int effective_vert_lead = vert_lead;
+	if (conversation_font && vert_lead == -1) {
+		const int target_line_height = fonts->get_text_line_height(0) - 1;
+		effective_vert_lead = target_line_height - font->get_text_height() - font->get_ver_lead();
+	}
+	return font->paint_text_box(
+			gwin->get_win()->get_ib8(), text, x, y, w, h, effective_vert_lead, pbreak, center, cursor);
 }
 
 Shape_manager::Cached_shape Shape_manager::cache_shape(int shape_kind, int shapenum, int framenum) {
