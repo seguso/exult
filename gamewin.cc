@@ -389,6 +389,12 @@ Game_window::Game_window(
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
+	// Smooth-camera experimental branch: ensure interpolation is actually on.
+	// The stock configuration defaults this to 0, in which case paint_lerped()
+	// is never called and none of the camera/actor decoupling code can run.
+	if (lerping_enabled <= 0) {
+		lerping_enabled = 100;
+	}
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
