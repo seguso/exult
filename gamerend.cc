@@ -722,6 +722,140 @@ void Game_window::paint_lerped(int factor) {
 	avposx_ld = avposy_ld = 0;
 }
 
+void Game_window::reset_velocity_camera() {
+	smooth_cam_valid = false;
+	smooth_cam_vx = 0.0;
+	smooth_cam_vy = 0.0;
+	smooth_cam_last_ticks = 0;
+}
+
+bool Game_window::paint_velocity_camera(uint32 ticks) {
+	if (!camera_actor) {
+		reset_velocity_camera();
+		return false;
+	}
+
+	const int world_pixels = c_num_tiles * c_tilesize;
+	const double half_world = static_cast<double>(world_pixels) * 0.5;
+
+	if (!smooth_cam_valid) {
+		smooth_cam_x = static_cast<double>(scrolltx * c_tilesize);
+		smooth_cam_y = static_cast<double>(scrollty * c_tilesize);
+		smooth_cam_vx = 0.0;
+		smooth_cam_vy = 0.0;
+		smooth_cam_last_ticks = ticks;
+		smooth_cam_valid = true;
+		return false;
+	}
+
+	uint32 elapsed_ms = ticks - smooth_cam_last_ticks;
+	smooth_cam_last_ticks = ticks;
+	if (elapsed_ms > 50) {
+		elapsed_ms = 50;
+	}
+	const double dt = static_cast<double>(elapsed_ms) / 1000.0;
+	if (dt <= 0.0) {
+		return false;
+	}
+
+	const Tile_coord actor_pos = camera_actor->get_tile();
+	const int tw = get_width() / c_tilesize;
+	const int th = get_height() / c_tilesize;
+	double target_x = static_cast<double>((actor_pos.tx - tw / 2) * c_tilesize);
+	double target_y = static_cast<double>((actor_pos.ty - th / 2) * c_tilesize);
+
+	// Choose the wrapped target image nearest to the current unwrapped camera.
+	auto nearest_wrapped = [&](double target, double current) {
+		double delta = target - current;
+		while (delta > half_world) {
+			delta -= world_pixels;
+		}
+		while (delta < -half_world) {
+			delta += world_pixels;
+		}
+		return current + delta;
+	};
+	target_x = nearest_wrapped(target_x, smooth_cam_x);
+	target_y = nearest_wrapped(target_y, smooth_cam_y);
+
+	const double error_x = target_x - smooth_cam_x;
+	const double error_y = target_y - smooth_cam_y;
+
+	// Teleports/map changes are the one case where carrying camera velocity is
+	// undesirable. Normal walking never produces an error anywhere near this.
+	if (std::abs(error_x) > 128.0 || std::abs(error_y) > 128.0) {
+		smooth_cam_x = target_x;
+		smooth_cam_y = target_y;
+		smooth_cam_vx = 0.0;
+		smooth_cam_vy = 0.0;
+	}
+
+	const int old_render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int old_render_y = static_cast<int>(std::lround(smooth_cam_y));
+
+	constexpr double max_speed = 96.0;         // game pixels / second
+	constexpr double max_acceleration = 480.0; // game pixels / second^2
+	const auto advance_axis = [&](double target, double& pos, double& velocity) {
+		const double error = target - pos;
+		if (std::abs(error) < 0.001 && std::abs(velocity) < 0.001) {
+			velocity = 0.0;
+			return;
+		}
+		const double stop_speed = std::sqrt(2.0 * max_acceleration * std::abs(error));
+		double desired_velocity = std::min(max_speed, stop_speed);
+		if (error < 0.0) {
+			desired_velocity = -desired_velocity;
+		}
+		const double max_dv = max_acceleration * dt;
+		const double dv = std::clamp(desired_velocity - velocity, -max_dv, max_dv);
+		velocity += dv;
+		pos += velocity * dt;
+	};
+
+	advance_axis(target_x, smooth_cam_x, smooth_cam_vx);
+	advance_axis(target_y, smooth_cam_y, smooth_cam_vy);
+
+	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
+	const bool camera_changed = render_x != old_render_x || render_y != old_render_y;
+	if (!camera_changed && !is_dirty()) {
+		return false;
+	}
+
+	const int saved_scrolltx = scrolltx;
+	const int saved_scrollty = scrollty;
+
+	const auto wrap_pixel = [&](int p) {
+		p %= world_pixels;
+		if (p < 0) {
+			p += world_pixels;
+		}
+		return p;
+	};
+	const int wrapped_x = wrap_pixel(render_x);
+	const int wrapped_y = wrap_pixel(render_y);
+	scrolltx = wrapped_x / c_tilesize;
+	scrollty = wrapped_y / c_tilesize;
+	scrolltx_lo = wrapped_x % c_tilesize;
+	scrollty_lo = wrapped_y % c_tilesize;
+
+	// Deliberately do not compensate the camera actor. It is allowed to move
+	// away from exact screen center while the velocity-driven camera catches up.
+	avposx_ld = 0;
+	avposy_ld = 0;
+
+	paint();
+
+	scrolltx = saved_scrolltx;
+	scrollty = saved_scrollty;
+	scrolltx_lo = 0;
+	scrollty_lo = 0;
+	avposx_ld = 0;
+	avposy_ld = 0;
+	return true;
+}
+
+
 /*
  *  Paint the flat (non-rle) shapes in a chunk.
  */
