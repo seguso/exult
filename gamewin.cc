@@ -570,9 +570,60 @@ void Game_window::display_to_world(int& x, int& y) const {
 	const World_view_point p = world_view.display_to_scene({static_cast<double>(x), static_cast<double>(y)});
 	x = static_cast<int>(std::lround(p.x));
 	y = static_cast<int>(std::lround(p.y));
+
+	// The velocity camera is purely visual: paint_velocity_camera() temporarily
+	// renders with a different scroll origin and then restores the logical
+	// tile scroll. Mouse hit-testing happens after that restore, so compensate
+	// for the difference between the origin the user is actually looking at
+	// and the current logical origin. During painting both origins coincide,
+	// making this adjustment naturally zero.
+	if (smooth_cam_valid) {
+		const int world_pixels = c_num_tiles * c_tilesize;
+		const auto wrapped_delta = [&](int visual, int logical) {
+			int d = visual - logical;
+			const int half = world_pixels / 2;
+			while (d > half) {
+				d -= world_pixels;
+			}
+			while (d < -half) {
+				d += world_pixels;
+			}
+			return d;
+		};
+		const int visual_x = static_cast<int>(std::lround(smooth_cam_x));
+		const int visual_y = static_cast<int>(std::lround(smooth_cam_y));
+		const int logical_x = scrolltx * c_tilesize + scrolltx_lo;
+		const int logical_y = scrollty * c_tilesize + scrollty_lo;
+		x += wrapped_delta(visual_x, logical_x);
+		y += wrapped_delta(visual_y, logical_y);
+	}
 }
 
 void Game_window::world_to_display(int& x, int& y) const {
+	// Inverse of display_to_world(): convert coordinates expressed relative to
+	// the current logical scroll origin into the visually rendered camera
+	// origin before applying the optional 45-degree world transform.
+	if (smooth_cam_valid) {
+		const int world_pixels = c_num_tiles * c_tilesize;
+		const auto wrapped_delta = [&](int visual, int logical) {
+			int d = visual - logical;
+			const int half = world_pixels / 2;
+			while (d > half) {
+				d -= world_pixels;
+			}
+			while (d < -half) {
+				d += world_pixels;
+			}
+			return d;
+		};
+		const int visual_x = static_cast<int>(std::lround(smooth_cam_x));
+		const int visual_y = static_cast<int>(std::lround(smooth_cam_y));
+		const int logical_x = scrolltx * c_tilesize + scrolltx_lo;
+		const int logical_y = scrollty * c_tilesize + scrollty_lo;
+		x -= wrapped_delta(visual_x, logical_x);
+		y -= wrapped_delta(visual_y, logical_y);
+	}
+
 	const World_view_point p = world_view.scene_to_display({static_cast<double>(x), static_cast<double>(y)});
 	x = static_cast<int>(std::lround(p.x));
 	y = static_cast<int>(std::lround(p.y));
