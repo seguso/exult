@@ -626,7 +626,10 @@ bool Dragging_info::drop_on_gump(
  */
 
 static bool Is_inaccessible(Game_window* gwin, Game_object* obj, int x, int y) {
-	Game_object* block = gwin->find_object_from_display(x, y);
+	// x/y here come from get_shape_rect() after the object has been moved, so
+	// they are already world-scene coordinates. Do not apply the inverse
+	// display rotation a second time.
+	Game_object* block = gwin->find_object(x, y);
 	return block && block != obj && !block->is_dragable();
 }
 
@@ -652,12 +655,17 @@ bool Dragging_info::drop_on_map(
 	if (max_lift >= skip) {    // Don't drop where we cannot see.
 		max_lift = skip - 1;
 	}
-	// Drop where we last painted it.
+	// Drop where we last painted it. During rotated-world dragging paintx/y
+	// are display coordinates so the item stays under the cursor; drop_at_lift()
+	// still expects unrotated world-scene pixel coordinates.
 	int posx = paintx;
 	int posy = painty;
 	if (posx == -1000) {    // Unless we never painted.
 		posx = x;
 		posy = y;
+	}
+	if (gwin->is_rotate_world_enabled()) {
+		gwin->display_to_world(posx, posy);
 	}
 	int lift;
 	// Was it dropped on something?
