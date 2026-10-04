@@ -652,8 +652,8 @@ void Game_window::paint_lerped(int factor) {
 	// end of the segment. This breaks the rigid "avatar glued to screen center"
 	// constraint while keeping both endpoints exact.
 	const int actor_factor = factor;
-	const int64 f = static_cast<int64>(factor);
-	const int camera_factor = static_cast<int>((f * f * f) / (static_cast<int64>(0x10000) * 0x10000));
+	const int64_t f = static_cast<int64_t>(factor);
+	const int camera_factor = static_cast<int>((f * f * f) / (static_cast<int64_t>(0x10000) * 0x10000));
 
 	scrolltx = scrolltx_l;
 	scrollty = scrollty_l;
