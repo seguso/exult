@@ -224,6 +224,22 @@ static int                  left_down_x = 0, left_down_y = 0;
 static int                  joy_aim_x = 0, joy_aim_y = 0;
 Mouse::Avatar_Speed_Factors joy_speed_factor  = Mouse::medium_speed_factor;
 static Uint32               last_speed_cursor = 0;    // When we last updated the mouse cursor
+
+static bool is_keyboard_movement_scancode(SDL_Scancode scancode) {
+	switch (scancode) {
+	case SDL_SCANCODE_W:
+	case SDL_SCANCODE_A:
+	case SDL_SCANCODE_S:
+	case SDL_SCANCODE_D:
+	case SDL_SCANCODE_UP:
+	case SDL_SCANCODE_DOWN:
+	case SDL_SCANCODE_LEFT:
+	case SDL_SCANCODE_RIGHT:
+		return true;
+	default:
+		return false;
+	}
+}
 #if defined _WIN32
 void do_cleanup_output() {
 	cleanup_output("std");
@@ -1414,6 +1430,53 @@ static void Handle_events() {
 			show_items_clicked = false;
 		}
 
+		// Combine held arrows/WASD into one 8-way direction.  The keybinder is
+		// event-oriented, so pressing Up then Right used to start two independent
+		// cardinal actions and whichever event arrived last won.  Polling the held
+		// state gives deterministic diagonals and also makes WASD independent of
+		// whatever bindings were present in the packaged defaultkeys resource.
+		static int keyboard_walk_dx = 0;
+		static int keyboard_walk_dy = 0;
+		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
+		const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
+		const bool* key_state = SDL_GetKeyboardState(nullptr);
+		int keyboard_dx = 0;
+		int keyboard_dy = 0;
+		if (plain_movement_keys) {
+			keyboard_dx += (key_state[SDL_SCANCODE_D] || key_state[SDL_SCANCODE_RIGHT]) ? 1 : 0;
+			keyboard_dx -= (key_state[SDL_SCANCODE_A] || key_state[SDL_SCANCODE_LEFT]) ? 1 : 0;
+			keyboard_dy += (key_state[SDL_SCANCODE_S] || key_state[SDL_SCANCODE_DOWN]) ? 1 : 0;
+			keyboard_dy -= (key_state[SDL_SCANCODE_W] || key_state[SDL_SCANCODE_UP]) ? 1 : 0;
+		}
+		keyboard_dx = std::clamp(keyboard_dx, -1, 1);
+		keyboard_dy = std::clamp(keyboard_dy, -1, 1);
+
+		if (keyboard_dx != 0 || keyboard_dy != 0) {
+			if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
+				if (keyboard_dy < 0 && keyboard_dx < 0) {
+					ActionWalkNorthWest(nullptr);
+				} else if (keyboard_dy < 0 && keyboard_dx > 0) {
+					ActionWalkNorthEast(nullptr);
+				} else if (keyboard_dy > 0 && keyboard_dx < 0) {
+					ActionWalkSouthWest(nullptr);
+				} else if (keyboard_dy > 0 && keyboard_dx > 0) {
+					ActionWalkSouthEast(nullptr);
+				} else if (keyboard_dy < 0) {
+					ActionWalkNorth(nullptr);
+				} else if (keyboard_dy > 0) {
+					ActionWalkSouth(nullptr);
+				} else if (keyboard_dx < 0) {
+					ActionWalkWest(nullptr);
+				} else {
+					ActionWalkEast(nullptr);
+				}
+			}
+		} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0) && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
+			gwin->stop_actor();
+		}
+		keyboard_walk_dx = keyboard_dx;
+		keyboard_walk_dy = keyboard_dy;
+
 		if (joy_aim_x != 0 || joy_aim_y != 0) {
 			// Calculate the player speed
 			const int speed = 200 * gwin->get_std_delay() / static_cast<int>(joy_speed_factor);
@@ -2036,12 +2099,16 @@ static void Handle_event(SDL_Event& event) {
 		gwin->get_gump_man()->okay_to_quit();
 		break;
 	case SDL_EVENT_KEY_DOWN:    // Keystroke.
-	case SDL_EVENT_KEY_UP:
-		if (!dragging &&    // ESC while dragging causes crashes.
+	case SDL_EVENT_KEY_UP: {
+		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
+		const bool plain_movement_key
+				= is_keyboard_movement_scancode(event.key.scancode) && (event.key.mod & move_mods) == 0;
+		if (!plain_movement_key && !dragging &&    // ESC while dragging causes crashes.
 			!gwin->get_gump_man()->handle_kbd_event(&event)) {
 			keybinder->HandleEvent(event);
 		}
 		break;
+	}
 	case SDL_EVENT_DROP_TEXT:
 	case SDL_EVENT_DROP_FILE: {
 #ifdef USE_EXULTSTUDIO
