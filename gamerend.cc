@@ -430,6 +430,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		resize_rotate_scene();
 	}
 
+	const int display_width  = world_view.get_display_width();
+	const int display_height = world_view.get_display_height();
 	const int scene_size = world_view.get_scene_size();
 	const int scene_x    = -world_view.get_scene_offset_x();
 	const int scene_y    = -world_view.get_scene_offset_y();
@@ -448,14 +450,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// The world is repainted in full for this first implementation.
 	int gx = 0;
 	int gy = 0;
-	int gw = get_width();
-	int gh = get_height();
+	int gw = display_width;
+	int gh = display_height;
 	win->BeginPaintIntoGuardBand(&gx, &gy, &gw, &gh);
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
 
-	for (int dy = 0; dy < get_height(); ++dy) {
-		for (int dx = 0; dx < get_width(); ++dx) {
+	for (int dy = 0; dy < display_height; ++dy) {
+		for (int dx = 0; dx < display_width; ++dx) {
 			const World_view_point source = world_view.display_to_scene(
 					{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
 			const int sx = static_cast<int>(std::lround(source.x));
@@ -466,7 +468,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 	}
 
-	win->set_clip(0, 0, get_width(), get_height());
+	win->set_clip(0, 0, display_width, display_height);
 	gump_man->paint(false);
 	if (dragging) {
 		dragging->paint();
@@ -476,7 +478,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->EndPaintIntoGuardBand();
 	win->clear_clip();
 
-	if (gx == 0 && gy == 0 && gw == get_width() && gh == get_height() && main_actor) {
+	if (main_actor) {
 		Actor* party[9];
 		const int cnt = get_party(party, 1);
 		int carried_light = 0;
