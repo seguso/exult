@@ -55,6 +55,9 @@ inline int Game_object::get_cyi() const {
  */
 
 void Ireg_game_object::paint() {
+	if (gwin->queue_rotate_local_object(this)) {
+		return;
+	}
 	int x;
 	int y;
 	gwin->get_shape_location(this, x, y);
