@@ -775,10 +775,10 @@ void KeyBinder::ApplyMovementOverrides() {
 	// Preserve whatever the active keymap currently assigned to WASD by moving
 	// those actions to Shift+the same key. This works for defaults, custom
 	// keyfiles and patch keyfiles alike.
-	preserve_on_shift(SDLK_w);
-	preserve_on_shift(SDLK_a);
-	preserve_on_shift(SDLK_s);
-	preserve_on_shift(SDLK_d);
+	preserve_on_shift(SDLK_W);
+	preserve_on_shift(SDLK_A);
+	preserve_on_shift(SDLK_S);
+	preserve_on_shift(SDLK_D);
 
 	const auto bind_action = [&](SDL_Keycode key, const char* action_name) {
 		auto it = actions.find(action_name);
@@ -786,10 +786,10 @@ void KeyBinder::ApplyMovementOverrides() {
 			AddKeyBinding(key, SDL_KMOD_NONE, it->second, 0, nullptr);
 		}
 	};
-	bind_action(SDLK_w, "WALK_NORTH");
-	bind_action(SDLK_a, "WALK_WEST");
-	bind_action(SDLK_s, "WALK_SOUTH");
-	bind_action(SDLK_d, "WALK_EAST");
+	bind_action(SDLK_W, "WALK_NORTH");
+	bind_action(SDLK_A, "WALK_WEST");
+	bind_action(SDLK_S, "WALK_SOUTH");
+	bind_action(SDLK_D, "WALK_EAST");
 }
 
 // codes used in keybindings-files. (use uppercase here)
