@@ -796,6 +796,7 @@ public:
 
 	void set_rotate_world_enabled(bool enabled);
 	void display_to_world(int& x, int& y) const;
+	void world_to_display(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
 	void start_actor_from_display(int x, int y, int speed = 125);
 	void start_actor_along_path_from_display(int x, int y, int speed = 125);
