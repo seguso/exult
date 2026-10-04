@@ -432,6 +432,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const int scene_y    = -world_view.get_scene_offset_y();
 	rotate_scene->clear_clip();
 	rotate_scene->fill8(pal->get_border_index());
+	rotate_local_objects.clear();
 	Image_buffer8* previous = push_render_target(rotate_scene.get());
 	rotate_scene->set_clip(scene_x, scene_y, scene_size, scene_size);
 	int light_sources = 0;
@@ -559,6 +560,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	}
 
 	win->set_clip(0, 0, display_width, display_height);
+	paint_rotate_local_objects();
 	gump_man->paint(false);
 	if (dragging) {
 		dragging->paint();
@@ -572,6 +574,141 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		update_lighting(light_sources);
 	}
 }
+
+void Game_window::paint_rotate_local_objects() {
+	if (rotate_local_objects.empty()) {
+		return;
+	}
+
+	constexpr double k = 0.7071067811865475244;
+	for (Game_object* obj : rotate_local_objects) {
+		if (!obj) {
+			continue;
+		}
+		Shape_frame* frame = obj->get_shape();
+		if (!frame || !frame->get_data() || !frame->is_rle()) {
+			continue;
+		}
+
+		const int sw = frame->get_width();
+		const int sh = frame->get_height();
+		if (sw <= 0 || sh <= 0) {
+			continue;
+		}
+
+		auto src_owner = win->create_buffer(sw, sh);
+		auto* src = static_cast<Image_buffer8*>(src_owner.get());
+		src->clear_clip();
+		src->fill8(255);
+		Image_buffer8* previous = push_render_target(src);
+		obj->paint_shape(frame->get_xleft(), frame->get_yabove());
+		pop_render_target(previous);
+
+		auto hi_owner = win->create_buffer(sw * 2, sh * 2);
+		auto* hi = static_cast<Image_buffer8*>(hi_owner.get());
+		hi->clear_clip();
+		hi->fill8(255);
+		const auto src_pixel = [&](int x, int y) {
+			x = std::clamp(x, 0, sw - 1);
+			y = std::clamp(y, 0, sh - 1);
+			return src->get_pixel8(x, y);
+		};
+		for (int sy = 0; sy < sh; ++sy) {
+			for (int sx = 0; sx < sw; ++sx) {
+				const unsigned char e = src_pixel(sx, sy);
+				const unsigned char b = src_pixel(sx, sy - 1);
+				const unsigned char d = src_pixel(sx - 1, sy);
+				const unsigned char f = src_pixel(sx + 1, sy);
+				const unsigned char h = src_pixel(sx, sy + 1);
+				unsigned char e0 = e;
+				unsigned char e1 = e;
+				unsigned char e2 = e;
+				unsigned char e3 = e;
+				if (b != h && d != f) {
+					if (d == b) e0 = d;
+					if (b == f) e1 = f;
+					if (d == h) e2 = d;
+					if (h == f) e3 = f;
+				}
+				const int hx = sx * 2;
+				const int hy = sy * 2;
+				hi->put_pixel8(e0, hx, hy);
+				hi->put_pixel8(e1, hx + 1, hy);
+				hi->put_pixel8(e2, hx, hy + 1);
+				hi->put_pixel8(e3, hx + 1, hy + 1);
+			}
+		}
+
+		int anchor_x = 0;
+		int anchor_y = 0;
+		get_shape_location(obj, anchor_x, anchor_y);
+		const World_view_point display_anchor = world_view.scene_to_display(
+				{static_cast<double>(anchor_x), static_cast<double>(anchor_y)});
+
+		const double left = -static_cast<double>(frame->get_xleft());
+		const double right = static_cast<double>(frame->get_xright()) + 1.0;
+		const double top = -static_cast<double>(frame->get_yabove());
+		const double bottom = static_cast<double>(frame->get_ybelow()) + 1.0;
+		const std::array<World_view_point, 4> corners = {{{left, top}, {right, top}, {right, bottom}, {left, bottom}}};
+		double min_x = 1e30;
+		double min_y = 1e30;
+		double max_x = -1e30;
+		double max_y = -1e30;
+		for (const auto& p : corners) {
+			const double rx = (p.x - p.y) * k + display_anchor.x;
+			const double ry = (p.x + p.y) * k + display_anchor.y;
+			min_x = std::min(min_x, rx);
+			min_y = std::min(min_y, ry);
+			max_x = std::max(max_x, rx);
+			max_y = std::max(max_y, ry);
+		}
+
+		const int x0 = std::max(0, static_cast<int>(std::floor(min_x)) - 1);
+		const int y0 = std::max(0, static_cast<int>(std::floor(min_y)) - 1);
+		const int x1 = std::min(get_width(), static_cast<int>(std::ceil(max_x)) + 1);
+		const int y1 = std::min(get_height(), static_cast<int>(std::ceil(max_y)) + 1);
+
+		const auto sample_local = [&](double dx, double dy) {
+			const double rx = dx - display_anchor.x;
+			const double ry = dy - display_anchor.y;
+			const double lx = (rx + ry) * k + static_cast<double>(frame->get_xleft());
+			const double ly = (-rx + ry) * k + static_cast<double>(frame->get_yabove());
+			const int hx = static_cast<int>(std::floor(lx * 2.0));
+			const int hy = static_cast<int>(std::floor(ly * 2.0));
+			if (hx < 0 || hy < 0 || hx >= sw * 2 || hy >= sh * 2) {
+				return static_cast<unsigned char>(255);
+			}
+			return hi->get_pixel8(hx, hy);
+		};
+
+		for (int dy = y0; dy < y1; ++dy) {
+			for (int dx = x0; dx < x1; ++dx) {
+				const unsigned char base = win->get_pixel8(dx, dy);
+				const std::array<unsigned char, 4> s = {
+						sample_local(dx + 0.25, dy + 0.25),
+						sample_local(dx + 0.75, dy + 0.25),
+						sample_local(dx + 0.25, dy + 0.75),
+						sample_local(dx + 0.75, dy + 0.75)};
+				if (s[0] == 255 && s[1] == 255 && s[2] == 255 && s[3] == 255) {
+					continue;
+				}
+				int r = 0;
+				int g = 0;
+				int bcol = 0;
+				for (unsigned char sample : s) {
+					const unsigned char color = sample == 255 ? base : sample;
+					r += pal->get_red(color);
+					g += pal->get_green(color);
+					bcol += pal->get_blue(color);
+				}
+				win->put_pixel8(
+						static_cast<unsigned char>(pal->find_color((r + 2) / 4, (g + 2) / 4, (bcol + 2) / 4)),
+						dx, dy);
+			}
+		}
+	}
+}
+
 
 void Game_window::update_lighting(int light_sources) {
 	if (!main_actor) {
