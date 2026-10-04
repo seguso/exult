@@ -594,7 +594,7 @@ void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 
 void Game_window::start_actor_from_display(int x, int y, int speed) {
 	display_to_world(x, y);
-	start_actor(x, y, speed);
+	start_actor(x, y, speed, true);
 }
 
 void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
@@ -1823,7 +1823,8 @@ Gump* Game_window::get_dragging_gump() {
  */
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	// Avatar can move, don't sync the barge anymore.
 	landing_barge = nullptr;
@@ -1848,6 +1849,11 @@ void Game_window::start_actor_alt(
 	const int aim_dy = winy - ay;
 	dir = Get_direction_NoWrap(-aim_dy, aim_dx);
 	const int requested_dir = dir;
+	// The movement grid is 8-way, but walking artwork only has the four
+	// principal facings. During continuous mouse steering, derive that facing
+	// from the exact requested vector and keep it stable while Bresenham-like
+	// correction steps alternate underneath.
+	mouse_walk_visual_dir = mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1944,7 +1950,8 @@ void Game_window::start_actor_alt(
 
 void Game_window::start_actor(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
 		return;    // Zzzzz....
@@ -1992,7 +1999,7 @@ void Game_window::start_actor(
 			}
 		}
 		// Going to use the alternative function for this at the moment
-		start_actor_alt(winx, winy, speed);
+		start_actor_alt(winx, winy, speed, mouse_steering);
 	}
 }
 
@@ -2035,6 +2042,7 @@ void Game_window::start_actor_along_path(
  */
 
 void Game_window::stop_actor() {
+	mouse_walk_visual_dir = -1;
 	if (moving_barge) {
 		moving_barge->stop();
 	} else {
