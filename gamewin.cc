@@ -320,7 +320,8 @@ Game_window::Game_window(
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
 		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
 		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), smooth_cam_x(0.0), smooth_cam_y(0.0), smooth_cam_vx(0.0),
-		  smooth_cam_vy(0.0), smooth_cam_last_ticks(0), smooth_cam_valid(false) {
+		  smooth_cam_vy(0.0), smooth_cam_target_x(0.0), smooth_cam_target_y(0.0), smooth_cam_actor_vx(0.0),
+		  smooth_cam_actor_vy(0.0), smooth_cam_last_ticks(0), smooth_cam_valid(false), smooth_cam_target_valid(false) {
 	game_window = this;    // Set static ->.
 	clock       = new Game_clock(tqueue);
 	shape_man   = new Shape_manager();    // Create the single instance.
