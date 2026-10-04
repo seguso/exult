@@ -83,8 +83,13 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 		return nullptr;
 	}
 
+#ifdef _WIN32
+	constexpr bool default_enabled = true;
+#else
+	constexpr bool default_enabled = false;
+#endif
 	bool enabled = false;
-	config->value("config/gameplay/conversation_font/enabled", enabled, true);
+	config->value("config/gameplay/conversation_font/enabled", enabled, default_enabled);
 	if (!enabled) {
 		return nullptr;
 	}
@@ -92,15 +97,21 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	std::string file;
 	std::string family;
 	config->value("config/gameplay/conversation_font/file", file, "");
-	config->value("config/gameplay/conversation_font/family", family, "Segoe UI");
+	config->value("config/gameplay/conversation_font/family", family, "");
+	if (family.empty() && file.empty()) {
+		family = "Segoe UI";
+	}
 
-	int pixels = fonts->get_text_height(0);
+	// Gen_shadow adds one pixel on every side, so subtract two from the
+	// original font's total height to keep the final outlined result close to
+	// Exult's existing conversation text size.
+	int pixels = std::max(5, fonts->get_text_height(0) - 2);
 	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
 	pixels = std::clamp(pixels, 5, 32);
 
-	int hlead = 0;
+	int hlead = -2;
 	int vlead = 0;
-	config->value("config/gameplay/conversation_font/hlead", hlead, 0);
+	config->value("config/gameplay/conversation_font/hlead", hlead, -2);
 	config->value("config/gameplay/conversation_font/vlead", vlead, 0);
 
 	// Match the classic conversation colour scheme: bright yellow glyphs,
