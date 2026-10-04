@@ -1010,3 +1010,13 @@ void ActionToggleRotateWorld(const int* params) {
 	Game_window* gwin = Game_window::get_instance();
 	gwin->set_rotate_world_enabled(!gwin->is_rotate_world_enabled());
 }
+
+void ActionToggleSmoothScrolling(const int* params) {
+	ignore_unused_variable_warning(params);
+	Game_window* gwin = Game_window::get_instance();
+	gwin->set_smooth_scrolling_enabled(gwin->is_lerping_enabled() <= 0);
+	// The continuously rotated movement arrow is deliberately coupled to the
+	// smooth-camera mode. Refresh it immediately so disabling smooth scrolling
+	// also restores the original 8-direction cursor without waiting for motion.
+	Mouse::mouse()->set_speed_cursor();
+}
