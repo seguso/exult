@@ -32,6 +32,7 @@
 #include "exceptions.h"
 #include "fnames.h"
 #include "fontvga.h"
+#include "fontgen.h"
 #include "game.h"
 #include "gamewin.h"
 #include "istring.h"
@@ -75,6 +76,63 @@ static void override_vleads() {
 		vlead_override[7] = -5;
 	}
 }
+
+static void apply_custom_conversation_font(Fonts_vga_file* fonts, const Palette& pal) {
+	if (!fonts) {
+		return;
+	}
+
+	bool enabled = false;
+	config->value("config/gameplay/conversation_font/enabled", enabled, false);
+	if (!enabled) {
+		return;
+	}
+
+	std::string file;
+	std::string family;
+	config->value("config/gameplay/conversation_font/file", file, "");
+	config->value("config/gameplay/conversation_font/family", family, "Segoe UI");
+
+	int pixels = fonts->get_text_height(0);
+	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
+	pixels = std::clamp(pixels, 5, 32);
+
+	int hlead = 0;
+	int vlead = 0;
+	config->value("config/gameplay/conversation_font/hlead", hlead, 0);
+	config->value("config/gameplay/conversation_font/vlead", vlead, 0);
+
+	// Match the classic conversation colour scheme: bright yellow glyphs,
+	// transparent background, one-pixel black outline.
+	const unsigned char fg     = static_cast<unsigned char>(pal.find_color(63, 63, 5));
+	const unsigned char bg     = 255;
+	const unsigned char shadow = static_cast<unsigned char>(pal.find_color(0, 0, 0));
+
+	auto generated = Gen_runtime_font_shape(
+			file.c_str(), family.c_str(), 256, pixels, fg, bg, shadow);
+	if (!generated) {
+		std::cerr << "Unable to load custom conversation font";
+		if (!file.empty()) {
+			std::cerr << " file '" << file << "'";
+		}
+		if (!family.empty()) {
+			std::cerr << " family '" << family << "'";
+		}
+		std::cerr << "; using the normal Exult font." << std::endl;
+		return;
+	}
+
+	fonts->set_font(0, std::make_shared<Font>(std::move(generated), hlead, vlead));
+	std::cout << "Using custom conversation font";
+	if (!family.empty()) {
+		std::cout << " '" << family << "'";
+	}
+	if (!file.empty()) {
+		std::cout << " from " << file;
+	}
+	std::cout << " at " << pixels << " px." << std::endl;
+}
+
 
 /*
  *  Singletons:
@@ -302,6 +360,7 @@ void Shape_manager::load() {
 	fonts = make_unique<Fonts_vga_file>();
 	override_vleads();
 	fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+	apply_custom_conversation_font(fonts.get(), pal);
 
 	// Get translucency tables.
 	unique_ptr<unsigned char[]> ptr;    // We will delete THIS at the end, not blends!
