@@ -136,8 +136,14 @@ Dragging_info::Dragging_info(
 		if (!to_drag) {
 			return;
 		}
-		// Get coord. where painted.
+		// Get the object's painted anchor. In rotated-world mode the mouse is in
+		// display coordinates while get_shape_location() still returns the
+		// unrotated world-scene position, so convert the anchor before preserving
+		// the grab offset. Otherwise the item jumps as soon as dragging starts.
 		gwin->get_shape_location(to_drag, paintx, painty);
+		if (gwin->is_rotate_world_enabled()) {
+			gwin->world_to_display(paintx, painty);
+		}
 		old_pos  = to_drag->get_tile();
 		old_foot = to_drag->get_footprint();
 	}
