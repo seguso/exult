@@ -84,6 +84,7 @@ private:
 	Shapes_vga_file                 shapes;                               // Main 'shapes.vga' file.
 	Vga_file                        files[static_cast<int>(SF_COUNT)];    // The files we manage.
 	std::unique_ptr<Fonts_vga_file> fonts = nullptr;                      // "fonts.vga" file.
+	std::shared_ptr<Font>            conversation_font;                    // Optional runtime TTF/GDI font.
 	std::vector<Xform_palette>      xforms;                               // Transforms translucent colors
 	//   0xf4 through 0xfe.
 	// ARGB (straight alpha) for each palette index that is a translucent
@@ -213,6 +214,10 @@ public:
 	int                   get_text_baseline(int fontnum);
 	int                   find_cursor(int fontnum, const char* text, int x, int y, int w, int h, int cx, int cy, int vert_lead);
 	std::shared_ptr<Font> get_font(int fontnum);
+	std::shared_ptr<Font> get_conversation_font();
+	int paint_conversation_text_box(
+			const char* text, int x, int y, int w, int h, int vert_lead = 0, bool pbreak = false, bool center = false,
+			int shading = -1, Cursor_info* cursor = nullptr);
 
 	size_t get_xforms_cnt() const {
 		return xforms.size();
