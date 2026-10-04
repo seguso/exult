@@ -1013,8 +1013,13 @@ private:
 	double smooth_cam_y;
 	double smooth_cam_vx;
 	double smooth_cam_vy;
+	double smooth_cam_target_x;
+	double smooth_cam_target_y;
+	double smooth_cam_actor_vx;
+	double smooth_cam_actor_vy;
 	uint32 smooth_cam_last_ticks;
 	bool smooth_cam_valid;
+	bool smooth_cam_target_valid;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
