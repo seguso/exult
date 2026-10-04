@@ -403,6 +403,9 @@ void Mouse::set_speed_cursor() {
 	Game_window*  gwin     = Game_window::get_instance();
 	Gump_manager* gump_man = gwin->get_gump_man();
 
+	// Most pointer shapes are not directional steering arrows. The normal
+	// movement branch below re-enables continuous rotation when appropriate.
+	smooth_arrow_active = false;
 	int cursor = dontchange;
 
 	// Check if we are in dont_move mode, in this case display the hand cursor
@@ -462,6 +465,35 @@ void Mouse::set_speed_cursor() {
 		const int       dy  = ay - mousey;
 		const int       dx  = mousex - ax;
 		const Direction dir = Get_direction_NoWrap(dy, dx);
+
+		// Keep the original 8-direction artwork (and therefore all three
+		// short/medium/long arrow designs), but remember the exact angle. The
+		// renderer rotates the selected frame only by the small residual from its
+		// nearest 45-degree direction, preserving the original art while making
+		// the pointer line up with mouse -> Avatar continuously.
+		if (dx != 0 || dy != 0) {
+			constexpr double pi = 3.14159265358979323846;
+			const double exact_screen_angle = std::atan2(static_cast<double>(mousey - ay), static_cast<double>(mousex - ax));
+			const double base_screen_angle = (-90.0 + 45.0 * static_cast<int>(dir)) * pi / 180.0;
+			double residual = exact_screen_angle - base_screen_angle;
+			while (residual > pi) {
+				residual -= 2.0 * pi;
+			}
+			while (residual < -pi) {
+				residual += 2.0 * pi;
+			}
+			smooth_arrow_residual_rad = residual;
+			// 256 angular steps over a full turn (~1.4 degrees). Quantizing keeps
+			// redraw/cache behavior stable while remaining visually continuous.
+			const double exact_turn = exact_screen_angle / (2.0 * pi);
+			int bucket = static_cast<int>(std::lround(exact_turn * 256.0));
+			bucket %= 256;
+			if (bucket < 0) {
+				bucket += 256;
+			}
+			smooth_arrow_angle_bucket = bucket;
+			smooth_arrow_active = true;
+		}
 
 		// Create a speed rectangle that's half of the game window dimensions
 		// but with a minimum size of 200x200
@@ -537,6 +569,10 @@ void Mouse::set_speed_cursor() {
 	}
 
 	if (cursor != dontchange) {
+		const bool angle_changed = smooth_arrow_active && smooth_arrow_angle_bucket != last_layer_angle_bucket;
 		set_shape(cursor);
+		if (angle_changed) {
+			last_layer_frame = -1;
+		}
 	}
 }
