@@ -465,6 +465,21 @@ void Dragging_info::paint_obj_to_layer() {
 	gwin->layer_set_visible(item_layer, true);
 }
 
+void Dragging_info::paint_world_object() {
+	if (!obj || gump) {
+		return;
+	}
+	int wx = paintx;
+	int wy = painty;
+	gwin->display_to_world(wx, wy);
+	if (obj->get_flag(Obj_flags::invisible)) {
+		obj->paint_invisible(wx, wy);
+	} else {
+		obj->paint_shape(wx, wy);
+	}
+}
+
+
 /*
  *  Paint object being moved.
  */
