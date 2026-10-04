@@ -1007,12 +1007,25 @@ private:
 	// Is lerping enabled
 	int lerping_enabled;
 
+	// Experimental velocity-driven visual camera. Logical map scrolling stays
+	// tile-based; these values only control the rendered camera position.
+	double smooth_cam_x;
+	double smooth_cam_y;
+	double smooth_cam_vx;
+	double smooth_cam_vy;
+	uint32 smooth_cam_last_ticks;
+	bool smooth_cam_valid;
+
 public:
 	// Reset (well update really) saved lerp scroll positions
 	void lerp_reset();
 
 	// (Re)paint the entire screen using a lerp factor 0-0x10000
 	void paint_lerped(int factor);
+
+	// Velocity-driven camera experiment. Returns true if it painted a frame.
+	bool paint_velocity_camera(uint32 ticks);
+	void reset_velocity_camera();
 
 	inline int get_scrolltx_lo() const {
 		return scrolltx_lo;
