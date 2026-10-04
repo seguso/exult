@@ -766,18 +766,19 @@ bool Dragging_info::drop_on_map(
 	if (max_lift >= skip) {    // Don't drop where we cannot see.
 		max_lift = skip - 1;
 	}
-	// Drop where we last painted it. During rotated-world dragging paintx/y
-	// are display coordinates so the item stays under the cursor; drop_at_lift()
-	// still expects unrotated world-scene pixel coordinates.
+	// Drop where we last painted it. paintx/y are display coordinates while
+	// dragging: that is true not only for the 45-degree view, but also for the
+	// lagging velocity camera. drop_at_lift() expects coordinates relative to
+	// the logical/world camera origin, so always convert through the same
+	// display->world mapping used by hit-testing. When neither rotation nor the
+	// modern camera is active this conversion is a no-op.
 	int posx = paintx;
 	int posy = painty;
 	if (posx == -1000) {    // Unless we never painted.
 		posx = x;
 		posy = y;
 	}
-	if (gwin->is_rotate_world_enabled()) {
-		gwin->display_to_world(posx, posy);
-	}
+	gwin->display_to_world(posx, posy);
 	int lift;
 	// Was it dropped on something?
 	Game_object* found   = gwin->find_object_from_display(x, y);
