@@ -994,6 +994,11 @@ private:
 	// These are saved scroll positions
 	int scrolltx_l, scrollty_l;
 	int scrolltx_lp, scrollty_lp;
+	// Saved logical camera-actor tile positions.  These let the actor move
+	// visually between discrete tile updates independently of camera easing.
+	int avtx_l, avty_l;
+	int avtx_lp, avty_lp;
+	bool lerp_actor_valid;
 	// These are the pixel offset that needs to be subtracted from shape
 	// positions due to smooth scrolling
 	int scrolltx_lo, scrollty_lo;
