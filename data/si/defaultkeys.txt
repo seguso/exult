@@ -8,6 +8,10 @@ right		walk_east	# Run east
 left		walk_west	# Run west
 up		walk_north	# Run north
 down		walk_south	# Run south
+D		walk_east	# Run east
+A		walk_west	# Run west
+W		walk_north	# Run north
+S		walk_south	# Run south
 KP7		walk_north_west	# Run north-west
 KP8		walk_north	# Run north
 KP9		walk_north_east	# Run north-east
@@ -109,7 +113,7 @@ R		face_stats
 Ctrl-Alt-S	screenshot
 Ctrl-S		quicksave
 Alt-S		change_skin
-S		save_restore
+Shift-S		save_restore
 Ctrl-Alt-T	next_map_teleport
 Ctrl-T		next_time_period
 Alt-T		cursor_teleport
@@ -117,7 +121,7 @@ T		target_mode
 V		about
 Shift-V		volume_mixer
 Alt-W		toggle_wizard_mode
-W		useitem			675 21	# Use watch
+Shift-W		useitem			675 21	# Use watch
 Alt-X		quit
 Z		stats
 
