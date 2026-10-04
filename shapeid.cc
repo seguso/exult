@@ -610,6 +610,19 @@ std::shared_ptr<Font> Shape_manager::get_font(int fontnum) {
 	return fonts->get_font(fontnum);
 }
 
+std::shared_ptr<Font> Shape_manager::get_conversation_font() {
+	return conversation_font ? conversation_font : fonts->get_font(0);
+}
+
+int Shape_manager::paint_conversation_text_box(
+		const char* text, int x, int y, int w, int h, int vert_lead, bool pbreak, bool center, int shading, Cursor_info* cursor) {
+	if (shading >= 0) {
+		gwin->get_win()->fill_translucent8(0, w, h, x, y, xforms[shading]);
+	}
+	auto font = get_conversation_font();
+	return font ? font->paint_text_box(gwin->get_win()->get_ib8(), text, x, y, w, h, vert_lead, pbreak, center, cursor) : 0;
+}
+
 Shape_manager::Cached_shape Shape_manager::cache_shape(int shape_kind, int shapenum, int framenum) {
 	Cached_shape cache{nullptr, false};
 	if (shapenum < 0 || framenum == -1) {
