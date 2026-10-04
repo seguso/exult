@@ -672,9 +672,10 @@ void Mouse::set_speed_cursor() {
 		// transform the anchor before measuring the visible mouse<->Avatar
 		// vector. This also keeps the short/medium/long speed zones visually
 		// centred on the Avatar.
-		if (gwin->is_rotate_world_enabled()) {
-			gwin->world_to_display(ax, ay);
-		}
+		// Convert the Avatar anchor into the actual displayed position. This
+		// handles both the optional 45-degree world rotation and the lagging
+		// velocity camera; in the ordinary aligned view it is a no-op.
+		gwin->world_to_display(ax, ay);
 
 		const int       dy  = ay - mousey;
 		const int       dx  = mousex - ax;
