@@ -99,7 +99,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	config->value("config/gameplay/conversation_font/file", file, "");
 	config->value("config/gameplay/conversation_font/family", family, "");
 	if (family.empty() && file.empty()) {
-		family = "Segoe UI";
+		family = "Tahoma";
 	}
 
 	// Gen_shadow adds one pixel on every side, so subtract two from the
