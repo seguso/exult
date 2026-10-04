@@ -577,29 +577,6 @@ void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 	h = world_view.get_scene_size();
 }
 
-bool Game_window::queue_rotate_local_object(Game_object* obj) {
-	if (!rotate_world || !obj) {
-		return false;
-	}
-	Shape_frame* frame = obj->get_shape();
-	if (!frame || !frame->get_data() || !frame->is_rle()) {
-		return false;
-	}
-	if (obj->is_translucent() || obj->get_flag(Obj_flags::invisible)) {
-		return false;
-	}
-	if (!obj->as_actor()) {
-		const int shape = obj->get_shapenum();
-		if (shape != 526 && shape != 889 && shape != 167 && shape != 168) {
-			return false;
-		}
-	}
-	if (std::find(rotate_local_objects.begin(), rotate_local_objects.end(), obj) == rotate_local_objects.end()) {
-		rotate_local_objects.push_back(obj);
-	}
-	return true;
-}
-
 void Game_window::start_actor_from_display(int x, int y, int speed) {
 	display_to_world(x, y);
 	start_actor(x, y, speed);
