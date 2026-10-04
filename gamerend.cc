@@ -443,7 +443,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// raster pipeline as when it is at rest. Painting it here preserves the
 	// exact Scale2x + rotate quality instead of promoting it to an unrotated UI
 	// overlay.
-	if (dragging && dragging->is_world_object_drag()) {
+	if (dragging && dragging->is_world_object_drag() && !dragging->is_over_gump()) {
 		dragging->paint_world_object();
 	}
 	rotate_scene->clear_clip();
@@ -567,8 +567,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 	win->set_clip(0, 0, display_width, display_height);
 	gump_man->paint(false);
-	if (dragging && !dragging->is_world_object_drag()) {
-		dragging->paint();
+	if (dragging) {
+		if (dragging->is_world_object_drag()) {
+			if (dragging->is_over_gump()) {
+				dragging->paint_gump_hover_overlay();
+			}
+		} else {
+			dragging->paint();
+		}
 	}
 	effects->paint_text();
 	gump_man->paint(true);
