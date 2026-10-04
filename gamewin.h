@@ -1056,6 +1056,8 @@ public:
 		lerping_enabled = e;
 	}
 
+	void set_smooth_scrolling_enabled(bool enabled);
+
 	Game_render* get_render() {
 		return render;
 	}
