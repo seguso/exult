@@ -762,6 +762,11 @@ Font::Font(const File_spec& fname0, const File_spec& fname1, int index, int hlea
 	load(fname0, fname1, index, hlead, vlead);
 }
 
+Font::Font(std::unique_ptr<Shape_file> shapes, int hlead, int vlead)
+		: hor_lead(hlead), ver_lead(vlead), font_shapes(std::move(shapes)) {
+	calc_highlow();
+}
+
 void Font::clean_up() {
 	font_shapes.reset();
 }
