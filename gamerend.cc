@@ -41,6 +41,7 @@
 #include "perf.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 
 /*
@@ -442,19 +443,50 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
 
+	// Rotate with 2x2 supersampling in destination-pixel space.  A single
+	// nearest-neighbour lookup leaves thin diagonals with visible holes after
+	// the 45 degree transform.  Four sub-pixel samples preserve coverage much
+	// better; their RGB average is mapped back to the closest non-cycling
+	// palette entry.
+	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
+	rotate_blend_cache.fill(255);
+	const auto sample_scene = [&](double display_x, double display_y) {
+		const World_view_point source = world_view.display_to_scene({display_x, display_y});
+		const int sx = static_cast<int>(std::lround(source.x));
+		const int sy = static_cast<int>(std::lround(source.y));
+		if (sx < scene_x || sx >= scene_x + scene_size || sy < scene_y || sy >= scene_y + scene_size) {
+			return static_cast<unsigned char>(pal->get_border_index());
+		}
+		return rotate_scene->get_pixel8(sx, sy);
+	};
+	const auto blend_samples = [&](unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+		if (a == b && a == c && a == d) {
+			return a;
+		}
+		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c) + pal->get_red(d) + 2) / 4;
+		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c) + pal->get_green(d) + 2) / 4;
+		const int bavg = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c) + pal->get_blue(d) + 2) / 4;
+		const unsigned int key = static_cast<unsigned int>(r)
+				| (static_cast<unsigned int>(g) << 6)
+				| (static_cast<unsigned int>(bavg) << 12);
+		unsigned char& cached = rotate_blend_cache[key];
+		if (cached == 255) {
+			cached = static_cast<unsigned char>(pal->find_color(r, g, bavg));
+		}
+		return cached;
+	};
+
 	for (int dy = 0; dy < display_height; ++dy) {
-		World_view_point source = world_view.display_to_scene(
-				{0.5, static_cast<double>(dy) + 0.5});
-		const double source_dx = world_view.display_to_scene_x_step();
-		const double source_dy = world_view.display_to_scene_y_step();
 		for (int dx = 0; dx < display_width; ++dx) {
-			const int sx = static_cast<int>(std::lround(source.x));
-			const int sy = static_cast<int>(std::lround(source.y));
-			if (sx >= scene_x && sx < scene_x + scene_size && sy >= scene_y && sy < scene_y + scene_size) {
-				win->put_pixel8(rotate_scene->get_pixel8(sx, sy), dx, dy);
-			}
-			source.x += source_dx;
-			source.y += source_dy;
+			const double x0 = static_cast<double>(dx) + 0.25;
+			const double x1 = static_cast<double>(dx) + 0.75;
+			const double y0 = static_cast<double>(dy) + 0.25;
+			const double y1 = static_cast<double>(dy) + 0.75;
+			win->put_pixel8(
+					blend_samples(
+							sample_scene(x0, y0), sample_scene(x1, y0),
+							sample_scene(x0, y1), sample_scene(x1, y1)),
+					dx, dy);
 		}
 	}
 
