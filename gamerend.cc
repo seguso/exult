@@ -583,6 +583,23 @@ void Game_window::paint_rotate_local_objects() {
 
 	constexpr double k = 0.7071067811865475244;
 
+	// The dependency order used by the original unrotated projection is not
+	// sufficient once sprites themselves are rotated: shapes that did not
+	// overlap before can overlap in the new view.  Use the rotated screen Y of
+	// the object's anchor as the primary painter order, retaining the original
+	// order for ties.
+	std::stable_sort(rotate_local_objects.begin(), rotate_local_objects.end(), [&](Game_object* a, Game_object* b) {
+		if (!a || !b) {
+			return a != nullptr;
+		}
+		int ax = 0, ay = 0, bx = 0, by = 0;
+		get_shape_location(a, ax, ay);
+		get_shape_location(b, bx, by);
+		const auto ap = world_view.scene_to_display({static_cast<double>(ax), static_cast<double>(ay)});
+		const auto bp = world_view.scene_to_display({static_cast<double>(bx), static_cast<double>(by)});
+		return ap.y < bp.y;
+	});
+
 	struct Cached_rotated_shape {
 		int origin_x = 0;    // Top-left relative to the canonical shape anchor.
 		int origin_y = 0;
@@ -595,10 +612,18 @@ void Game_window::paint_rotate_local_objects() {
 	};
 	static std::map<uint64, Cached_rotated_shape> cache;
 
-	const auto cache_key = [](const Game_object* obj) {
-		return static_cast<uint64>(static_cast<uint16>(obj->get_shapenum()))
+	const auto cache_key = [](Game_object* obj) {
+		uint64 key = static_cast<uint64>(static_cast<uint16>(obj->get_shapenum()))
 				| (static_cast<uint64>(static_cast<uint8>(obj->get_framenum())) << 16)
 				| (static_cast<uint64>(static_cast<uint16>(obj->get_palette_transform())) << 24);
+		if (Actor* actor = obj->as_actor()) {
+			int wx = 0, wy = 0, weapon_frame = 0;
+			if (actor->figure_weapon_pos(wx, wy, weapon_frame)) {
+				key ^= static_cast<uint64>(static_cast<uint16>(actor->get_effective_weapon_shape())) << 40;
+				key ^= static_cast<uint64>(static_cast<uint8>(weapon_frame)) << 56;
+			}
+		}
+		return key;
 	};
 
 	for (Game_object* obj : rotate_local_objects) {
@@ -613,23 +638,57 @@ void Game_window::paint_rotate_local_objects() {
 		const uint64 key = cache_key(obj);
 		auto cached_it = cache.find(key);
 		if (cached_it == cache.end()) {
-			const int sw = frame->get_width();
-			const int sh = frame->get_height();
+			int local_left = -frame->get_xleft();
+			int local_top = -frame->get_yabove();
+			int local_right = frame->get_xright();
+			int local_bottom = frame->get_ybelow();
+			ShapeID weapon_id;
+			Shape_frame* weapon_shape = nullptr;
+			int weapon_x = 0;
+			int weapon_y = 0;
+			if (Actor* actor = obj->as_actor()) {
+				int weapon_frame = 0;
+				if (actor->figure_weapon_pos(weapon_x, weapon_y, weapon_frame)) {
+					weapon_id = ShapeID(actor->get_effective_weapon_shape(), weapon_frame);
+					weapon_shape = weapon_id.get_shape();
+					if (weapon_shape) {
+						local_left = std::min(local_left, weapon_x - weapon_shape->get_xleft());
+						local_top = std::min(local_top, weapon_y - weapon_shape->get_yabove());
+						local_right = std::max(local_right, weapon_x + weapon_shape->get_xright());
+						local_bottom = std::max(local_bottom, weapon_y + weapon_shape->get_ybelow());
+					}
+				}
+			}
+			const int sw = local_right - local_left + 1;
+			const int sh = local_bottom - local_top + 1;
 			if (sw <= 0 || sh <= 0) {
 				continue;
 			}
+			const int canonical_anchor_x = -local_left;
+			const int canonical_anchor_y = -local_top;
 
-			// Render the source frame at a canonical local origin.
+			// Render a canonical local composite.  Actors include the weapon at
+			// exactly the same relative offset as Actor::paint_weapon(), so dagger,
+			// bow, etc. rotate and cache together with the body.
 			auto src_owner = win->create_buffer(sw, sh);
 			auto* src = static_cast<Image_buffer8*>(src_owner.get());
 			src->clear_clip();
 			src->fill8(255);
 			Image_buffer8* previous = push_render_target(src);
-			obj->paint_shape(frame->get_xleft(), frame->get_yabove());
+			if (obj->as_actor()) {
+				// Actor::paint() deliberately requests the translucent-capable RLE
+				// path even for ordinary actor pixels.
+				obj->paint_shape(canonical_anchor_x, canonical_anchor_y, true);
+			} else {
+				obj->paint_shape(canonical_anchor_x, canonical_anchor_y);
+			}
+			if (weapon_shape) {
+				weapon_id.paint_shape(canonical_anchor_x + weapon_x, canonical_anchor_y + weapon_y);
+			}
 			pop_render_target(previous);
 
 			// Reconstruct the source with the same Scale2x/EPX rule used by the
-			// global rotated pass.  This happens only once per shape/frame.
+			// global rotated pass.  This happens only once per composite key.
 			auto hi_owner = win->create_buffer(sw * 2, sh * 2);
 			auto* hi = static_cast<Image_buffer8*>(hi_owner.get());
 			hi->clear_clip();
@@ -665,10 +724,10 @@ void Game_window::paint_rotate_local_objects() {
 				}
 			}
 
-			const double left = -static_cast<double>(frame->get_xleft());
-			const double right = static_cast<double>(frame->get_xright()) + 1.0;
-			const double top = -static_cast<double>(frame->get_yabove());
-			const double bottom = static_cast<double>(frame->get_ybelow()) + 1.0;
+			const double left = static_cast<double>(local_left);
+			const double right = static_cast<double>(local_right) + 1.0;
+			const double top = static_cast<double>(local_top);
+			const double bottom = static_cast<double>(local_bottom) + 1.0;
 			const std::array<World_view_point, 4> corners = {{{left, top}, {right, top}, {right, bottom}, {left, bottom}}};
 			double min_x = 1e30;
 			double min_y = 1e30;
@@ -693,8 +752,8 @@ void Game_window::paint_rotate_local_objects() {
 			entry.samples.resize(static_cast<size_t>(entry.width) * entry.height * 4, 255);
 
 			const auto sample_local = [&](double rx, double ry) {
-				const double lx = (rx + ry) * k + static_cast<double>(frame->get_xleft());
-				const double ly = (-rx + ry) * k + static_cast<double>(frame->get_yabove());
+				const double lx = (rx + ry) * k - static_cast<double>(local_left);
+				const double ly = (-rx + ry) * k - static_cast<double>(local_top);
 				const int hx = static_cast<int>(std::floor(lx * 2.0));
 				const int hy = static_cast<int>(std::floor(ly * 2.0));
 				if (hx < 0 || hy < 0 || hx >= sw * 2 || hy >= sh * 2) {
