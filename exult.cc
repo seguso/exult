@@ -1337,6 +1337,8 @@ static void Handle_events() {
 	 */
 	int last_x = -1;
 	int last_y = -1;
+	int last_actor_tx = -1;
+	int last_actor_ty = -1;
 	// Interpolation duration (ms) for the current smooth-scroll
 	// segment. Captured when the scroll actually changes so the glide always
 	// runs at the speed of the step that produced it.
@@ -1451,16 +1453,24 @@ static void Handle_events() {
 			// code deliberately snapped slow-walk frames to the final position,
 			// which is exactly the visible tile-step we want to remove.
 
-			// Force a reset if position changed
-			if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
-				// printf ("%i: %i -> %i, %i -> %i\n", ticks, last_x,
-				// gwin->get_scrolltx(), last_y, gwin->get_scrollty());
+			// Reset interpolation when either the logical camera tile OR the camera
+			// actor tile changes. The latter is essential: otherwise actor motion
+			// inside the 2x2 scroll box remains a raw tile jump and no camera
+			// smoothing can hide it.
+			int actor_tx = -1;
+			int actor_ty = -1;
+			if (act) {
+				const Tile_coord apos = act->get_tile();
+				actor_tx = apos.tx;
+				actor_ty = apos.ty;
+			}
+			const bool scroll_changed = last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty();
+			const bool actor_changed  = act && (last_actor_tx != actor_tx || last_actor_ty != actor_ty);
+			if (scroll_changed || actor_changed) {
 				gwin->lerp_reset();
 				last_repaint = ticks;
-				// A real step happened, so any pending stop-glide shortening no
-				// longer applies; allow it to fire again once we next stop.
 				lerp_stop_anchored = false;
-				const int ft       = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
+				const int ft = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
 																						: (act ? act->get_frame_time() : 0);
 				if (ft > 0) {
 					lerp_mswait = (ft * lerp) / 100;
@@ -1468,6 +1478,8 @@ static void Handle_events() {
 			}
 			last_x = gwin->get_scrolltx();
 			last_y = gwin->get_scrollty();
+			last_actor_tx = actor_tx;
+			last_actor_ty = actor_ty;
 
 			int mswait = lerp_mswait;
 			if (mswait <= 0) {
