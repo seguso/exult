@@ -65,6 +65,7 @@ Alt-Enter	toggle_fullscreen
 Alt-1		sound_tester
 Alt-2       perf_metrics
 Ctrl-Alt-B		toggle_bboxes
+Q		toggle_rotate_world
 Ctrl-B		shape_browser
 B		useitem			761	# Show spellbook
 INSERT		create_item		-1	# Create last shape

@@ -984,3 +984,9 @@ void ActionToggleBBoxes(const int* /*params*/) {
 void ActionPerfMetrics(const int* /*params*/) {
 	PerformanceTimer::IncMode();
 }
+
+void ActionToggleRotateWorld(const int* params) {
+	ignore_unused_variable_warning(params);
+	Game_window* gwin = Game_window::get_instance();
+	gwin->set_rotate_world_enabled(!gwin->is_rotate_world_enabled());
+}

@@ -706,6 +706,7 @@
 0x857:Toggle egg area display
 #CLEAR_SELECTED
 0x858: Clear selection
+0x859:Toggle rotated world view
 
 
 #Shape Browser Help

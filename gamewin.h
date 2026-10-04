@@ -25,6 +25,7 @@
 #include "flags.h"
 #include "iwin8.h"
 #include "rect.h"
+#include "worldview.h"
 #include "shapeid.h"
 #include "shapeinf.h"
 #include "tiles.h"
@@ -137,6 +138,9 @@ class Game_window {
 	int      scrolltx, scrollty;    // Top-left tile of screen.
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
+	bool rotate_world = false;
+	World_view_transform world_view;
+	std::unique_ptr<Image_buffer8> rotate_scene;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
@@ -766,6 +770,7 @@ public:
 	void paint_map_at_tile(int x, int y, int w, int h, int toptx, int topty, int skip_above = 31);
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
+	void paint_rotated(int x, int y, int w, int h);
 
 	void paint(TileRect& r) {
 		paint(r.x, r.y, r.w, r.h);
@@ -782,6 +787,14 @@ public:
 	void add_dirty(const TileRect& r) {    // Add rectangle to dirty area.
 		dirty = dirty.w > 0 ? dirty.add(r) : r;
 	}
+
+	bool is_rotate_world_enabled() const {
+		return rotate_world;
+	}
+
+	void set_rotate_world_enabled(bool enabled);
+	void display_to_world(int& x, int& y) const;
+	void resize_rotate_scene();
 
 	// Add dirty rect. for obj. Rets. false
 	//   if not on screen.

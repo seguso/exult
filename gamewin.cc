@@ -85,6 +85,7 @@
 #include "virstone.h"
 
 #include <cstdarg>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -325,6 +326,8 @@ Game_window::Game_window(
 	// Create window.
 	win = new Image_window8(width, height, gwidth, gheight, scale, fullscreen, scaler, fillmode, fillsclr);
 	win->set_title("Exult Ultima VII Engine");
+	assert(World_view_transform::self_test());
+	resize_rotate_scene();
 	pal = new Palette();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
@@ -530,6 +533,26 @@ Game_window::~Game_window() {
 	// The single instance is gone; clear the static so get_instance() returns
 	// null (e.g. Mouse's destructor checks this before touching the window).
 	game_window = nullptr;
+}
+
+void Game_window::resize_rotate_scene() {
+	world_view.configure(win->get_game_width(), win->get_game_height());
+	auto buffer = win->create_buffer(world_view.get_scene_size(), world_view.get_scene_size());
+	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
+	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
+}
+
+void Game_window::set_rotate_world_enabled(bool enabled) {
+	rotate_world = enabled;
+	world_view.set_enabled(enabled);
+	set_all_dirty();
+	paint();
+}
+
+void Game_window::display_to_world(int& x, int& y) const {
+	const World_view_point p = world_view.display_to_scene({static_cast<double>(x), static_cast<double>(y)});
+	x = static_cast<int>(std::lround(p.x));
+	y = static_cast<int>(std::lround(p.y));
 }
 
 /*
@@ -917,6 +940,7 @@ void Game_window::resized(
 		unsigned int neww, unsigned int newh, bool newfs, unsigned int newgw, unsigned int newgh, unsigned int newsc,
 		unsigned int newsclr, Image_window::FillMode newfill, unsigned int newfillsclr) {
 	win->resized(neww, newh, newfs, newgw, newgh, newsc, newsclr, newfill, newfillsclr);
+	resize_rotate_scene();
 	pal->apply(false);
 	Shape_frame::set_to_render(win->get_ib8());
 	if (!main_actor) {    // In case we're before start.
@@ -1861,6 +1885,7 @@ void Game_window::start_actor(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed              // Msecs. between frames.
 ) {
+	display_to_world(winx, winy);
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
 		return;    // Zzzzz....
 	}
@@ -1919,6 +1944,7 @@ void Game_window::start_actor_along_path(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed              // Msecs. between frames.
 ) {
+	display_to_world(winx, winy);
 	if (main_actor->Actor::get_flag(Obj_flags::asleep) || main_actor->Actor::get_flag(Obj_flags::paralyzed)
 		|| main_actor->get_schedule_type() == Schedule::sleep || moving_barge) {    // For now, don't do barges.
 		return;                                                                     // Zzzzz....
@@ -2078,6 +2104,7 @@ bool Game_window::activate_item(
 Game_object* Game_window::find_object(
 		int x, int y    // Pos. on screen.
 ) {
+	display_to_world(x, y);
 #ifdef DEBUG
 	cout << "Clicked at tile (" << get_scrolltx() + x / c_tilesize << ", " << get_scrollty() + y / c_tilesize << ")" << endl;
 #endif
@@ -2370,6 +2397,7 @@ void Game_window::paused_combat_select(
 	}
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {                 // Nothing?  Walk there.
+		display_to_world(x, y);
 		// Needs work if lift > 0.
 		const int        lift       = npc->get_lift();
 		const int        liftpixels = 4 * lift;

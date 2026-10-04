@@ -328,6 +328,10 @@ void Game_render::increment_bbox_index() {
 void Game_window::paint(
 		int x, int y, int w, int h    // Rectangle to cover.
 ) {
+	if (rotate_world) {
+		paint_rotated(x, y, w, h);
+		return;
+	}
 	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 
 	if (!win->ready()) {
@@ -411,6 +415,76 @@ void Game_window::paint(
 
 	win->EndPaintIntoGuardBand();
 	win->clear_clip();
+}
+
+/*
+ *  Paint the world into an expanded logical buffer, rotate it into the
+ *  normal game buffer, then paint UI layers on top without rotating them.
+ */
+void Game_window::paint_rotated(int x, int y, int w, int h) {
+	ignore_unused_variable_warning(x);
+	ignore_unused_variable_warning(y);
+	ignore_unused_variable_warning(w);
+	ignore_unused_variable_warning(h);
+	if (!rotate_scene) {
+		resize_rotate_scene();
+	}
+
+	const int scene_size = world_view.get_scene_size();
+	const int scene_x    = -world_view.get_scene_offset_x();
+	const int scene_y    = -world_view.get_scene_offset_y();
+	rotate_scene->clear_clip();
+	rotate_scene->fill8(pal->get_border_index());
+	Image_buffer8* previous = push_render_target(rotate_scene.get());
+	rotate_scene->set_clip(scene_x, scene_y, scene_size, scene_size);
+	int light_sources = 0;
+	if (main_actor) {
+		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
+	}
+	effects->paint();
+	rotate_scene->clear_clip();
+	pop_render_target(previous);
+
+	// The world is repainted in full for this first implementation.
+	int gx = 0;
+	int gy = 0;
+	int gw = get_width();
+	int gh = get_height();
+	win->BeginPaintIntoGuardBand(&gx, &gy, &gw, &gh);
+	win->set_clip(gx, gy, gw, gh);
+	win->fill8(pal->get_border_index());
+
+	for (int dy = 0; dy < get_height(); ++dy) {
+		for (int dx = 0; dx < get_width(); ++dx) {
+			const World_view_point source = world_view.display_to_scene(
+					{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
+			const int sx = static_cast<int>(std::lround(source.x));
+			const int sy = static_cast<int>(std::lround(source.y));
+			if (sx >= scene_x && sx < scene_x + scene_size && sy >= scene_y && sy < scene_y + scene_size) {
+				win->put_pixel8(rotate_scene->get_pixel8(sx, sy), dx, dy);
+			}
+		}
+	}
+
+	win->set_clip(0, 0, get_width(), get_height());
+	gump_man->paint(false);
+	if (dragging) {
+		dragging->paint();
+	}
+	effects->paint_text();
+	gump_man->paint(true);
+	win->EndPaintIntoGuardBand();
+	win->clear_clip();
+
+	if (gx == 0 && gy == 0 && gw == get_width() && gh == get_height() && main_actor) {
+		Actor* party[9];
+		const int cnt = get_party(party, 1);
+		int carried_light = 0;
+		for (int i = 0; i < cnt; ++i) {
+			carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
+		}
+		clock->set_light_source(carried_light + light_sources, in_dungeon);
+	}
 }
 
 /*

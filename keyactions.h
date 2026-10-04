@@ -116,4 +116,5 @@ void ActionTest(const int* params);
 
 void ActionToggleBBoxes(const int* params);
 void ActionPerfMetrics(const int* params);
+void ActionToggleRotateWorld(const int* params);
 #endif
