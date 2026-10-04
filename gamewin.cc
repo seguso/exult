@@ -318,7 +318,8 @@ Game_window::Game_window(
 		  allow_autonotes(false), allow_enhancements(false), in_exult_menu(false), extended_intro(false), load_palette_timer(0),
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
-		  scrolltx_lo(0), scrollty_lo(0), avposx_ld(0), avposy_ld(0), lerping_enabled(0) {
+		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0) {
 	game_window = this;    // Set static ->.
 	clock       = new Game_clock(tqueue);
 	shape_man   = new Shape_manager();    // Create the single instance.
