@@ -831,7 +831,12 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 
 	const bool actor_moving = camera_actor->is_moving();
 	const double actor_speed = std::hypot(smooth_cam_actor_vx, smooth_cam_actor_vy);
-	const double max_acceleration = actor_moving ? std::max(80.0, actor_speed * 8.0) : 360.0;
+	// Keep acceleration deliberately low while following a moving Avatar.
+	// At slow walk the logical target advances only once per long animation
+	// step; a strong controller visibly speeds up after each step and slows
+	// down before the next one.  Let velocity change much more gradually so
+	// those target pulses are averaged out over time.
+	const double max_acceleration = actor_moving ? std::max(20.0, actor_speed * 2.0) : 240.0;
 	const auto advance_axis = [&](double target, double actor_velocity, double& pos, double& velocity) {
 		const double error = target - pos;
 		double desired_velocity;
