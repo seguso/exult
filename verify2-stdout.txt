@@ -1,0 +1,41 @@
+Exult version 1.13.1git
+Git Branch: master
+Git Revision: 0e3cd67bc751223b24e41d4bc6ef9aebd8830ac4
+Source url: https://github.com/seguso/exult/tree/0e3cd67bc751223b24e41d4bc6ef9aebd8830ac4
+Build Architecture: x86_64
+CPUID: GenuineIntel, Intel(R) Xeon(R) W-2145 CPU @ 3.70GHz
+stepping: 4
+type: 0
+family: 6
+ext family: 0
+model: 5
+ext model: 5
+X86-64-v4 supported
+Built at: Oct  4 2026 19:37:12
+Compile-time options: USE_FMOPL_MIDI, USE_MT32EMU_MIDI, USE_EXULTSTUDIO, HAVE_ZIP_SUPPORT
+Compiler: Microsoft C/C++ Compiler 19.44.35215
+
+Platform: Windows 11 Version 10.0 Build 26200 x64 16 Processors
+Installing Windows crash Handler with normal minidumps
+Exult path settings:
+Data          : C:\Users\Maurizio\Software\exult\data
+Digital music : C:\Users\Maurizio\Software\exult\data\music
+
+Looking for 'blackgate' at 'C:/Games/ultima7andserpent/ULTIMA7'... found game with identity 'FORGE'
+Looking for 'forgeofvirtue' at './forgeofvirtue'... but it wasn't there.
+Looking for 'serpentisle' at './serpentisle'... but it wasn't there.
+Looking for 'silverseed' at './silverseed'... but it wasn't there.
+Looking for 'serpentbeta' at './serpentbeta'... but it wasn't there.
+Looking for 'demo' at './demo'... but it wasn't there.
+Black Gate   : not found (<BLACKGATE_STATIC>\.)
+Forge of Virtue   : found
+exult_bg.flx : found
+Serpent Isle   : not found (<SERPENTISLE_STATIC>\.)
+Silver Seed   : not found (<SILVERSEED_STATIC>\.)
+
+
+========================================
+Starting file verification
+========================================
+File verification finished
+All files match, your data files are good
