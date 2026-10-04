@@ -439,6 +439,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
 	}
 	effects->paint();
+	// A world object being dragged should go through the same rotated-world
+	// raster pipeline as when it is at rest. Painting it here preserves the
+	// exact Scale2x + rotate quality instead of promoting it to an unrotated UI
+	// overlay.
+	if (dragging && dragging->is_world_object_drag()) {
+		dragging->paint_world_object();
+	}
 	rotate_scene->clear_clip();
 	pop_render_target(previous);
 
@@ -560,7 +567,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 	win->set_clip(0, 0, display_width, display_height);
 	gump_man->paint(false);
-	if (dragging) {
+	if (dragging && !dragging->is_world_object_drag()) {
 		dragging->paint();
 	}
 	effects->paint_text();
