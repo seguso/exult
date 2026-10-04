@@ -320,7 +320,7 @@ void Dragging_info::free_item_layer() {
  *  Render the dragged object into its own layer, scaled and placed to
  *  match the mouse-pointer layer.
  */
-void Dragging_info::paint_obj_to_layer() {
+void Dragging_info::paint_obj_to_layer(bool rotate_world_drag) {
 	Shape_frame* frame = obj->get_shape();
 	if (!frame) {
 		return;
@@ -341,7 +341,7 @@ void Dragging_info::paint_obj_to_layer() {
 	std::unique_ptr<Image_buffer> rotated_owner;
 	Image_buffer8* rotated = nullptr;
 
-	if (gwin->is_rotate_world_enabled() && !gump) {
+	if (gwin->is_rotate_world_enabled() && !gump && rotate_world_drag) {
 		// Only world-space drag overlays need to match the rotated world.
 		// Objects dragged from a gump/inventory are UI content: the gump itself
 		// is not rotated, so rotating the item here would make it visibly snap
@@ -478,6 +478,21 @@ void Dragging_info::paint_world_object() {
 	} else {
 		obj->paint_shape(wx, wy);
 	}
+}
+
+
+bool Dragging_info::is_over_gump() const {
+	return obj && gumpman->find_gump(mousex, mousey) != nullptr;
+}
+
+void Dragging_info::paint_gump_hover_overlay() {
+	if (!obj) {
+		return;
+	}
+	// Once a world item crosses into a gump, present it in the same unrotated
+	// UI orientation used by the gump itself.  It stays above the gump while
+	// hovering and will therefore not disappear behind the container.
+	paint_obj_to_layer(false);
 }
 
 
