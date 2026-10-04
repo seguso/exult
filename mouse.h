@@ -77,6 +77,7 @@ protected:
 	// Overlay-layer helpers.
 	bool ensure_mouse_layer();                          // Lazily create the layer.
 	void draw_cursor_to_layer(unsigned char* trans);    // Paint cur into the layer.
+	void draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans);
 	void position_mouse_layer();                        // Place the layer at the cursor.
 
 public:
