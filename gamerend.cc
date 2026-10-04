@@ -450,8 +450,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// palette entry.
 	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
 	rotate_blend_cache.fill(255);
-	const auto sample_scene = [&](double display_x, double display_y) {
-		const World_view_point source = world_view.display_to_scene({display_x, display_y});
+	const auto sample_scene = [&](const World_view_point& source) {
 		const int sx = static_cast<int>(std::lround(source.x));
 		const int sy = static_cast<int>(std::lround(source.y));
 		if (sx < scene_x || sx >= scene_x + scene_size || sy < scene_y || sy >= scene_y + scene_size) {
@@ -476,17 +475,29 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		return cached;
 	};
 
+	const double source_dx = world_view.display_to_scene_x_step();
+	const double source_dy = world_view.display_to_scene_y_step();
 	for (int dy = 0; dy < display_height; ++dy) {
+		const double y0 = static_cast<double>(dy) + 0.25;
+		const double y1 = static_cast<double>(dy) + 0.75;
+		World_view_point source00 = world_view.display_to_scene({0.25, y0});
+		World_view_point source10 = world_view.display_to_scene({0.75, y0});
+		World_view_point source01 = world_view.display_to_scene({0.25, y1});
+		World_view_point source11 = world_view.display_to_scene({0.75, y1});
 		for (int dx = 0; dx < display_width; ++dx) {
-			const double x0 = static_cast<double>(dx) + 0.25;
-			const double x1 = static_cast<double>(dx) + 0.75;
-			const double y0 = static_cast<double>(dy) + 0.25;
-			const double y1 = static_cast<double>(dy) + 0.75;
 			win->put_pixel8(
 					blend_samples(
-							sample_scene(x0, y0), sample_scene(x1, y0),
-							sample_scene(x0, y1), sample_scene(x1, y1)),
+							sample_scene(source00), sample_scene(source10),
+							sample_scene(source01), sample_scene(source11)),
 					dx, dy);
+			source00.x += source_dx;
+			source00.y += source_dy;
+			source10.x += source_dx;
+			source10.y += source_dy;
+			source01.x += source_dx;
+			source01.y += source_dy;
+			source11.x += source_dx;
+			source11.y += source_dy;
 		}
 	}
 
