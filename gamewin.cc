@@ -390,7 +390,7 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
-	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 100);
+	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
@@ -1913,7 +1913,8 @@ void Game_window::start_actor_alt(
 	// principal facings. During continuous mouse steering, derive that facing
 	// from the exact requested vector and keep it stable while Bresenham-like
 	// correction steps alternate underneath.
-	mouse_walk_visual_dir = mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
+	const bool modern_mouse_steering = mouse_steering && lerping_enabled > 0;
+	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1939,7 +1940,7 @@ void Game_window::start_actor_alt(
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.
 
-	if (dir == requested_dir && (aim_dx != 0 || aim_dy != 0)) {
+	if (modern_mouse_steering && dir == requested_dir && (aim_dx != 0 || aim_dy != 0)) {
 		// Mouse steering is not restricted to the eight animation directions.
 		// Aim a long temporary destination along the exact mouse->Avatar vector;
 		// the tile walker then naturally alternates cardinal/diagonal tile steps
