@@ -142,6 +142,7 @@ class Game_window {
 	World_view_transform world_view;
 	std::unique_ptr<Image_buffer8> rotate_scene;
 	std::unique_ptr<Image_buffer8> rotate_scene_2x;
+	std::vector<Game_object*> rotate_local_objects;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
@@ -797,6 +798,8 @@ public:
 	void set_rotate_world_enabled(bool enabled);
 	void display_to_world(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
+	bool queue_rotate_local_object(Game_object* obj);
+	void paint_rotate_local_objects();
 	void start_actor_from_display(int x, int y, int speed = 125);
 	void start_actor_along_path_from_display(int x, int y, int speed = 125);
 	Game_object* find_object_from_display(int x, int y);
