@@ -293,7 +293,15 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 	}
 	const Tile_coord cur        = actor->get_tile();
 	const int        newdir     = static_cast<int>(Get_direction4(cur.ty - tile.ty, tile.tx - cur.tx));
-	Frames_sequence* frames     = actor->get_frames(newdir);
+	int              visual_dir = newdir;
+	Game_window*     gwin       = Game_window::get_instance();
+	if (actor == gwin->get_main_actor()) {
+		const int mouse_dir = gwin->get_mouse_walk_visual_dir();
+		if (mouse_dir >= 0) {
+			visual_dir = mouse_dir;
+		}
+	}
+	Frames_sequence* frames     = actor->get_frames(visual_dir);
 	int&             step_index = actor->get_step_index();
 	if (!step_index) {    // First time?  Init.
 		step_index = frames->find_unrotated(actor->get_framenum());
