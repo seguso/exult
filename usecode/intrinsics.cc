@@ -1095,8 +1095,8 @@ USECODE_INTRINSIC(click_on_item) {
 				obj = gump->find_actor(gx, gy);
 			}
 		} else {    // Search rest of world.
-			t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize, gwin->get_scrollty() + y / c_tilesize, 0);
 			gwin->display_to_world(x, y);
+			t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize, gwin->get_scrollty() + y / c_tilesize, 0);
 			obj = gwin->find_object(x, y);
 			if (obj) {    // Found object?  Use its coords.
 				t = obj->get_tile();
