@@ -781,16 +781,21 @@ void KeyBinder::ApplyMovementOverrides() {
 	preserve_on_shift(SDLK_S);
 	preserve_on_shift(SDLK_D);
 
-	const auto bind_action = [&](SDL_Keycode key, const char* action_name) {
+	const auto bind_action = [&](SDL_Keycode key, SDL_Keymod mods, const char* action_name) {
 		auto it = actions.find(action_name);
 		if (it != actions.end()) {
-			AddKeyBinding(key, SDL_KMOD_NONE, it->second, 0, nullptr);
+			AddKeyBinding(key, mods, it->second, 0, nullptr);
 		}
 	};
-	bind_action(SDLK_W, "WALK_NORTH");
-	bind_action(SDLK_A, "WALK_WEST");
-	bind_action(SDLK_S, "WALK_SOUTH");
-	bind_action(SDLK_D, "WALK_EAST");
+	bind_action(SDLK_W, SDL_KMOD_NONE, "WALK_NORTH");
+	bind_action(SDLK_A, SDL_KMOD_NONE, "WALK_WEST");
+	bind_action(SDLK_S, SDL_KMOD_NONE, "WALK_SOUTH");
+	bind_action(SDLK_D, SDL_KMOD_NONE, "WALK_EAST");
+
+	// Do not rely on the packaged defaultkeys resource for this experimental
+	// toggle: installed data files can lag behind the executable. Bind it after
+	// all defaults/custom/patch keys have been loaded, just like WASD above.
+	bind_action(SDLK_Q, SDL_KMOD_SHIFT, "TOGGLE_SMOOTH_SCROLLING");
 }
 
 // codes used in keybindings-files. (use uppercase here)
