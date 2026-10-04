@@ -141,6 +141,7 @@ class Game_window {
 	bool rotate_world = false;
 	World_view_transform world_view;
 	std::unique_ptr<Image_buffer8> rotate_scene;
+	std::unique_ptr<Image_buffer8> rotate_scene_2x;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
