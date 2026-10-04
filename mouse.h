@@ -155,8 +155,19 @@ public:
 	void hide();    // Stop showing the cursor.
 
 	void set_shape(int framenum) {    // Set to desired shape.
+		// Continuous rotation belongs only to the normal steering arrows chosen
+		// by set_speed_cursor(). Any explicit cursor change (hand, too-heavy,
+		// blocked, targeting, etc.) must immediately return to its original
+		// unrotated artwork.
+		const bool was_rotated = smooth_arrow_active;
+		smooth_arrow_active = false;
+		smooth_arrow_angle_bucket = -1;
 		if (framenum != cur_framenum) {
 			set_shape0(framenum);
+		} else if (was_rotated) {
+			// Same frame can still need a redraw because the previous layer image
+			// was the software-rotated version.
+			last_layer_frame = -1;
 		}
 	}
 
