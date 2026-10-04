@@ -120,8 +120,9 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	const unsigned char bg     = 255;
 	const unsigned char shadow = static_cast<unsigned char>(pal.find_color(0, 0, 0));
 
+	const std::string font_path = file.empty() ? std::string() : get_system_path(file);
 	auto generated = Gen_runtime_font_shape(
-			file.c_str(), family.c_str(), 256, pixels, fg, bg, shadow);
+			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow);
 	if (!generated) {
 		std::cerr << "Unable to load custom conversation font";
 		if (!file.empty()) {
