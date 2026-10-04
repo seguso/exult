@@ -537,9 +537,17 @@ Game_window::~Game_window() {
 
 void Game_window::resize_rotate_scene() {
 	world_view.configure(win->get_game_width(), win->get_game_height());
-	auto buffer = win->create_buffer(world_view.get_scene_size(), world_view.get_scene_size());
+	const int scene_size = world_view.get_scene_size();
+
+	auto buffer = win->create_buffer(scene_size, scene_size);
 	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
 	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
+
+	// Pixel-art-aware rotation uses a persistent 2x intermediate.  Keep this
+	// buffer in ordinary 0-based coordinates; paint_rotated() maps logical
+	// scene coordinates into it after running the Scale2x reconstruction.
+	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
+	rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
 }
 
 void Game_window::set_rotate_world_enabled(bool enabled) {
