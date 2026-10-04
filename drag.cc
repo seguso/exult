@@ -136,12 +136,19 @@ Dragging_info::Dragging_info(
 		if (!to_drag) {
 			return;
 		}
-		// Get the object's painted anchor. In rotated-world mode the mouse is in
-		// display coordinates while get_shape_location() still returns the
-		// unrotated world-scene position, so convert the anchor before preserving
-		// the grab offset. Otherwise the item jumps as soon as dragging starts.
+		// Get the object's painted anchor. Preserve the exact point grabbed in
+		// unrotated object-local/world coordinates before converting the anchor
+		// into rotated display coordinates. If the drag later crosses into a
+		// gump, this lets the UI overlay keep that same point under the cursor
+		// while changing orientation.
 		gwin->get_shape_location(to_drag, paintx, painty);
 		if (gwin->is_rotate_world_enabled()) {
+			int grabx = x;
+			int graby = y;
+			gwin->display_to_world(grabx, graby);
+			world_grab_dx = grabx - paintx;
+			world_grab_dy = graby - painty;
+			has_world_grab = true;
 			gwin->world_to_display(paintx, painty);
 		}
 		old_pos  = to_drag->get_tile();
@@ -458,10 +465,25 @@ void Dragging_info::paint_obj_to_layer(bool rotate_world_drag) {
 		if (py > sy) sy = py;
 	}
 
-	int anchor_sx, anchor_sy;
-	iwin->game_to_screen(paintx, painty, false, anchor_sx, anchor_sy);
-	const int dx = static_cast<int>(static_cast<float>(anchor_sx) + local_origin_x * sx);
-	const int dy = static_cast<int>(static_cast<float>(anchor_sy) + local_origin_y * sy);
+	int dx;
+	int dy;
+	if (!rotate_world_drag && has_world_grab) {
+		// We are switching a world drag into an unrotated gump/UI overlay.
+		// Anchor the same source pixel that was originally grabbed, rather than
+		// anchoring the shape origin. This prevents the item from jumping when
+		// its orientation changes at the world/gump boundary.
+		int cursor_sx, cursor_sy;
+		iwin->game_to_screen(mousex, mousey, false, cursor_sx, cursor_sy);
+		const float grab_from_left = static_cast<float>(world_grab_dx + xleft);
+		const float grab_from_top  = static_cast<float>(world_grab_dy + yabove);
+		dx = static_cast<int>(std::lround(static_cast<float>(cursor_sx) - grab_from_left * sx));
+		dy = static_cast<int>(std::lround(static_cast<float>(cursor_sy) - grab_from_top * sy));
+	} else {
+		int anchor_sx, anchor_sy;
+		iwin->game_to_screen(paintx, painty, false, anchor_sx, anchor_sy);
+		dx = static_cast<int>(static_cast<float>(anchor_sx) + local_origin_x * sx);
+		dy = static_cast<int>(static_cast<float>(anchor_sy) + local_origin_y * sy);
+	}
 	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(layer_w * sx), static_cast<int>(layer_h * sy));
 	gwin->layer_set_visible(item_layer, true);
 }
