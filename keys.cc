@@ -189,6 +189,7 @@ const struct Action {
 		{       "TOGGLE_BBOXES",       ActionToggleBBoxes,           nullptr, 0x856, Action::mapedit_keys,         NONE, false,  true,  true, false},
 		{       "PERF_METRICS",         ActionPerfMetrics,           nullptr, 0x856, Action::dont_show,            NONE, false,  true,  true, false},
 		{  "TOGGLE_ROTATE_WORLD",  ActionToggleRotateWorld,           nullptr, 0x859, Action::normal_keys,         NONE, false,  true,  true, false},
+		{"TOGGLE_SMOOTH_SCROLLING", ActionToggleSmoothScrolling,       nullptr, 0x85a, Action::normal_keys,         NONE, false,  true,  true, false},
 		{                    "",                  nullptr,           nullptr,     0,    Action::dont_show,         NONE, true,  true,  true, false}  //  terminator
 		// clang-format on
 };
