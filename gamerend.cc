@@ -675,7 +675,13 @@ void Game_window::paint_rotate_local_objects() {
 			src->clear_clip();
 			src->fill8(255);
 			Image_buffer8* previous = push_render_target(src);
-			obj->paint_shape(canonical_anchor_x, canonical_anchor_y, true);
+			if (obj->as_actor()) {
+				// Actor::paint() deliberately requests the translucent-capable RLE
+				// path even for ordinary actor pixels.
+				obj->paint_shape(canonical_anchor_x, canonical_anchor_y, true);
+			} else {
+				obj->paint_shape(canonical_anchor_x, canonical_anchor_y);
+			}
 			if (weapon_shape) {
 				weapon_id.paint_shape(canonical_anchor_x + weapon_x, canonical_anchor_y + weapon_y);
 			}
