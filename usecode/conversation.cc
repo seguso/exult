@@ -720,6 +720,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	const int      line_height = sman->get_text_line_height(0);
 	const int      space_width = normal_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
 	const int      marker_width = original_font ? original_font->get_text_width("\x7f") : sman->get_text_width(0, "\x7f");
+	constexpr int  marker_gap = 1;
 	const int      custom_y_offset = (normal_font && original_font)
 			? original_font->get_text_baseline() - normal_font->get_text_baseline()
 			: 0;
@@ -793,7 +794,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	// First pass: determine positions and draw all backgrounds.
 	for (int i = 0; i < num_choices; i++) {
 		const int width = normal_font
-				? marker_width + normal_font->get_text_width(choices[i])
+				? marker_width + marker_gap + normal_font->get_text_width(choices[i])
 				: sman->get_text_width(0, (std::string("\x7f") + choices[i]).c_str());
 		if (x > 0 && x + width >= tbox.w) {
 			// Start a new line.
@@ -829,7 +830,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 			// spacing/baseline while using the readable custom font.
 			sman->paint_text(original_font, "\x7f", conv_choices[i].x, conv_choices[i].y);
 			sman->paint_text(
-					normal_font, choices[i], conv_choices[i].x + marker_width,
+					normal_font, choices[i], conv_choices[i].x + marker_width + marker_gap,
 					conv_choices[i].y + custom_y_offset);
 		} else {
 			char text[256];
