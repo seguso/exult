@@ -50,7 +50,9 @@
 #include "schedule.h" /* To get Schedule::combat */
 #include "ucsched.h"
 
+#include <algorithm>
 #include <array>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
