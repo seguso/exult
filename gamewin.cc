@@ -563,6 +563,12 @@ void Game_window::display_to_world(int& x, int& y) const {
 	y = static_cast<int>(std::lround(p.y));
 }
 
+void Game_window::world_to_display(int& x, int& y) const {
+	const World_view_point p = world_view.scene_to_display({static_cast<double>(x), static_cast<double>(y)});
+	x = static_cast<int>(std::lround(p.x));
+	y = static_cast<int>(std::lround(p.y));
+}
+
 void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 	if (!rotate_world) {
 		x = 0;
