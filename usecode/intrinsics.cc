@@ -1084,8 +1084,6 @@ USECODE_INTRINSIC(click_on_item) {
 		if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
 			return Usecode_value(0);
 		}
-		// Get abs. tile coords. clicked on.
-		t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize, gwin->get_scrollty() + y / c_tilesize, 0);
 		// Look for obj. in open gump.
 		Gump* gump = gumpman->find_gump(x, y);
 		if (gump) {
@@ -1097,6 +1095,8 @@ USECODE_INTRINSIC(click_on_item) {
 				obj = gump->find_actor(gx, gy);
 			}
 		} else {    // Search rest of world.
+			t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize, gwin->get_scrollty() + y / c_tilesize, 0);
+			gwin->display_to_world(x, y);
 			obj = gwin->find_object(x, y);
 			if (obj) {    // Found object?  Use its coords.
 				t = obj->get_tile();

@@ -1292,7 +1292,7 @@ static void Select_for_combo(
 	gwin->get_win()->screen_to_game(event.button.x, event.button.y, false, x, y);
 	// int tx = (gwin->get_scrolltx() + x/c_tilesize)%c_num_tiles;
 	// int ty = (gwin->get_scrollty() + y/c_tilesize)%c_num_tiles;
-	Game_object* obj = gwin->find_object(x, y);
+	Game_object* obj = gwin->find_object_from_display(x, y);
 	if (obj) {
 		if (dragging && obj == last_obj) {
 			return;
@@ -1399,7 +1399,7 @@ static void Handle_events() {
 			int       y  = Mouse::mouse()->get_mousey();
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
-				gwin->start_actor(x, y, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
 			} else if (ticks > last_rest) {
 				const int resttime = ticks - last_rest;
 				gwin->get_main_actor()->resting(resttime);
@@ -1864,7 +1864,7 @@ static void Handle_event(SDL_Event& event) {
 			} else if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
 				// Try removing old queue entry.
 				gwin->get_tqueue()->remove(gwin->get_main_actor());
-				gwin->start_actor(x, y, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
 			}
 		}
 		break;
@@ -1949,14 +1949,14 @@ static void Handle_event(SDL_Event& event) {
 				// Last right click not within .5 secs (not a doubleclick or
 				// rapid right clicking)?
 				if (gwin->get_allow_right_pathfind() == 1 && curtime - last_b3_click > 500 && gwin->main_actor_can_act_charmed()) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 				}
 
 				// Last right click within .5 secs (doubleclick)?
 				else if (
 						gwin->get_allow_right_pathfind() == 2 && curtime - last_b3_click < 500
 						&& gwin->main_actor_can_act_charmed()) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 				}
 
 				else {
@@ -1999,7 +1999,7 @@ static void Handle_event(SDL_Event& event) {
 				}
 				if (gwin->get_touch_pathfind() && avatar_can_act && gwin->main_actor_can_act_charmed() && !dragging
 					&& !gump_man->find_gump(x, y, false)) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 					dragging = dragged = false;
 					break;
 				}
@@ -2065,7 +2065,7 @@ static void Handle_event(SDL_Event& event) {
 		// Dragging with right?
 		else if ((event.motion.state & SDL_BUTTON_RMASK) && !right_on_gump) {
 			if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
-				gwin->start_actor(mx, my, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(mx, my, Mouse::mouse()->avatar_speed);
 			}
 		}
 #ifdef USE_EXULTSTUDIO    // Painting?

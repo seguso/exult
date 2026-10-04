@@ -392,7 +392,7 @@ void ActionTryKeys(const int* params) {
 	if (gump) {
 		obj = gump->find_object(gx, gy);
 	} else {    // Search rest of world.
-		obj = gwin->find_object(x, y);
+		obj = gwin->find_object_from_display(x, y);
 	}
 	if (!obj) {
 		return;
@@ -491,7 +491,7 @@ void ActionUseHealingItems(const int* params) {
 	if (!is_party_item(340, 1) || !Get_click(x, y, Mouse::greenselect)) {
 		return;
 	}
-	Game_object* obj = gwin->find_object(x, y);
+	Game_object* obj = gwin->find_object_from_display(x, y);
 	if (obj) {
 		Actor* target = obj->as_actor();
 		if (target && target->get_property(Actor::health) < target->get_property(Actor::strength)) {

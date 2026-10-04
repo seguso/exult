@@ -132,7 +132,7 @@ Dragging_info::Dragging_info(
 			return;
 		}
 	} else if (x > 0 && y > 0 && x < gwin->get_width() && y < gwin->get_height()) {    // Not found in gump?
-		to_drag = gwin->find_object(x, y);
+		to_drag = gwin->find_object_from_display(x, y);
 		if (!to_drag) {
 			return;
 		}
@@ -620,7 +620,7 @@ bool Dragging_info::drop_on_gump(
  */
 
 static bool Is_inaccessible(Game_window* gwin, Game_object* obj, int x, int y) {
-	Game_object* block = gwin->find_object(x, y);
+	Game_object* block = gwin->find_object_from_display(x, y);
 	return block && block != obj && !block->is_dragable();
 }
 
@@ -655,7 +655,7 @@ bool Dragging_info::drop_on_map(
 	}
 	int lift;
 	// Was it dropped on something?
-	Game_object* found   = gwin->find_object(x, y);
+	Game_object* found   = gwin->find_object_from_display(x, y);
 	int          dropped = 0;    // 1 when dropped.
 	if (found && found != obj.get()) {
 		if (!Check_weight(gwin, to_drop, found)) {

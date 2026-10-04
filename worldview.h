@@ -32,13 +32,14 @@ class World_view_transform {
 
 	static constexpr double half_sqrt_2 = 0.7071067811865475244;
 
-	World_view_point rotate(World_view_point p, double angle) const {
+	World_view_point rotate45(World_view_point p, bool inverse) const {
 		const double cx = display_width * 0.5;
 		const double cy = display_height * 0.5;
 		const double x  = p.x - cx;
 		const double y  = p.y - cy;
-		return {cx + x * std::cos(angle) - y * std::sin(angle),
-				cy + x * std::sin(angle) + y * std::cos(angle)};
+		const double s  = inverse ? -half_sqrt_2 : half_sqrt_2;
+		return {cx + x * half_sqrt_2 - y * s,
+				cy + x * s + y * half_sqrt_2};
 	}
 
 public:
@@ -87,12 +88,28 @@ public:
 		return scene_offset_y;
 	}
 
+	int get_scene_x() const {
+		return -scene_offset_x;
+	}
+
+	int get_scene_y() const {
+		return -scene_offset_y;
+	}
+
+	double display_to_scene_x_step() const {
+		return enabled ? half_sqrt_2 : 1.0;
+	}
+
+	double display_to_scene_y_step() const {
+		return enabled ? -half_sqrt_2 : 0.0;
+	}
+
 	World_view_point scene_to_display(World_view_point p) const {
-		return enabled ? rotate(p, 3.14159265358979323846 * 0.25) : p;
+		return enabled ? rotate45(p, false) : p;
 	}
 
 	World_view_point display_to_scene(World_view_point p) const {
-		return enabled ? rotate(p, -3.14159265358979323846 * 0.25) : p;
+		return enabled ? rotate45(p, true) : p;
 	}
 
 	World_view_rect transform_rect(const World_view_rect& r) const {

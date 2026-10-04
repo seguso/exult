@@ -306,6 +306,48 @@ void Game_map::read_map_data() {
 	Game_window* gwin     = Game_window::get_instance();
 	const int    scrolltx = gwin->get_scrolltx();
 	const int    scrollty = gwin->get_scrollty();
+	if (gwin->is_rotate_world_enabled()) {
+		int scene_x;
+		int scene_y;
+		int scene_w;
+		int scene_h;
+		gwin->get_world_scene_bounds(scene_x, scene_y, scene_w, scene_h);
+		// The scene is centered around the normal viewport, so its left/top
+		// edges may be negative.  Use mathematical floor division here; C++
+		// integer division truncates negative values toward zero.
+		const auto floor_div = [](int n, int d) {
+			int q = n / d;
+			if (n < 0 && n % d != 0) {
+				--q;
+			}
+			return q;
+		};
+		const auto wrap_schunk = [](int n) {
+			n %= c_num_schunks;
+			return n < 0 ? n + c_num_schunks : n;
+		};
+		// Keep the same safety margin used by the normal renderer for smooth
+		// scrolling and object extents, now applied to the expanded scene.
+		const int first_tile_x = scrolltx + floor_div(scene_x, c_tilesize) - c_tiles_per_chunk;
+		const int first_tile_y = scrollty + floor_div(scene_y, c_tilesize) - c_tiles_per_chunk;
+		const int last_tile_x  = scrolltx + floor_div(scene_x + scene_w - 1, c_tilesize) + c_tiles_per_chunk;
+		const int last_tile_y  = scrollty + floor_div(scene_y + scene_h - 1, c_tilesize) + c_tiles_per_chunk;
+		const int firstsx = wrap_schunk(floor_div(first_tile_x, c_tiles_per_schunk));
+		const int firstsy = wrap_schunk(floor_div(first_tile_y, c_tiles_per_schunk));
+		const int lastsx  = wrap_schunk(floor_div(last_tile_x, c_tiles_per_schunk));
+		const int lastsy  = wrap_schunk(floor_div(last_tile_y, c_tiles_per_schunk));
+		const int stopsx  = (lastsx + 1) % c_num_schunks;
+		const int stopsy  = (lastsy + 1) % c_num_schunks;
+		for (int sy = firstsy; sy != stopsy; sy = (sy + 1) % c_num_schunks) {
+			for (int sx = firstsx; sx != stopsx; sx = (sx + 1) % c_num_schunks) {
+				const int schunk = 12 * sy + sx;
+				if (!schunk_read[schunk]) {
+					get_superchunk_objects(schunk);
+				}
+			}
+		}
+		return;
+	}
 	const int    w        = gwin->get_width();
 	const int    h        = gwin->get_height();
 	// Start one tile to left.

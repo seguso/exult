@@ -555,6 +555,35 @@ void Game_window::display_to_world(int& x, int& y) const {
 	y = static_cast<int>(std::lround(p.y));
 }
 
+void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
+	if (!rotate_world) {
+		x = 0;
+		y = 0;
+		w = get_width();
+		h = get_height();
+		return;
+	}
+	x = world_view.get_scene_x();
+	y = world_view.get_scene_y();
+	w = world_view.get_scene_size();
+	h = world_view.get_scene_size();
+}
+
+void Game_window::start_actor_from_display(int x, int y, int speed) {
+	display_to_world(x, y);
+	start_actor(x, y, speed);
+}
+
+void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
+	display_to_world(x, y);
+	start_actor_along_path(x, y, speed);
+}
+
+Game_object* Game_window::find_object_from_display(int x, int y) {
+	display_to_world(x, y);
+	return find_object(x, y);
+}
+
 /*
  *  Redirect all shape/text drawing to a buffer (e.g. an overlay layer),
  *  returning the previous target. Both the window's active buffer and the
@@ -1885,7 +1914,6 @@ void Game_window::start_actor(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed              // Msecs. between frames.
 ) {
-	display_to_world(winx, winy);
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
 		return;    // Zzzzz....
 	}
@@ -1944,7 +1972,6 @@ void Game_window::start_actor_along_path(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed              // Msecs. between frames.
 ) {
-	display_to_world(winx, winy);
 	if (main_actor->Actor::get_flag(Obj_flags::asleep) || main_actor->Actor::get_flag(Obj_flags::paralyzed)
 		|| main_actor->get_schedule_type() == Schedule::sleep || moving_barge) {    // For now, don't do barges.
 		return;                                                                     // Zzzzz....
@@ -2104,7 +2131,6 @@ bool Game_window::activate_item(
 Game_object* Game_window::find_object(
 		int x, int y    // Pos. on screen.
 ) {
-	display_to_world(x, y);
 #ifdef DEBUG
 	cout << "Clicked at tile (" << get_scrolltx() + x / c_tilesize << ", " << get_scrollty() + y / c_tilesize << ")" << endl;
 #endif
@@ -2219,6 +2245,8 @@ void Game_window::show_items(
 	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;
+	int          world_x      = x;
+	int          world_y      = y;
 	if (gump) {
 		obj           = gump->find_object(gx, gy);
 		found_in_gump = (obj != nullptr);
@@ -2226,12 +2254,13 @@ void Game_window::show_items(
 			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
-		obj = find_object(x, y);
+		display_to_world(world_x, world_y);
+		obj = find_object(world_x, world_y);
 	}
 
 	if (item_menu) {
 		Game_object_map_xy mobjxy;
-		find_nearby_objects(mobjxy, x, y, gump);
+		find_nearby_objects(mobjxy, gump ? x : world_x, gump ? y : world_y, gump);
 		if (!mobjxy.empty() && Notebook_gump::get_instance() == nullptr) {
 			// Make sure menu is visible on the screen
 			Itemmenu_gump itemgump(&mobjxy, x, y);
@@ -2284,10 +2313,10 @@ void Game_window::show_items(
 		effects->add_text(namestr.c_str(), obj);
 	} else if (cheat.in_map_editor() && skip_lift > 0) {
 		// Show flat, but not when editing ter.
-		const ShapeID id = get_flat(x, y);
+		const ShapeID id = get_flat(world_x, world_y);
 		char          str[20];
 		snprintf(str, sizeof(str), "Flat %d:%d", id.get_shapenum(), id.get_framenum());
-		effects->add_text(str, x, y);
+		effects->add_text(str, world_x, world_y);
 	}
 	// If it's an actor and we want to grab the actor, grab it.
 	if (npc && cheat.grabbing_actor() && (npc->get_npc_num() || npc == main_actor)) {
@@ -2379,6 +2408,7 @@ void Game_window::paused_combat_select(
 	if (gump) {
 		return;    // Ignore if clicked on gump.
 	}
+	display_to_world(x, y);
 	Game_object* obj = find_object(x, y);
 	Actor*       npc = obj ? obj->as_actor() : nullptr;
 	if (!npc || !npc->is_in_party() || npc->get_flag(Obj_flags::asleep) || npc->is_dead() || npc->get_flag(Obj_flags::paralyzed)
@@ -2395,9 +2425,9 @@ void Game_window::paused_combat_select(
 	if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
 		return;
 	}
+	display_to_world(x, y);
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {                 // Nothing?  Walk there.
-		display_to_world(x, y);
 		// Needs work if lift > 0.
 		const int        lift       = npc->get_lift();
 		const int        liftpixels = 4 * lift;
@@ -2465,6 +2495,7 @@ void Game_window::double_clicked(
 
 	// If gump manager didn't handle it, we search the world for an object
 	if (!gump) {
+		display_to_world(x, y);
 		obj = find_object(x, y);
 		if (!avatar_can_act && obj && obj->as_actor() && obj->as_actor() == main_actor->as_actor()) {
 			ActionFileGump(nullptr);

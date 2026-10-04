@@ -396,21 +396,7 @@ void Game_window::paint(
 
 	// Complete repaint?
 	if (!gx && !gy && gw == get_width() && gh == get_height() && main_actor) {
-		// Look for lights.
-		Actor*    party[9];    // Get party, including Avatar.
-		const int cnt           = get_party(party, 1);
-		int       carried_light = 0;
-		for (int i = 0; i < cnt; i++) {
-			carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
-		}
-		// Also check light spell.
-		if (special_light && clock->get_total_minutes() > special_light) {
-			// Just expired.
-			special_light = 0;
-			clock->set_palette();
-		}
-		// Set palette for lights.
-		clock->set_light_source(carried_light + light_sources, in_dungeon);
+		update_lighting(light_sources);
 	}
 
 	win->EndPaintIntoGuardBand();
@@ -457,14 +443,18 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->fill8(pal->get_border_index());
 
 	for (int dy = 0; dy < display_height; ++dy) {
+		World_view_point source = world_view.display_to_scene(
+				{0.5, static_cast<double>(dy) + 0.5});
+		const double source_dx = world_view.display_to_scene_x_step();
+		const double source_dy = world_view.display_to_scene_y_step();
 		for (int dx = 0; dx < display_width; ++dx) {
-			const World_view_point source = world_view.display_to_scene(
-					{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
 			const int sx = static_cast<int>(std::lround(source.x));
 			const int sy = static_cast<int>(std::lround(source.y));
 			if (sx >= scene_x && sx < scene_x + scene_size && sy >= scene_y && sy < scene_y + scene_size) {
 				win->put_pixel8(rotate_scene->get_pixel8(sx, sy), dx, dy);
 			}
+			source.x += source_dx;
+			source.y += source_dy;
 		}
 	}
 
@@ -479,14 +469,25 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->clear_clip();
 
 	if (main_actor) {
-		Actor* party[9];
-		const int cnt = get_party(party, 1);
-		int carried_light = 0;
-		for (int i = 0; i < cnt; ++i) {
-			carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
-		}
-		clock->set_light_source(carried_light + light_sources, in_dungeon);
+		update_lighting(light_sources);
 	}
+}
+
+void Game_window::update_lighting(int light_sources) {
+	if (!main_actor) {
+		return;
+	}
+	Actor* party[9];
+	const int cnt = get_party(party, 1);
+	int carried_light = 0;
+	for (int i = 0; i < cnt; ++i) {
+		carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
+	}
+	if (special_light && clock->get_total_minutes() > special_light) {
+		special_light = 0;
+		clock->set_palette();
+	}
+	clock->set_light_source(carried_light + light_sources, in_dungeon);
 }
 
 /*

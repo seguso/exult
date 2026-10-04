@@ -771,6 +771,7 @@ public:
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
 	void paint_rotated(int x, int y, int w, int h);
+	void update_lighting(int light_sources);
 
 	void paint(TileRect& r) {
 		paint(r.x, r.y, r.w, r.h);
@@ -794,6 +795,10 @@ public:
 
 	void set_rotate_world_enabled(bool enabled);
 	void display_to_world(int& x, int& y) const;
+	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
+	void start_actor_from_display(int x, int y, int speed = 125);
+	void start_actor_along_path_from_display(int x, int y, int speed = 125);
+	Game_object* find_object_from_display(int x, int y);
 	void resize_rotate_scene();
 
 	// Add dirty rect. for obj. Rets. false
