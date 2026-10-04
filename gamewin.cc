@@ -563,6 +563,9 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {
 	lerping_enabled = enabled ? 100 : 0;
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, true);
+	if (!enabled) {
+		mouse_walk_visual_dir = -1;
+	}
 
 	// Throw away any visual-camera lag immediately when switching modes so
 	// rendering and mouse hit-testing use the same origin from this frame on.
