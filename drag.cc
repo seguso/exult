@@ -333,20 +333,87 @@ void Dragging_info::paint_obj_to_layer() {
 		return;
 	}
 	Image_window* iwin = gwin->get_win();
-	// (Re)create the layer if missing or the shape size changed.
-	if (item_layer < 0 || item_layer_w != w || item_layer_h != h) {
+
+	int layer_w = w;
+	int layer_h = h;
+	int local_origin_x = -xleft;
+	int local_origin_y = -yabove;
+	std::unique_ptr<Image_buffer> rotated_owner;
+	Image_buffer8* rotated = nullptr;
+
+	if (gwin->is_rotate_world_enabled()) {
+		// The normal drag layer is a UI overlay and therefore bypasses the
+		// rotated-world compositing pass.  Build a small locally rotated copy so
+		// the object keeps the same orientation when it leaves the world buffer.
+		auto src_owner = iwin->create_buffer(w, h);
+		auto* src = static_cast<Image_buffer8*>(src_owner.get());
+		src->clear_clip();
+		src->fill8(255);
+		Image_buffer8* prev = gwin->push_render_target(src);
+		if (obj->get_flag(Obj_flags::invisible)) {
+			obj->paint_invisible(xleft, yabove);
+		} else {
+			obj->paint_shape(xleft, yabove);
+		}
+		gwin->pop_render_target(prev);
+
+		constexpr double k = 0.7071067811865475244;
+		const double left   = -static_cast<double>(xleft);
+		const double top    = -static_cast<double>(yabove);
+		const double right  = left + static_cast<double>(w);
+		const double bottom = top + static_cast<double>(h);
+		const std::array<World_view_point, 4> corners = {{{left, top}, {right, top}, {right, bottom}, {left, bottom}}};
+		double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+		for (const auto& p : corners) {
+			const double rx = (p.x - p.y) * k;
+			const double ry = (p.x + p.y) * k;
+			min_x = std::min(min_x, rx);
+			min_y = std::min(min_y, ry);
+			max_x = std::max(max_x, rx);
+			max_y = std::max(max_y, ry);
+		}
+		const int origin_x = static_cast<int>(std::floor(min_x)) - 1;
+		const int origin_y = static_cast<int>(std::floor(min_y)) - 1;
+		layer_w = static_cast<int>(std::ceil(max_x)) - origin_x + 1;
+		layer_h = static_cast<int>(std::ceil(max_y)) - origin_y + 1;
+		local_origin_x = origin_x;
+		local_origin_y = origin_y;
+
+		rotated_owner = iwin->create_buffer(layer_w, layer_h);
+		rotated = static_cast<Image_buffer8*>(rotated_owner.get());
+		rotated->clear_clip();
+		rotated->fill8(255);
+		for (int dy = 0; dy < layer_h; ++dy) {
+			for (int dx = 0; dx < layer_w; ++dx) {
+				const double rx = static_cast<double>(origin_x + dx) + 0.5;
+				const double ry = static_cast<double>(origin_y + dy) + 0.5;
+				const double lx = (rx + ry) * k + static_cast<double>(xleft);
+				const double ly = (-rx + ry) * k + static_cast<double>(yabove);
+				const int sxp = static_cast<int>(std::floor(lx));
+				const int syp = static_cast<int>(std::floor(ly));
+				if (sxp >= 0 && sxp < w && syp >= 0 && syp < h) {
+					const unsigned char pix = src->get_pixel8(sxp, syp);
+					if (pix != 255) {
+						rotated->put_pixel8(pix, dx, dy);
+					}
+				}
+			}
+		}
+	}
+
+	// (Re)create the layer if missing or its raster size changed.
+	if (item_layer < 0 || item_layer_w != layer_w || item_layer_h != layer_h) {
 		if (item_layer >= 0) {
 			gwin->destroy_layer(item_layer);
 			item_layer = -1;
 		}
-		item_layer = gwin->create_layer("item", w, h, 255, 0, item_layer_z);
+		item_layer = gwin->create_layer("item", layer_w, layer_h, 255, 0, item_layer_z);
 		if (item_layer < 0) {
 			return;
 		}
-		// Derive scale/placement settings from the mouse-pointer layer.
 		gwin->layer_set_ui_kind(item_layer, Image_window::UiLayerMousePointer);
-		item_layer_w = w;
-		item_layer_h = h;
+		item_layer_w = layer_w;
+		item_layer_h = layer_h;
 	}
 	gwin->layer_set_z(item_layer, item_layer_z);
 
@@ -355,60 +422,46 @@ void Dragging_info::paint_obj_to_layer() {
 		return;
 	}
 	lbuf->clear_clip();
-	lbuf->fill8(255);    // Fully transparent.
-	Image_buffer8* prev = gwin->push_render_target(lbuf);
-	// Paint the shape at its origin within the layer buffer.
-	if (obj->get_flag(Obj_flags::invisible)) {
-		obj->paint_invisible(xleft, yabove);
+	lbuf->fill8(255);
+	if (rotated) {
+		lbuf->copy8(rotated->get_bits(), layer_w, layer_h, 0, 0);
 	} else {
-		obj->paint_shape(xleft, yabove);
+		Image_buffer8* prev = gwin->push_render_target(lbuf);
+		if (obj->get_flag(Obj_flags::invisible)) {
+			obj->paint_invisible(xleft, yabove);
+		} else {
+			obj->paint_shape(xleft, yabove);
+		}
+		gwin->pop_render_target(prev);
 	}
-	gwin->pop_render_target(prev);
 	gwin->layer_set_dirty(item_layer);
 
-	// Size the dragged item to match the mouse pointer, but ENLARGE ONLY: never
-	// shrink it below its native (game -> screen) size. So compute the item's
-	// native world scale, then grow each axis up to the pointer scale if the
-	// pointer is larger; if the pointer would shrink it, keep it native.
-	float     sx    = 1.0f;
-	float     sy    = 1.0f;
+	float sx = 1.0f;
+	float sy = 1.0f;
 	const int gamew = iwin->get_game_width();
 	const int gameh = iwin->get_game_height();
 	if (gamew > 0 && gameh > 0) {
-		int gx0;
-		int gy0;
-		int gx1;
-		int gy1;
+		int gx0, gy0, gx1, gy1;
 		iwin->game_to_screen(0, 0, false, gx0, gy0);
 		iwin->game_to_screen(gamew, gameh, false, gx1, gy1);
 		sx = static_cast<float>(gx1 - gx0) / static_cast<float>(gamew);
 		sy = static_cast<float>(gy1 - gy0) / static_cast<float>(gameh);
-		if (sx <= 0.0f) {
-			sx = 1.0f;
-		}
-		if (sy <= 0.0f) {
-			sy = 1.0f;
-		}
+		if (sx <= 0.0f) sx = 1.0f;
+		if (sy <= 0.0f) sy = 1.0f;
 	}
 	if (Mouse::mouse()) {
 		float px = sx;
 		float py = sy;
 		Mouse::mouse()->get_pointer_scale(px, py);
-		if (px > sx) {
-			sx = px;    // Enlarge to the pointer size.
-		}
-		if (py > sy) {
-			sy = py;
-		}
+		if (px > sx) sx = px;
+		if (py > sy) sy = py;
 	}
-	int cx;
-	int cy;
-	iwin->game_to_screen(mousex, mousey, false, cx, cy);
-	const float ox = static_cast<float>(cx) + static_cast<float>(paintx - mousex) * sx;
-	const float oy = static_cast<float>(cy) + static_cast<float>(painty - mousey) * sy;
-	const int   dx = static_cast<int>(ox - xleft * sx);
-	const int   dy = static_cast<int>(oy - yabove * sy);
-	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(w * sx), static_cast<int>(h * sy));
+
+	int anchor_sx, anchor_sy;
+	iwin->game_to_screen(paintx, painty, false, anchor_sx, anchor_sy);
+	const int dx = static_cast<int>(static_cast<float>(anchor_sx) + local_origin_x * sx);
+	const int dy = static_cast<int>(static_cast<float>(anchor_sy) + local_origin_y * sy);
+	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(layer_w * sx), static_cast<int>(layer_h * sy));
 	gwin->layer_set_visible(item_layer, true);
 }
 
