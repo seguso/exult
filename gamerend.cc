@@ -724,8 +724,11 @@ void Game_window::paint_lerped(int factor) {
 
 void Game_window::reset_velocity_camera() {
 	smooth_cam_valid = false;
+	smooth_cam_target_valid = false;
 	smooth_cam_vx = 0.0;
 	smooth_cam_vy = 0.0;
+	smooth_cam_actor_vx = 0.0;
+	smooth_cam_actor_vy = 0.0;
 	smooth_cam_last_ticks = 0;
 }
 
@@ -743,6 +746,8 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 		smooth_cam_y = static_cast<double>(scrollty * c_tilesize);
 		smooth_cam_vx = 0.0;
 		smooth_cam_vy = 0.0;
+		smooth_cam_actor_vx = 0.0;
+		smooth_cam_actor_vy = 0.0;
 		smooth_cam_last_ticks = ticks;
 		smooth_cam_valid = true;
 		return false;
@@ -778,6 +783,33 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	target_x = nearest_wrapped(target_x, smooth_cam_x);
 	target_y = nearest_wrapped(target_y, smooth_cam_y);
 
+	// Estimate the Avatar's average visual velocity from successive logical
+	// target steps. This is the key difference from the previous controller:
+	// while the Avatar is moving, the camera tracks that velocity instead of
+	// trying to brake to a halt at every discrete tile target.
+	if (!smooth_cam_target_valid) {
+		smooth_cam_target_x = target_x;
+		smooth_cam_target_y = target_y;
+		smooth_cam_target_valid = true;
+	}
+	const double target_step_x = target_x - smooth_cam_target_x;
+	const double target_step_y = target_y - smooth_cam_target_y;
+	if (std::abs(target_step_x) > 0.001 || std::abs(target_step_y) > 0.001) {
+		int frame_ms = camera_actor->get_frame_time();
+		if (frame_ms <= 0) {
+			frame_ms = get_std_delay();
+		}
+		frame_ms = std::max(frame_ms, 1);
+		smooth_cam_actor_vx = target_step_x * 1000.0 / static_cast<double>(frame_ms);
+		smooth_cam_actor_vy = target_step_y * 1000.0 / static_cast<double>(frame_ms);
+		smooth_cam_target_x = target_x;
+		smooth_cam_target_y = target_y;
+	}
+	if (!camera_actor->is_moving()) {
+		smooth_cam_actor_vx = 0.0;
+		smooth_cam_actor_vy = 0.0;
+	}
+
 	const double error_x = target_x - smooth_cam_x;
 	const double error_y = target_y - smooth_cam_y;
 
@@ -788,23 +820,35 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 		smooth_cam_y = target_y;
 		smooth_cam_vx = 0.0;
 		smooth_cam_vy = 0.0;
+		smooth_cam_target_x = target_x;
+		smooth_cam_target_y = target_y;
+		smooth_cam_actor_vx = 0.0;
+		smooth_cam_actor_vy = 0.0;
 	}
 
 	const int old_render_x = static_cast<int>(std::lround(smooth_cam_x));
 	const int old_render_y = static_cast<int>(std::lround(smooth_cam_y));
 
-	constexpr double max_speed = 96.0;         // game pixels / second
-	constexpr double max_acceleration = 480.0; // game pixels / second^2
-	const auto advance_axis = [&](double target, double& pos, double& velocity) {
+	const bool actor_moving = camera_actor->is_moving();
+	const double actor_speed = std::hypot(smooth_cam_actor_vx, smooth_cam_actor_vy);
+	const double max_acceleration = actor_moving ? std::max(80.0, actor_speed * 8.0) : 360.0;
+	const auto advance_axis = [&](double target, double actor_velocity, double& pos, double& velocity) {
 		const double error = target - pos;
-		if (std::abs(error) < 0.001 && std::abs(velocity) < 0.001) {
-			velocity = 0.0;
-			return;
-		}
-		const double stop_speed = std::sqrt(2.0 * max_acceleration * std::abs(error));
-		double desired_velocity = std::min(max_speed, stop_speed);
-		if (error < 0.0) {
-			desired_velocity = -desired_velocity;
+		double desired_velocity;
+		if (actor_moving) {
+			// Follow the Avatar's average speed, allowing only a small correction
+			// for accumulated lag. This prevents slow walking from producing
+			// move-stop-move-stop camera motion between tile updates.
+			const double correction_cap = std::max(4.0, std::abs(actor_velocity) * 0.25);
+			const double correction = std::clamp(error * 2.0, -correction_cap, correction_cap);
+			desired_velocity = actor_velocity + correction;
+		} else {
+			// Once the Avatar actually stops, smoothly settle on the exact target.
+			const double stop_speed = std::sqrt(2.0 * max_acceleration * std::abs(error));
+			desired_velocity = std::min(64.0, stop_speed);
+			if (error < 0.0) {
+				desired_velocity = -desired_velocity;
+			}
 		}
 		const double max_dv = max_acceleration * dt;
 		const double dv = std::clamp(desired_velocity - velocity, -max_dv, max_dv);
@@ -812,8 +856,8 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 		pos += velocity * dt;
 	};
 
-	advance_axis(target_x, smooth_cam_x, smooth_cam_vx);
-	advance_axis(target_y, smooth_cam_y, smooth_cam_vy);
+	advance_axis(target_x, smooth_cam_actor_vx, smooth_cam_x, smooth_cam_vx);
+	advance_axis(target_y, smooth_cam_actor_vy, smooth_cam_y, smooth_cam_vy);
 
 	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
 	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
