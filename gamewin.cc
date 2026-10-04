@@ -1829,17 +1829,7 @@ void Game_window::start_actor_alt(
 	int  ax;
 	int  ay;
 	bool blocked[8];
-
-	// With the experimental lagging camera the Avatar is no longer guaranteed
-	// to coincide with the screen centre.  Keep mouse-steering semantics stable
-	// by deriving the movement direction from screen centre -> mouse, not from
-	// the Avatar's current rendered position -> mouse.  winx/winy have already
-	// been converted from rotated display coordinates into world-scene
-	// coordinates by start_actor_from_display(), so convert the screen centre
-	// through the same transform before comparing vectors.
-	ax = get_width() / 2;
-	ay = get_height() / 2;
-	display_to_world(ax, ay);
+	get_shape_location(main_actor, ax, ay);
 
 	Tile_coord start = main_actor->get_tile();
 	int        dir;
