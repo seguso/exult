@@ -341,10 +341,11 @@ void Dragging_info::paint_obj_to_layer() {
 	std::unique_ptr<Image_buffer> rotated_owner;
 	Image_buffer8* rotated = nullptr;
 
-	if (gwin->is_rotate_world_enabled()) {
-		// The normal drag layer is a UI overlay and therefore bypasses the
-		// rotated-world compositing pass.  Build a small locally rotated copy so
-		// the object keeps the same orientation when it leaves the world buffer.
+	if (gwin->is_rotate_world_enabled() && !gump) {
+		// Only world-space drag overlays need to match the rotated world.
+		// Objects dragged from a gump/inventory are UI content: the gump itself
+		// is not rotated, so rotating the item here would make it visibly snap
+		// into the opposite orientation as soon as dragging starts.
 		auto src_owner = iwin->create_buffer(w, h);
 		auto* src = static_cast<Image_buffer8*>(src_owner.get());
 		src->clear_clip();
