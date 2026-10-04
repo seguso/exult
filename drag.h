@@ -50,6 +50,8 @@ class Dragging_info : public Game_singletons {
 	int      readied_index;    // If it was a 'readied' item.
 	// Last mouse, paint positions:
 	int                 mousex, mousey, paintx, painty;
+	int                 world_grab_dx = 0, world_grab_dy = 0;
+	bool                has_world_grab = false;
 	Mouse::Mouse_shapes mouse_shape;       // Save starting mouse shape.
 	TileRect            rect;              // Rectangle to repaint.
 	bool                okay;              // True if drag constructed okay.
