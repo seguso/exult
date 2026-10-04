@@ -78,15 +78,15 @@ static void override_vleads() {
 	}
 }
 
-static void apply_custom_conversation_font(Fonts_vga_file* fonts, const Palette& pal) {
+static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts, const Palette& pal) {
 	if (!fonts) {
-		return;
+		return nullptr;
 	}
 
 	bool enabled = false;
 	config->value("config/gameplay/conversation_font/enabled", enabled, true);
 	if (!enabled) {
-		return;
+		return nullptr;
 	}
 
 	std::string file;
@@ -120,10 +120,10 @@ static void apply_custom_conversation_font(Fonts_vga_file* fonts, const Palette&
 			std::cerr << " family '" << family << "'";
 		}
 		std::cerr << "; using the normal Exult font." << std::endl;
-		return;
+		return nullptr;
 	}
 
-	fonts->set_font(0, std::make_shared<Font>(std::move(generated), hlead, vlead));
+	auto result = std::make_shared<Font>(std::move(generated), hlead, vlead);
 	std::cout << "Using custom conversation font";
 	if (!family.empty()) {
 		std::cout << " '" << family << "'";
@@ -132,6 +132,7 @@ static void apply_custom_conversation_font(Fonts_vga_file* fonts, const Palette&
 		std::cout << " from " << file;
 	}
 	std::cout << " at " << pixels << " px." << std::endl;
+	return result;
 }
 
 
@@ -361,7 +362,7 @@ void Shape_manager::load() {
 	fonts = make_unique<Fonts_vga_file>();
 	override_vleads();
 	fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
-	apply_custom_conversation_font(fonts.get(), pal);
+	conversation_font = make_custom_conversation_font(fonts.get(), pal);
 
 	// Get translucency tables.
 	unique_ptr<unsigned char[]> ptr;    // We will delete THIS at the end, not blends!
