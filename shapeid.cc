@@ -105,7 +105,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	// Gen_shadow adds one pixel on every side, so subtract two from the
 	// original font's total height to keep the final outlined result close to
 	// Exult's existing conversation text size.
-	int pixels = std::max(5, fonts->get_text_height(0) - 3);
+	int pixels = std::max(5, fonts->get_text_height(0) - 4);
 	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
 	pixels = std::clamp(pixels, 5, 32);
 
@@ -641,7 +641,7 @@ int Shape_manager::paint_conversation_text_box(
 	// the built-in font by one pixel; reproduce that same final line height.
 	int effective_vert_lead = vert_lead;
 	if (conversation_font && vert_lead == -1) {
-		const int target_line_height = fonts->get_text_line_height(0) - 1;
+		const int target_line_height = fonts->get_text_line_height(0);
 		effective_vert_lead = target_line_height - font->get_text_height() - font->get_ver_lead();
 	}
 	return font->paint_text_box(
