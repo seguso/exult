@@ -1844,7 +1844,10 @@ void Game_window::start_actor_alt(
 		}
 	}
 
-	dir = Get_direction_NoWrap(ay - winy, winx - ax);
+	const int aim_dx = winx - ax;
+	const int aim_dy = winy - ay;
+	dir = Get_direction_NoWrap(-aim_dy, aim_dx);
+	const int requested_dir = dir;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1869,50 +1872,53 @@ void Game_window::start_actor_alt(
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.
-	switch (dir) {
-	case north:
-		// cout << "NORTH" << endl;
-		ay -= delta;
-		break;
 
-	case northeast:
-		// cout << "NORTH EAST" << endl;
-		ay -= delta;
-		ax += delta;
-		break;
-
-	case east:
-		// cout << "EAST" << endl;
-		ax += delta;
-		break;
-
-	case southeast:
-		// cout << "SOUTH EAST" << endl;
-		ay += delta;
-		ax += delta;
-		break;
-
-	case south:
-		// cout << "SOUTH" << endl;
-		ay += delta;
-		break;
-
-	case southwest:
-		// cout << "SOUTH WEST" << endl;
-		ay += delta;
-		ax -= delta;
-		break;
-
-	case west:
-		// cout << "WEST" << endl;
-		ax -= delta;
-		break;
-
-	case northwest:
-		// cout << "NORTH WEST" << endl;
-		ay -= delta;
-		ax -= delta;
-		break;
+	if (dir == requested_dir && (aim_dx != 0 || aim_dy != 0)) {
+		// Mouse steering is not restricted to the eight animation directions.
+		// Aim a long temporary destination along the exact mouse->Avatar vector;
+		// the tile walker then naturally alternates cardinal/diagonal tile steps
+		// (Bresenham-style) so the *average* trajectory can have any angle. The
+		// actor artwork itself still uses the nearest of its 8 facing directions.
+		//
+		// Keyboard/WASD callers pass exact cardinal/diagonal vectors, so they
+		// remain strictly 8-way.
+		const int max_component = std::max(std::abs(aim_dx), std::abs(aim_dy));
+		ax += static_cast<int>(std::lround(static_cast<double>(aim_dx) * delta / max_component));
+		ay += static_cast<int>(std::lround(static_cast<double>(aim_dy) * delta / max_component));
+	} else {
+		// If collision handling deliberately redirected the first step, preserve
+		// the old 8-way detour for this call instead of immediately steering back
+		// into the obstacle.
+		switch (dir) {
+		case north:
+			ay -= delta;
+			break;
+		case northeast:
+			ay -= delta;
+			ax += delta;
+			break;
+		case east:
+			ax += delta;
+			break;
+		case southeast:
+			ay += delta;
+			ax += delta;
+			break;
+		case south:
+			ay += delta;
+			break;
+		case southwest:
+			ay += delta;
+			ax -= delta;
+			break;
+		case west:
+			ax -= delta;
+			break;
+		case northwest:
+			ay -= delta;
+			ax -= delta;
+			break;
+		}
 	}
 
 	const int lift       = main_actor->get_lift();
