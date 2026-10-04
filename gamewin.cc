@@ -390,13 +390,7 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
-	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
-	// Smooth-camera experimental branch: ensure interpolation is actually on.
-	// The stock configuration defaults this to 0, in which case paint_lerped()
-	// is never called and none of the camera/actor decoupling code can run.
-	if (lerping_enabled <= 0) {
-		lerping_enabled = 100;
-	}
+	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 100);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
@@ -562,6 +556,21 @@ void Game_window::resize_rotate_scene() {
 void Game_window::set_rotate_world_enabled(bool enabled) {
 	rotate_world = enabled;
 	world_view.set_enabled(enabled);
+	set_all_dirty();
+	paint();
+}
+
+void Game_window::set_smooth_scrolling_enabled(bool enabled) {
+	lerping_enabled = enabled ? 100 : 0;
+	config->set("config/gameplay/smooth_scrolling", lerping_enabled, true);
+
+	// Throw away any visual-camera lag immediately when switching modes so
+	// rendering and mouse hit-testing use the same origin from this frame on.
+	reset_velocity_camera();
+	scrolltx_lo = 0;
+	scrollty_lo = 0;
+	avposx_ld = 0;
+	avposy_ld = 0;
 	set_all_dirty();
 	paint();
 }
