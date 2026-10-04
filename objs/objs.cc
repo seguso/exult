@@ -957,6 +957,9 @@ void Game_object::say(
  */
 
 void Game_object::paint() {
+	if (gwin->queue_rotate_local_object(this)) {
+		return;
+	}
 	int x;
 	int y;
 	gwin->get_shape_location(this, x, y);
