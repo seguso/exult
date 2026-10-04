@@ -443,22 +443,53 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
 
-	// Rotate with 4x4 supersampling in destination-pixel space.  The plain RGB
-	// average used by the first supersampled version fixes most holes, but it
-	// also washes out one-pixel dark outlines.  Resolve high-contrast pixels
-	// with a coverage-aware dark-edge rule: if at least a quarter of the
-	// sub-samples belong to the dark side of a strong edge, preserve the dark
-	// colour instead of averaging it into the background.
+	// Reconstruct the 8-bit scene at 2x with the Scale2x/EPX neighbourhood
+	// rule before rotating it.  This is deliberately pixel-art-aware: diagonal
+	// runs that are only corner-connected at 1x get extra coverage at 2x, while
+	// interior colours (for example the lighter stripe inside a lamp post) stay
+	// distinct instead of being swallowed by a generic dark-edge bias.
+	rotate_scene_2x->clear_clip();
+	rotate_scene_2x->fill8(pal->get_border_index());
+	const auto scene_pixel = [&](int x, int y) {
+		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
+		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
+		return rotate_scene->get_pixel8(x, y);
+	};
+	for (int sy = 0; sy < scene_size; ++sy) {
+		const int y = scene_y + sy;
+		for (int sx = 0; sx < scene_size; ++sx) {
+			const int x = scene_x + sx;
+			const unsigned char e = scene_pixel(x, y);
+			const unsigned char b = scene_pixel(x, y - 1);
+			const unsigned char d = scene_pixel(x - 1, y);
+			const unsigned char f = scene_pixel(x + 1, y);
+			const unsigned char h = scene_pixel(x, y + 1);
+
+			unsigned char e0 = e;
+			unsigned char e1 = e;
+			unsigned char e2 = e;
+			unsigned char e3 = e;
+			if (b != h && d != f) {
+				if (d == b) e0 = d;
+				if (b == f) e1 = f;
+				if (d == h) e2 = d;
+				if (h == f) e3 = f;
+			}
+
+			const int hx = sx * 2;
+			const int hy = sy * 2;
+			rotate_scene_2x->put_pixel8(e0, hx, hy);
+			rotate_scene_2x->put_pixel8(e1, hx + 1, hy);
+			rotate_scene_2x->put_pixel8(e2, hx, hy + 1);
+			rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
+		}
+	}
+
+	// Rotate from the reconstructed 2x scene and area-sample each destination
+	// pixel at four quarter-pixel positions.  Unlike the previous dark-edge
+	// resolver this treats light and dark detail symmetrically.
 	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
 	rotate_blend_cache.fill(255);
-	const auto sample_scene = [&](const World_view_point& source) {
-		const int sx = static_cast<int>(std::lround(source.x));
-		const int sy = static_cast<int>(std::lround(source.y));
-		if (sx < scene_x || sx >= scene_x + scene_size || sy < scene_y || sy >= scene_y + scene_size) {
-			return static_cast<unsigned char>(pal->get_border_index());
-		}
-		return rotate_scene->get_pixel8(sx, sy);
-	};
 	const auto quantize_rgb = [&](int r, int g, int b) {
 		r = std::clamp(r, 0, 63);
 		g = std::clamp(g, 0, 63);
@@ -472,99 +503,50 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 		return cached;
 	};
-	const auto resolve_samples = [&](const std::array<unsigned char, 16>& samples) {
-		bool all_same = true;
-		for (size_t i = 1; i < samples.size(); ++i) {
-			if (samples[i] != samples[0]) {
-				all_same = false;
-				break;
-			}
+	const auto sample_scene_2x = [&](const World_view_point& source) {
+		const double fx = (source.x - static_cast<double>(scene_x)) * 2.0 + 0.5;
+		const double fy = (source.y - static_cast<double>(scene_y)) * 2.0 + 0.5;
+		const int sx = static_cast<int>(std::floor(fx));
+		const int sy = static_cast<int>(std::floor(fy));
+		const int hi_size = scene_size * 2;
+		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
+			return static_cast<unsigned char>(pal->get_border_index());
 		}
-		if (all_same) {
-			return samples[0];
+		return rotate_scene_2x->get_pixel8(sx, sy);
+	};
+	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+		if (a == b && a == c && a == d) {
+			return a;
 		}
-
-		int sum_r = 0;
-		int sum_g = 0;
-		int sum_b = 0;
-		int min_luma = 100000;
-		int max_luma = -1;
-		std::array<int, 16> luma{};
-		for (size_t i = 0; i < samples.size(); ++i) {
-			const int r = pal->get_red(samples[i]);
-			const int g = pal->get_green(samples[i]);
-			const int b = pal->get_blue(samples[i]);
-			sum_r += r;
-			sum_g += g;
-			sum_b += b;
-			// Integer approximation of perceptual luminance, scaled by 10.
-			luma[i] = 3 * r + 6 * g + b;
-			min_luma = std::min(min_luma, luma[i]);
-			max_luma = std::max(max_luma, luma[i]);
-		}
-
-		const int avg_r = (sum_r + 8) / 16;
-		const int avg_g = (sum_g + 8) / 16;
-		const int avg_b = (sum_b + 8) / 16;
-		const int contrast = max_luma - min_luma;
-
-		// On strong edges, group samples near the darkest end.  Four out of
-		// sixteen samples corresponds to roughly 25% pixel coverage: enough for
-		// a one-pixel outline to remain visually continuous after rotation.
-		if (contrast >= 90) {
-			const int dark_limit = min_luma + contrast / 3;
-			int dark_count = 0;
-			int dark_r = 0;
-			int dark_g = 0;
-			int dark_b = 0;
-			for (size_t i = 0; i < samples.size(); ++i) {
-				if (luma[i] <= dark_limit) {
-					++dark_count;
-					dark_r += pal->get_red(samples[i]);
-					dark_g += pal->get_green(samples[i]);
-					dark_b += pal->get_blue(samples[i]);
-				}
-			}
-			if (dark_count >= 4) {
-				return quantize_rgb(
-						(dark_r + dark_count / 2) / dark_count,
-						(dark_g + dark_count / 2) / dark_count,
-						(dark_b + dark_count / 2) / dark_count);
-			}
-			if (dark_count >= 2) {
-				const int dr = (dark_r + dark_count / 2) / dark_count;
-				const int dg = (dark_g + dark_count / 2) / dark_count;
-				const int db = (dark_b + dark_count / 2) / dark_count;
-				// Sub-quarter coverage: keep anti-aliasing, but bias it toward the
-				// dark edge so the contour does not fade to a pale dotted line.
-				return quantize_rgb((avg_r + dr) / 2, (avg_g + dg) / 2, (avg_b + db) / 2);
-			}
-		}
-
-		return quantize_rgb(avg_r, avg_g, avg_b);
+		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c) + pal->get_red(d) + 2) / 4;
+		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c) + pal->get_green(d) + 2) / 4;
+		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c) + pal->get_blue(d) + 2) / 4;
+		return quantize_rgb(r, g, blue);
 	};
 
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
-	constexpr std::array<double, 4> subpixel = {0.125, 0.375, 0.625, 0.875};
 	for (int dy = 0; dy < display_height; ++dy) {
-		std::array<World_view_point, 16> source{};
-		for (size_t sy = 0; sy < subpixel.size(); ++sy) {
-			for (size_t sx = 0; sx < subpixel.size(); ++sx) {
-				source[sy * 4 + sx] = world_view.display_to_scene(
-						{subpixel[sx], static_cast<double>(dy) + subpixel[sy]});
-			}
-		}
+		const double y0 = static_cast<double>(dy) + 0.25;
+		const double y1 = static_cast<double>(dy) + 0.75;
+		World_view_point source00 = world_view.display_to_scene({0.25, y0});
+		World_view_point source10 = world_view.display_to_scene({0.75, y0});
+		World_view_point source01 = world_view.display_to_scene({0.25, y1});
+		World_view_point source11 = world_view.display_to_scene({0.75, y1});
 		for (int dx = 0; dx < display_width; ++dx) {
-			std::array<unsigned char, 16> samples{};
-			for (size_t i = 0; i < source.size(); ++i) {
-				samples[i] = sample_scene(source[i]);
-			}
-			win->put_pixel8(resolve_samples(samples), dx, dy);
-			for (auto& p : source) {
-				p.x += source_dx;
-				p.y += source_dy;
-			}
+			win->put_pixel8(
+					blend4(
+							sample_scene_2x(source00), sample_scene_2x(source10),
+							sample_scene_2x(source01), sample_scene_2x(source11)),
+					dx, dy);
+			source00.x += source_dx;
+			source00.y += source_dy;
+			source10.x += source_dx;
+			source10.y += source_dy;
+			source01.x += source_dx;
+			source01.y += source_dy;
+			source11.x += source_dx;
+			source11.y += source_dy;
 		}
 	}
 
