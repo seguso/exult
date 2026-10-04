@@ -390,8 +390,15 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
-	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
-	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
+	// Keep the experimental modern movement package separate from Exult's
+	// historical smooth_scrolling setting. Earlier development builds wrote
+	// smooth_scrolling=100 into existing configs, which would otherwise make
+	// the new package start enabled forever. The modern package is opt-in and
+	// defaults OFF.
+	bool modern_movement_enabled = false;
+	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
+	lerping_enabled = modern_movement_enabled ? 100 : 0;
+	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -562,7 +569,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {
 	lerping_enabled = enabled ? 100 : 0;
-	config->set("config/gameplay/smooth_scrolling", lerping_enabled, true);
+	config->set("config/gameplay/modern_movement", enabled, true);
 	if (!enabled) {
 		mouse_walk_visual_dir = -1;
 	}
