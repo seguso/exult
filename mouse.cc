@@ -667,6 +667,14 @@ void Mouse::set_speed_cursor() {
 		} else {
 			gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
 		}
+		// Mouse coordinates are display-relative. In rotated-world mode the
+		// object's normal shape location is still in the unrotated scene, so
+		// transform the anchor before measuring the visible mouse<->Avatar
+		// vector. This also keeps the short/medium/long speed zones visually
+		// centred on the Avatar.
+		if (gwin->is_rotate_world_enabled()) {
+			gwin->world_to_display(ax, ay);
+		}
 
 		const int       dy  = ay - mousey;
 		const int       dx  = mousex - ax;
