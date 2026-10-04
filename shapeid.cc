@@ -41,6 +41,7 @@
 #include "utils.h"
 #include "vgafile.h"
 
+#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -83,7 +84,7 @@ static void apply_custom_conversation_font(Fonts_vga_file* fonts, const Palette&
 	}
 
 	bool enabled = false;
-	config->value("config/gameplay/conversation_font/enabled", enabled, false);
+	config->value("config/gameplay/conversation_font/enabled", enabled, true);
 	if (!enabled) {
 		return;
 	}
