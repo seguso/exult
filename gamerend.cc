@@ -583,22 +583,6 @@ void Game_window::paint_rotate_local_objects() {
 
 	constexpr double k = 0.7071067811865475244;
 
-	// The dependency order used by the original unrotated projection is not
-	// sufficient once sprites themselves are rotated: shapes that did not
-	// overlap before can overlap in the new view.  Use the rotated screen Y of
-	// the object's anchor as the primary painter order, retaining the original
-	// order for ties.
-	std::stable_sort(rotate_local_objects.begin(), rotate_local_objects.end(), [&](Game_object* a, Game_object* b) {
-		if (!a || !b) {
-			return a != nullptr;
-		}
-		int ax = 0, ay = 0, bx = 0, by = 0;
-		get_shape_location(a, ax, ay);
-		get_shape_location(b, bx, by);
-		const auto ap = world_view.scene_to_display({static_cast<double>(ax), static_cast<double>(ay)});
-		const auto bp = world_view.scene_to_display({static_cast<double>(bx), static_cast<double>(by)});
-		return ap.y < bp.y;
-	});
 
 	struct Cached_rotated_shape {
 		int origin_x = 0;    // Top-left relative to the canonical shape anchor.
