@@ -402,3 +402,31 @@ bool Gen_font_shape(
 }
 
 #endif /* HAVE_FREETYPE2 */
+
+
+std::unique_ptr<Shape_file> Gen_runtime_font_shape(
+		const char* fontfile, const char* family, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow) {
+	auto shape = std::make_unique<Shape_file>();
+
+#if defined(_WIN32) && defined(USE_WIN32_FONTGEN)
+	bool private_font_loaded = false;
+	if (fontfile && *fontfile) {
+		private_font_loaded = AddFontResourceExA(fontfile, FR_PRIVATE, nullptr) > 0;
+	}
+	const bool ok = family && *family
+							&& Gen_font_shape_win32(shape.get(), family, nullptr, nframes, pixels_ht, fg, bg, shadow);
+	if (private_font_loaded) {
+		RemoveFontResourceExA(fontfile, FR_PRIVATE, nullptr);
+	}
+	if (ok) {
+		return shape;
+	}
+#endif
+
+#if defined(HAVE_FREETYPE2)
+	if (fontfile && *fontfile && Gen_font_shape(shape.get(), fontfile, nframes, pixels_ht, fg, bg, shadow)) {
+		return shape;
+	}
+#endif
+	return nullptr;
+}
