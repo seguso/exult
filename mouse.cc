@@ -456,7 +456,13 @@ void Mouse::set_speed_cursor() {
 			ax -= barge->get_xtiles() * (c_tilesize / 2);
 			ay -= barge->get_ytiles() * (c_tilesize / 2);
 		} else {
-			gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
+			// With the lagging visual camera the Avatar is intentionally allowed
+			// to drift away from the exact centre. Keep the classic speed zones
+			// tied to the screen centre so camera lag cannot feed back into
+			// movement speed (near/far cursor classification).
+			const TileRect game_rect = gwin->get_game_rect();
+			ax = game_rect.x + game_rect.w / 2;
+			ay = game_rect.y + game_rect.h / 2;
 		}
 
 		const int       dy  = ay - mousey;
