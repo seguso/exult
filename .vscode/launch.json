@@ -5,6 +5,7 @@
             "name": "Launch Exult (Black Gate)",
             "type": "cppvsdbg",
             "request": "launch",
+            "preLaunchTask": "Build Exult (Release x64)",
             "program": "${workspaceFolder}/Exult.exe",
             "args": [
                 "-c",
@@ -19,6 +20,7 @@
             "name": "Launch Exult (Serpent Isle)",
             "type": "cppvsdbg",
             "request": "launch",
+            "preLaunchTask": "Build Exult (Release x64)",
             "program": "${workspaceFolder}/Exult.exe",
             "args": [
                 "-c",
