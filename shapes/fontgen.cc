@@ -277,6 +277,23 @@ static bool Gen_font_shape_win32(
 
 #endif
 
+static void Install_runtime_font_specials(Shape_file* shape, unsigned char fg, unsigned char bg, unsigned char shadow) {
+	if (!shape || shape->get_num_frames() <= 127) {
+		return;
+	}
+	// Exult uses frame 127 as the round marker in Avatar conversation choices.
+	// Standard TrueType fonts treat U+007F as a control character, so provide
+	// an equivalent tiny outlined dot explicitly.
+	unsigned char pixels[25] = {
+		bg,     shadow, shadow, shadow, bg,
+		shadow, fg,     fg,     fg,     shadow,
+		shadow, fg,     fg,     fg,     shadow,
+		shadow, fg,     fg,     fg,     shadow,
+		bg,     shadow, shadow, shadow, bg,
+	};
+	shape->set_frame(std::make_unique<Shape_frame>(pixels, 5, 5, 0, 4, true), 127);
+}
+
 #if defined(HAVE_FREETYPE2)
 #	include <ft2build.h>
 #	ifdef __GNUC__
@@ -419,12 +436,14 @@ std::unique_ptr<Shape_file> Gen_runtime_font_shape(
 		RemoveFontResourceExA(fontfile, FR_PRIVATE, nullptr);
 	}
 	if (ok) {
+		Install_runtime_font_specials(shape.get(), fg, bg, static_cast<unsigned char>(shadow >= 0 ? shadow : fg));
 		return shape;
 	}
 #endif
 
 #if defined(HAVE_FREETYPE2)
 	if (fontfile && *fontfile && Gen_font_shape(shape.get(), fontfile, nframes, pixels_ht, fg, bg, shadow)) {
+		Install_runtime_font_specials(shape.get(), fg, bg, static_cast<unsigned char>(shadow >= 0 ? shadow : fg));
 		return shape;
 	}
 #endif
