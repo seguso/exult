@@ -65,7 +65,11 @@ static const char* Pass_space(const char* text) {
  */
 
 static const char* Pass_word(const char* text) {
-	while (*text && (*text != '^') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
+	// '*' is Exult's in-band page-break marker. Stop the current word before
+	// it even when it follows punctuation with no intervening space, so the
+	// main text-box loop can consume it as control syntax instead of painting
+	// the replacement TTF's visible asterisk glyph.
+	while (*text && (*text != '^') && (*text != '*') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
 		text++;
 	}
 	return text;
