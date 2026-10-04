@@ -332,7 +332,8 @@ void Conversation::render_conv_layer() {
  */
 
 void Conversation::set_face_rect(Npc_face_info* info, Npc_face_info* prev) {
-	const int text_height = sman->get_text_line_height(0);
+	auto      normal_font = sman->get_conversation_font();
+	const int text_height = normal_font ? normal_font->get_text_height() + normal_font->get_ver_lead() : sman->get_text_line_height(0);
 	// Figure starting y-coord.
 	// Get character's portrait.
 	Shape_frame* face   = info->shape.get_shapenum() >= 0 ? info->shape.get_shape() : nullptr;
@@ -628,7 +629,11 @@ void Conversation::show_npc_message(const char* msg) {
 			lbuf->fill8(conv_transparent);
 			paint_faces(true);
 		}
-		height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, info->large_face, -1);
+		if (info->large_face) {
+			height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, true, -1);
+		} else {
+			height = sman->paint_conversation_text_box(msg, box.x, box.y, box.w, box.h, -1, true, false, -1);
+		}
 		if (lbuf) {
 			lbuf->clear_clip();
 			gwin->pop_render_target(prev);
@@ -711,8 +716,9 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	const TileRect sbox        = get_conv_rect();
 	int            x           = 0;
 	int            y           = 0;    // Keep track of coords. in box.
-	const int      line_height = sman->get_text_line_height(0);
-	const int      space_width = sman->get_text_width(0, " ");
+	auto           normal_font = sman->get_conversation_font();
+	const int      line_height = normal_font ? normal_font->get_text_height() + normal_font->get_ver_lead() : sman->get_text_line_height(0);
+	const int      space_width = normal_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
 
 	// Get main actor's portrait, checking for Petra flag.
 	int shape = Shapeinfo_lookup::GetFaceReplacement(0);
@@ -785,7 +791,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 		char text[256];
 		text[0] = 127;    // A circle.
 		strcpy(&text[1], choices[i]);
-		const int width = sman->get_text_width(0, text);
+		const int width = normal_font ? normal_font->get_text_width(text) : sman->get_text_width(0, text);
 		if (x > 0 && x + width >= tbox.w) {
 			// Start a new line.
 			x = 0;
@@ -817,7 +823,11 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 		char text[256];
 		text[0] = 127;    // A circle.
 		strcpy(&text[1], choices[i]);
-		sman->paint_text(0, text, conv_choices[i].x, conv_choices[i].y);
+		if (normal_font) {
+			sman->paint_text(normal_font, text, conv_choices[i].x, conv_choices[i].y);
+		} else {
+			sman->paint_text(0, text, conv_choices[i].x, conv_choices[i].y);
+		}
 	}
 	avatar_face.enlarge((3 * c_tilesize) / 4);    // Encloses entire area.
 	avatar_face = avatar_face.intersect(sbox);
@@ -924,9 +934,12 @@ void Conversation::paint_faces(bool text) {
 		}
 		if (text) {    // Show text too?
 			const TileRect& box = finfo->text_rect;
-			// Use red for Guardian, snake.
-			const int font = finfo->large_face ? 7 : 0;
-			sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, -1);
+			if (finfo->large_face) {
+				// Guardian/serpent keeps its original red font.
+				sman->paint_text_box(7, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, true, -1);
+			} else {
+				sman->paint_conversation_text_box(finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, false, -1);
+			}
 		}
 	}
 }
