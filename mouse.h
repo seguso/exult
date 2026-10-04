@@ -52,6 +52,13 @@ protected:
 	int            hot_y            = 0;
 	int            last_layer_frame = -1;         // Frame currently drawn in the layer.
 	unsigned char* last_layer_trans = nullptr;    // Remap currently drawn.
+	// Continuous steering-arrow rotation. The nearest of the existing 8
+	// direction/length frames remains the source artwork; only the residual
+	// angle (at most 22.5 degrees) is generated in software.
+	bool   smooth_arrow_active       = false;
+	double smooth_arrow_residual_rad = 0.0;
+	int    smooth_arrow_angle_bucket = -1;
+	int    last_layer_angle_bucket   = -1;
 	static short   short_arrows[8];               // Frame #'s of short arrows, indexed
 	//   by direction (0-7, 0=east).
 	static short med_arrows[8];               // Medium arrows.
