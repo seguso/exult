@@ -585,11 +585,14 @@ bool Game_window::queue_rotate_local_object(Game_object* obj) {
 	if (!frame || !frame->get_data() || !frame->is_rle()) {
 		return false;
 	}
-	// Canonical local rotation currently handles ordinary opaque world sprites.
-	// Keep destination-dependent translucency/invisibility in the legacy/global
-	// path until those effects get their own local compositor.
 	if (obj->is_translucent() || obj->get_flag(Obj_flags::invisible)) {
 		return false;
+	}
+	if (!obj->as_actor()) {
+		const int shape = obj->get_shapenum();
+		if (shape != 526 && shape != 889 && shape != 167 && shape != 168) {
+			return false;
+		}
 	}
 	if (std::find(rotate_local_objects.begin(), rotate_local_objects.end(), obj) == rotate_local_objects.end()) {
 		rotate_local_objects.push_back(obj);
