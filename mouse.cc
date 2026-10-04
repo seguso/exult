@@ -784,8 +784,19 @@ void Mouse::set_speed_cursor() {
 	}
 
 	if (cursor != dontchange) {
-		const bool angle_changed = smooth_arrow_active && smooth_arrow_angle_bucket != last_layer_angle_bucket;
+		// set_shape() deliberately clears software rotation for every explicit
+		// cursor change. Preserve/restore it only for the steering arrow selected
+		// by this routine.
+		const bool rotate_arrow = smooth_arrow_active;
+		const double residual = smooth_arrow_residual_rad;
+		const int bucket = smooth_arrow_angle_bucket;
+		const bool angle_changed = rotate_arrow && bucket != last_layer_angle_bucket;
 		set_shape(cursor);
+		if (rotate_arrow) {
+			smooth_arrow_active = true;
+			smooth_arrow_residual_rad = residual;
+			smooth_arrow_angle_bucket = bucket;
+		}
 		if (angle_changed) {
 			last_layer_frame = -1;
 		}
