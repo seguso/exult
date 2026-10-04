@@ -142,15 +142,20 @@ Dragging_info::Dragging_info(
 		// gump, this lets the UI overlay keep that same point under the cursor
 		// while changing orientation.
 		gwin->get_shape_location(to_drag, paintx, painty);
-		if (gwin->is_rotate_world_enabled()) {
-			int grabx = x;
-			int graby = y;
-			gwin->display_to_world(grabx, graby);
-			world_grab_dx = grabx - paintx;
-			world_grab_dy = graby - painty;
-			has_world_grab = true;
-			gwin->world_to_display(paintx, painty);
-		}
+		// get_shape_location() is expressed relative to the logical scroll,
+		// while x/y are in the camera position actually shown to the user.
+		// This used to matter only for the 45-degree view; with the new lagging
+		// velocity camera it matters in the ordinary view too. Preserve the
+		// exact source pixel grabbed and convert the object anchor back to the
+		// displayed coordinate system before the drag starts, otherwise the item
+		// visibly jumps away from the hand by the current camera lag.
+		int grabx = x;
+		int graby = y;
+		gwin->display_to_world(grabx, graby);
+		world_grab_dx = grabx - paintx;
+		world_grab_dy = graby - painty;
+		has_world_grab = true;
+		gwin->world_to_display(paintx, painty);
 		old_pos  = to_drag->get_tile();
 		old_foot = to_drag->get_footprint();
 	}
