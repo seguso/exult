@@ -417,6 +417,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		resize_rotate_scene();
 	}
 
+	// Quantize camera translation only in the rotated view.  The renderer
+	// itself still scrolls by exact source pixels; this phase term makes the
+	// resampling lattice world-anchored, so a stationary object's contour does
+	// not change merely because smooth scrolling advanced by one pixel.
+	world_view.set_camera_pixel_origin(
+			static_cast<double>(scrolltx * c_tilesize + get_scrolltx_lo()),
+			static_cast<double>(scrollty * c_tilesize + get_scrollty_lo()));
+
 	const int display_width  = world_view.get_display_width();
 	const int display_height = world_view.get_display_height();
 	const int scene_size = world_view.get_scene_size();

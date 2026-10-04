@@ -29,6 +29,8 @@ class World_view_transform {
 	int scene_size = 0;
 	int scene_offset_x = 0;
 	int scene_offset_y = 0;
+	double phase_x = 0.0;
+	double phase_y = 0.0;
 
 	static constexpr double half_sqrt_2 = 0.7071067811865475244;
 
@@ -104,12 +106,40 @@ public:
 		return enabled ? -half_sqrt_2 : 0.0;
 	}
 
+	void set_camera_pixel_origin(double x, double y) {
+		if (!enabled) {
+			phase_x = 0.0;
+			phase_y = 0.0;
+			return;
+		}
+
+		// Keep the rotated raster phase locked to absolute world pixels.
+		// Without this, translating the camera by one source pixel changes the
+		// sub-pixel phase of every rotated edge (0.707... destination pixels),
+		// so the same lamp post alternates between crisp and broken contours.
+		const double rotated_x = (x - y) * half_sqrt_2;
+		const double rotated_y = (x + y) * half_sqrt_2;
+		phase_x = rotated_x - std::round(rotated_x);
+		phase_y = rotated_y - std::round(rotated_y);
+	}
+
 	World_view_point scene_to_display(World_view_point p) const {
-		return enabled ? rotate45(p, false) : p;
+		if (!enabled) {
+			return p;
+		}
+		World_view_point out = rotate45(p, false);
+		out.x += phase_x;
+		out.y += phase_y;
+		return out;
 	}
 
 	World_view_point display_to_scene(World_view_point p) const {
-		return enabled ? rotate45(p, true) : p;
+		if (!enabled) {
+			return p;
+		}
+		p.x -= phase_x;
+		p.y -= phase_y;
+		return rotate45(p, true);
 	}
 
 	World_view_rect transform_rect(const World_view_rect& r) const {
