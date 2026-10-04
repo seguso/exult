@@ -1335,18 +1335,6 @@ static void Handle_events() {
 	/*
 	 *  Main event loop.
 	 */
-	int last_x = -1;
-	int last_y = -1;
-	int last_actor_tx = -1;
-	int last_actor_ty = -1;
-	// Interpolation duration (ms) for the current smooth-scroll
-	// segment. Captured when the scroll actually changes so the glide always
-	// runs at the speed of the step that produced it.
-	int lerp_mswait = 0;
-	// True once the final catch-up glide has been shortened after the camera
-	// actor stopped (see the stop-skate handling below). Reset on each new
-	// step so it only ever fires once per stop.
-	bool lerp_stop_anchored = false;
 	while (!quitting_time) {
 #ifdef USE_EXULTSTUDIO
 		Server_delay();    // Handle requests.
@@ -1434,93 +1422,25 @@ static void Handle_events() {
 			gwin->start_actor(joy_aim_x, joy_aim_y, speed);
 		}
 
-		// Lerping stuff...
-		const int lerp    = gwin->is_lerping_enabled();
-		bool      didlerp = false;
+		// Smooth-camera experiment. Unlike the stock segment lerp, the visual
+		// camera owns persistent position and velocity. Actor tile updates only
+		// move its target; they never directly reposition the camera.
+		const bool smooth_camera = gwin->is_lerping_enabled() > 0;
 
 		// Update gumps every frame (drives auto-repeat for held
-		// slider/spinner arrows).  Must run even when nothing is dirty.
+		// slider/spinner arrows). Must run even when nothing is dirty.
 		if (!gwin->main_actor_dont_move()) {
 			gwin->get_gump_man()->update_gumps();
 		}
 
-		if (lerp) {
-			// Always repaint,
-			Actor*        act   = gwin->get_camera_actor();
-			Barge_object* barge = gwin->get_moving_barge();
-
-			// Keep camera interpolation enabled even for slow walking.  The old
-			// code deliberately snapped slow-walk frames to the final position,
-			// which is exactly the visible tile-step we want to remove.
-
-			// Reset interpolation when either the logical camera tile OR the camera
-			// actor tile changes. The latter is essential: otherwise actor motion
-			// inside the 2x2 scroll box remains a raw tile jump and no camera
-			// smoothing can hide it.
-			int actor_tx = -1;
-			int actor_ty = -1;
-			if (act) {
-				const Tile_coord apos = act->get_tile();
-				actor_tx = apos.tx;
-				actor_ty = apos.ty;
-			}
-			const bool scroll_changed = last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty();
-			const bool actor_changed  = act && (last_actor_tx != actor_tx || last_actor_ty != actor_ty);
-			if (scroll_changed || actor_changed) {
-				gwin->lerp_reset();
-				last_repaint = ticks;
-				lerp_stop_anchored = false;
-				const int ft = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
-																						: (act ? act->get_frame_time() : 0);
-				if (ft > 0) {
-					lerp_mswait = (ft * lerp) / 100;
-				}
-			}
-			last_x = gwin->get_scrolltx();
-			last_y = gwin->get_scrollty();
-			last_actor_tx = actor_tx;
-			last_actor_ty = actor_ty;
-
-			int mswait = lerp_mswait;
-			if (mswait <= 0) {
-				mswait = (gwin->get_std_delay() * lerp) / 100;
-			}
-
-			// Shorten the final catch-up glide once the camera actor has
-			// stopped.
-			if (!lerp_stop_anchored && lerp_mswait > 0 && !gwin->is_moving()) {
-				const int stopwait = (gwin->get_std_delay() * lerp) / 100;
-				if (stopwait > 0 && stopwait < mswait) {
-					int factor = ((ticks - last_repaint) * 0x10000) / mswait;
-					if (factor < 0) {
-						factor = 0;
-					}
-					if (factor > 0x10000) {
-						factor = 0x10000;
-					}
-					// Pick last_repaint so the factor is unchanged right now but
-					// advances at the faster (stopwait) rate from here on.
-					last_repaint = ticks - (factor * stopwait) / 0x10000;
-					lerp_mswait  = stopwait;
-					mswait       = stopwait;
-				}
-				lerp_stop_anchored = true;
-			}
-
-			// Is lerping (smooth scrolling) enabled
-			if (mswait && ticks < (last_repaint + mswait * 2)) {
-				const int factor = ((ticks - last_repaint) * 0x10000) / mswait;
-				gwin->paint_lerped(factor);
-				didlerp = true;
-			}
+		bool camera_painted = false;
+		if (smooth_camera) {
+			camera_painted = gwin->paint_velocity_camera(ticks);
 		}
-		if (!lerp || !didlerp) {       // No lerping
-			if (gwin->is_dirty()) {    // Note the ending else in the above #if!
-				gwin->paint_dirty();
-			}
-			// Reset it for lerping.
-			last_x = last_y = -1;
+		if (!camera_painted && gwin->is_dirty()) {
+			gwin->paint_dirty();
 		}
+
 		// update mousecursor appearance if needed
 		if (last_speed_cursor + 100 < SDL_GetTicks() && !dragging) {
 			last_speed_cursor = SDL_GetTicks();
