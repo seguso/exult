@@ -1505,7 +1505,7 @@ static void Handle_events() {
 		}
 
 		// update mousecursor appearance if needed
-		if (last_speed_cursor + 100 < SDL_GetTicks() && !dragging) {
+		if (last_speed_cursor + 16 < SDL_GetTicks() && !dragging) {
 			last_speed_cursor = SDL_GetTicks();
 			Mouse::mouse()->set_speed_cursor();
 			Mouse::mouse_update = true;
