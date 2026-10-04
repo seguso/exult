@@ -139,6 +139,11 @@ class Game_window {
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
 	bool rotate_world = false;
+	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
+	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
+	// the dominant requested direction instead of visibly snapping toward each
+	// one-tile correction step. -1 means no mouse-facing override.
+	int mouse_walk_visual_dir = -1;
 	World_view_transform world_view;
 	std::unique_ptr<Image_buffer8> rotate_scene;
 	std::unique_ptr<Image_buffer8> rotate_scene_2x;
@@ -924,8 +929,11 @@ public:
 	void view_down();     // Move view down.
 	void view_up();       // Move view up.
 	// Start moving actor.
-	void start_actor_alt(int winx, int winy, int speed);
-	void start_actor(int winx, int winy, int speed = 125);
+	void start_actor_alt(int winx, int winy, int speed, bool mouse_steering = false);
+	void start_actor(int winx, int winy, int speed = 125, bool mouse_steering = false);
+	int get_mouse_walk_visual_dir() const {
+		return mouse_walk_visual_dir;
+	}
 	void start_actor_along_path(int winx, int winy, int speed = 125);
 	void stop_actor();    // Stop main actor.
 
