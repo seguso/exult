@@ -619,6 +619,20 @@ void Game_window::lerp_reset() {
 	scrollty_lp = scrollty_l;
 	scrolltx_l  = scrolltx;
 	scrollty_l  = scrollty;
+
+	if (camera_actor) {
+		const Tile_coord t = camera_actor->get_tile();
+		if (!lerp_actor_valid) {
+			avtx_l = avtx_lp = t.tx;
+			avty_l = avty_lp = t.ty;
+			lerp_actor_valid = true;
+		} else {
+			avtx_lp = avtx_l;
+			avty_lp = avty_l;
+			avtx_l  = t.tx;
+			avty_l  = t.ty;
+		}
+	}
 }
 
 void Game_window::paint_lerped(int factor) {
@@ -629,16 +643,17 @@ void Game_window::paint_lerped(int factor) {
 		factor = 0x10000;
 	}
 
-	// Smooth-camera experiment: keep the visual camera on the native pixel
-	// grid, but expose every intermediate pixel between two logical 8-pixel
-	// tile scroll positions. This deliberately avoids sub-pixel sampling (and
-	// therefore pixel-art shimmer) while reducing the old tile-sized visual
-	// jump to one game pixel at a time.
-	const int camera_pixel_step = (factor * c_tilesize + 0x8000) / 0x10000;
-	factor = (camera_pixel_step * 0x10000) / c_tilesize;
-
 	const int saved_scrolltx = scrolltx;
 	const int saved_scrollty = scrollty;
+
+	// Actor motion and camera motion intentionally use different curves.
+	// The actor follows a linear interpolation between discrete logical tile
+	// updates; the camera follows a slower cubic ease-in and catches up at the
+	// end of the segment. This breaks the rigid "avatar glued to screen center"
+	// constraint while keeping both endpoints exact.
+	const int actor_factor = factor;
+	const int64 f = static_cast<int64>(factor);
+	const int camera_factor = static_cast<int>((f * f * f) / (static_cast<int64>(0x10000) * 0x10000));
 
 	scrolltx = scrolltx_l;
 	scrollty = scrollty_l;
@@ -660,46 +675,42 @@ void Game_window::paint_lerped(int factor) {
 		dy -= c_num_tiles;
 	}
 
-	// Only allow lerping to occur within say a 4 tile limit
 	if (dx > -4 && dx < 4 && dy > -4 && dy < 4) {
 		dx *= c_tilesize;
 		dy *= c_tilesize;
 		scrolltx *= c_tilesize;
 		scrollty *= c_tilesize;
 
-		scrolltx = scrolltx + (dx * (0x10000 - factor)) / 0x10000;
-		scrollty = scrollty + (dy * (0x10000 - factor)) / 0x10000;
+		scrolltx = scrolltx + (dx * (0x10000 - camera_factor)) / 0x10000;
+		scrollty = scrollty + (dy * (0x10000 - camera_factor)) / 0x10000;
 
 		dx = scrolltx % c_tilesize;
 		dy = scrollty % c_tilesize;
 
-		avposx_ld = scrolltx - saved_scrolltx * c_tilesize;
-		avposy_ld = scrollty - saved_scrollty * c_tilesize;
-
-		while (avposx_ld < -c_num_tiles * c_tilesize / 2) {
-			avposx_ld += c_num_tiles * c_tilesize;
-		}
-		while (avposx_ld > c_num_tiles * c_tilesize / 2) {
-			avposx_ld -= c_num_tiles * c_tilesize;
-		}
-		while (avposy_ld < -c_num_tiles * c_tilesize / 2) {
-			avposy_ld += c_num_tiles * c_tilesize;
-		}
-		while (avposy_ld > c_num_tiles * c_tilesize / 2) {
-			avposy_ld -= c_num_tiles * c_tilesize;
-		}
-
 		scrolltx = ((scrolltx / c_tilesize) + c_num_tiles) % c_num_tiles;
 		scrollty = ((scrollty / c_tilesize) + c_num_tiles) % c_num_tiles;
-
-		// printf ("f %05x %i-%i %i.%i\n", factor, scrolltx_lp, scrolltx_l,
-		// scrolltx, dx);
 	} else {
 		dx = 0;
 		dy = 0;
 	}
 
-	// Set pixel offset needed for lerping
+	// Interpolate the camera actor independently from the visual camera.
+	avposx_ld = 0;
+	avposy_ld = 0;
+	if (lerp_actor_valid) {
+		int adx = avtx_lp - avtx_l;
+		int ady = avty_lp - avty_l;
+		while (adx < -c_num_tiles / 2) adx += c_num_tiles;
+		while (adx > c_num_tiles / 2) adx -= c_num_tiles;
+		while (ady < -c_num_tiles / 2) ady += c_num_tiles;
+		while (ady > c_num_tiles / 2) ady -= c_num_tiles;
+		if (adx > -4 && adx < 4 && ady > -4 && ady < 4) {
+			avposx_ld = (adx * c_tilesize * (0x10000 - actor_factor)) / 0x10000;
+			avposy_ld = (ady * c_tilesize * (0x10000 - actor_factor)) / 0x10000;
+		}
+	}
+
+	// Set pixel offset needed for camera interpolation.
 	scrolltx_lo = dx;
 	scrollty_lo = dy;
 
