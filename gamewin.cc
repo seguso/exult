@@ -1210,6 +1210,7 @@ void Game_window::set_scrolls(Tile_coord cent    // Want center here.
 
 void Game_window::center_view(const Tile_coord& t) {
 	set_scrolls(t);
+	reset_velocity_camera();
 	set_all_dirty();
 }
 
@@ -1227,6 +1228,7 @@ void Game_window::set_camera_actor(Actor* a) {
 	camera_actor       = a;
 	const Tile_coord t = a->get_tile();
 	set_scrolls(t);    // Set scrolling around position,
+	reset_velocity_camera();
 	// and read in map there.
 	set_all_dirty();
 }
