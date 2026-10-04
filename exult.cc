@@ -1447,7 +1447,9 @@ static void Handle_events() {
 			Actor*        act   = gwin->get_camera_actor();
 			Barge_object* barge = gwin->get_moving_barge();
 
-			const bool slow_walk = !barge && act && act->get_frame_time() * 2 >= 3 * gwin->get_std_delay();
+			// Keep camera interpolation enabled even for slow walking.  The old
+			// code deliberately snapped slow-walk frames to the final position,
+			// which is exactly the visible tile-step we want to remove.
 
 			// Force a reset if position changed
 			if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
@@ -1495,8 +1497,7 @@ static void Handle_events() {
 
 			// Is lerping (smooth scrolling) enabled
 			if (mswait && ticks < (last_repaint + mswait * 2)) {
-				// Slow walk doesn't use smooth scrolling.
-				const int factor = slow_walk ? 0x10000 : ((ticks - last_repaint) * 0x10000) / mswait;
+				const int factor = ((ticks - last_repaint) * 0x10000) / mswait;
 				gwin->paint_lerped(factor);
 				didlerp = true;
 			}
