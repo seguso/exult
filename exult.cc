@@ -1349,6 +1349,14 @@ static void Handle_events() {
 	uint32 last_fps = 0;
 #endif
 	/*
+	 *  State for Exult's original segment-based smooth scrolling. It is only
+	 *  used while our independent modern movement package is disabled.
+	 */
+	int  last_x = -1;
+	int  last_y = -1;
+	int  lerp_mswait = 0;
+	bool lerp_stop_anchored = false;
+	/*
 	 *  Main event loop.
 	 */
 	while (!quitting_time) {
