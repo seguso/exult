@@ -8,10 +8,6 @@ right		walk_east	# Run east
 left		walk_west	# Run west
 up		walk_north	# Run north
 down		walk_south	# Run south
-D		walk_east	# Run east
-A		walk_west	# Run west
-W		walk_north	# Run north
-S		walk_south	# Run south
 KP7		walk_north_west	# Run north-west
 KP8		walk_north	# Run north
 KP9		walk_north_east	# Run north-east
@@ -69,8 +65,6 @@ Alt-Enter	toggle_fullscreen
 Alt-1		sound_tester
 Alt-2       perf_metrics
 Ctrl-Alt-B		toggle_bboxes
-Q		toggle_rotate_world
-Shift-Q		toggle_smooth_scrolling
 Ctrl-B		shape_browser
 B		useitem			761	# Show spellbook
 INSERT		create_item		-1	# Create last shape
@@ -109,7 +103,7 @@ R		face_stats
 Alt-S		change_skin
 Ctrl-Alt-S	screenshot
 Ctrl-S		quicksave
-Shift-S		save_restore
+S		save_restore
 Ctrl-Alt-T	next_map_teleport
 Ctrl-T		next_time_period
 Alt-T		cursor_teleport
@@ -117,7 +111,7 @@ T		target_mode
 V		about
 Shift-V		volume_mixer
 Alt-W		toggle_wizard_mode
-Shift-W		useitem			159	# Use watch
+W		useitem			159	# Use watch
 Alt-X		quit
 Z		stats
 
