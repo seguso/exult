@@ -63,7 +63,17 @@ static void Gen_shadow(
 					continue;
 				}
 				for (cc = c - radius; cc <= c + radius; cc++) {
-					if (cc >= 0 && cc < w && pixels[rr * w + cc] != fg) {
+					if (cc < 0 || cc >= w) {
+						continue;
+					}
+					// Radius 1 keeps the historical full 3x3 outline. Radius 2
+					// uses a rounded/diamond second ring instead of filling the
+					// whole 5x5 square; visually this lands between the old
+					// one-pixel and the very heavy two-pixel outline.
+					if (radius > 1 && std::abs(rr - r) + std::abs(cc - c) > radius) {
+						continue;
+					}
+					if (pixels[rr * w + cc] != fg) {
 						pixels[rr * w + cc] = shadow;
 					}
 				}
