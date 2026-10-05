@@ -114,15 +114,16 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	config->value("config/gameplay/conversation_font/hlead", hlead, -2);
 	config->value("config/gameplay/conversation_font/vlead", vlead, 0);
 
-	// Match the classic conversation colour scheme: bright yellow glyphs,
-	// transparent background, one-pixel black outline.
+	// Match the classic conversation colour scheme: bright yellow glyphs and
+	// transparent background, with a stronger two-pixel black outline for
+	// readability over the world.
 	const unsigned char fg     = static_cast<unsigned char>(pal.find_color(63, 63, 5));
 	const unsigned char bg     = 255;
 	const unsigned char shadow = static_cast<unsigned char>(pal.find_color(0, 0, 0));
 
 	const std::string font_path = file.empty() ? std::string() : get_system_path(file);
 	auto generated = Gen_runtime_font_shape(
-			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow);
+			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow, 2);
 	if (!generated) {
 		std::cerr << "Unable to load custom conversation font";
 		if (!file.empty()) {
