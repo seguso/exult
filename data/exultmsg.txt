@@ -332,6 +332,7 @@
 0x658:Day
 0x659:am
 0x65A:pm
+0x65B:Continuous mouse steering:
 
 #Newfile_gump.cc
 #Info Box Strings
@@ -712,6 +713,7 @@
 #CLEAR_SELECTED
 0x858: Clear selection
 0x859:Toggle rotated world view
+0x85A:Toggle modern smooth scrolling
 
 
 #Shape Browser Help
