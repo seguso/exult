@@ -278,6 +278,7 @@ autogen.sh.1
 Makecache
 
 # vscode
+.vscode
 .vs
 .cache
 msvc/.vs
