@@ -583,10 +583,16 @@ int get_walking_speed(const int* params) {
 }
 
 static void start_keyboard_walk(Game_window* gwin, int screen_dx, int screen_dy, int speed) {
-	// Keyboard directions are display-relative. In the normal view display and
-	// world axes coincide. In the 45-degree view, inverse-rotate the requested
-	// display vector so Up/W still means visually up, Right/D visually right,
-	// and so on.
+	const bool transformed_movement = gwin->is_rotate_world_enabled() || gwin->is_modern_movement_enabled()
+									 || gwin->is_modern_keyboard_enabled();
+	if (!transformed_movement) {
+		// Preserve Exult's historical keyboard-walk targeting exactly when all
+		// experimental movement/view options are disabled.
+		gwin->start_actor(gwin->get_width() / 2 + screen_dx * 50, gwin->get_height() / 2 + screen_dy * 50, speed);
+		return;
+	}
+
+	// With a transformed/lagged view, keyboard directions are display-relative.
 	int world_dx = screen_dx;
 	int world_dy = screen_dy;
 	if (gwin->is_rotate_world_enabled()) {
@@ -595,7 +601,6 @@ static void start_keyboard_walk(Game_window* gwin, int screen_dx, int screen_dy,
 	}
 
 	// Aim from the Avatar's actual rendered position rather than screen centre.
-	// This matters now that the smooth camera is allowed to lag behind it.
 	int ax = 0;
 	int ay = 0;
 	gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
