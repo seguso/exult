@@ -1936,7 +1936,7 @@ void Game_window::start_actor_alt(
 	// principal facings. During continuous mouse steering, derive that facing
 	// from the exact requested vector and keep it stable while Bresenham-like
 	// correction steps alternate underneath.
-	const bool modern_mouse_steering = mouse_steering && lerping_enabled > 0;
+	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
