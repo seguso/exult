@@ -319,7 +319,7 @@ Game_window::Game_window(
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
 		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
-		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_movement_tau_ms(55),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_movement_tau_ms(150),
 		  smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
 		  smooth_cam_stage2_x(0.0), smooth_cam_stage2_y(0.0), smooth_cam_x(0.0), smooth_cam_y(0.0),
 		  smooth_cam_last_ticks(0), smooth_cam_valid(false) {
@@ -399,7 +399,7 @@ Game_window::Game_window(
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
-	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 55);
+	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
