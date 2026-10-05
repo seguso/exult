@@ -564,7 +564,7 @@ void GameDisplayOptions_gump::save_settings() {
 	if (fonts >= 0 && size_t(fonts) < std::size(fontcodes)) {
 		config->set("config/gameplay/fonts", fontcodes[fonts], false);
 	}
-	config->set("config/gameplay/conversation_font/enabled", conversation_font != 0, false);
+	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
 	// Reload fonts after both font-related settings have been stored.
 	Game::setup_fonts();
 	// Re-translate text messages with the correct UTF-8 map.
