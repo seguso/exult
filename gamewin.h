@@ -1016,8 +1016,11 @@ private:
 	int avposx_ld, avposy_ld;
 	// Legacy Exult smooth-scrolling amount (0..100).
 	int lerping_enabled;
-	// Our independent modern movement/camera package (Shift+Q).
+	// Our independent modern movement/camera package.
 	bool modern_movement_enabled;
+	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
+	// original Exult keymap and event-driven cardinal movement semantics.
+	bool modern_keyboard_enabled;
 	// Per-stage time constant for the modern 3-pole camera, in milliseconds.
 	int modern_movement_tau_ms;
 
@@ -1063,6 +1066,10 @@ public:
 	bool is_modern_movement_enabled() const {
 		return modern_movement_enabled;
 	}
+	bool is_modern_keyboard_enabled() const {
+		return modern_keyboard_enabled;
+	}
+	void set_modern_keyboard_enabled(bool enabled);
 	int get_modern_movement_tau_ms() const {
 		return modern_movement_tau_ms;
 	}
