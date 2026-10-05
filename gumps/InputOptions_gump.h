@@ -40,7 +40,6 @@ private:
 	int  dpad_location;
 	bool touch_pathfind;
 	bool modern_keyboard;
-	bool modern_mouse_steering;
 
 	enum button_ids {
 		id_first = 0,
@@ -58,7 +57,6 @@ private:
 		id_dpad_location,
 		id_touch_pathfind,
 		id_modern_keyboard,
-		id_modern_mouse_steering,
 		id_count
 	};
 
@@ -116,10 +114,6 @@ public:
 
 	void toggle_modern_keyboard(int state) {
 		modern_keyboard = state;
-	}
-
-	void toggle_modern_mouse_steering(int state) {
-		modern_mouse_steering = state;
 	}
 
 	Gump_button* on_button(int mx, int my) override;
