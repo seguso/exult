@@ -21,8 +21,11 @@
 #endif
 #include "istring.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <iostream>
+#include <iterator>
 
 #ifdef __GNUC__
 #	pragma GCC diagnostic push
@@ -227,11 +230,36 @@ public:
 	static auto Serif() {
 		return get_text_msg(0x5DA - msg_file_start);
 	}
+
+	// Keep the experimental labels self-contained for now. The generated
+	// message resource is not rebuilt by every development build, which made
+	// newly-added message IDs render as blank labels.
+	static const char* Modernsmoothscrolling_() {
+		return "Modern smooth scrolling:";
+	}
+
+	static const char* Smoothcameratau_() {
+		return "Smooth camera tau:";
+	}
+
+	static const char* Rotateworld45deg_() {
+		return "Rotate world 45 deg:";
+	}
+
+	static const char* Readableconversationfont_() {
+		return "Readable conversation font:";
+	}
+
+	static const char* Conversationfontsize_() {
+		return "Conversation font size:";
+	}
 };
 
 using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
 using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gump>;
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
+
+static constexpr int modern_tau_values[] = {90, 120, 150, 180, 220, 300, 400, 500};
 
 // Android stuff
 
@@ -244,7 +272,13 @@ void GameDisplayOptions_gump::SetAndroidAutoLaunchFPtrs(void (*setter)(bool), bo
 }
 
 Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
-	for (auto& btn : buttons) {
+	for (size_t i = 0; i < buttons.size(); ++i) {
+		// Legacy smooth scrolling is intentionally unavailable while the modern
+		// camera package is active; its percentage is a different algorithm.
+		if (modern_smooth && i == id_smooth_scrolling) {
+			continue;
+		}
+		auto& btn = buttons[i];
 		auto found = btn ? btn->on_button(mx, my) : nullptr;
 		if (found) {
 			return found;
@@ -306,10 +340,24 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_text_bg, std::move(textbgcolor), text_bg,
 			get_button_pos_for_label(Strings::TextBackground_()), yForRow(++y_index), large_size);
 
-	std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
-	buttons[id_smooth_scrolling]         = std::make_unique<GameDisplayTextToggle>(
-            this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
-            get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(++y_index), small_size);
+	++y_index;
+	update_legacy_smooth_button();
+
+	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
+			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
+
+	std::vector<std::string> tau_text;
+	for (int value : modern_tau_values) {
+		tau_text.emplace_back(std::to_string(value) + " ms");
+	}
+	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_tau, std::move(tau_text), modern_tau,
+			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
+
+	buttons[id_rotate_world] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_rotate_world, yesNo, rotate_world,
+			get_button_pos_for_label(Strings::Rotateworld45deg_()), yForRow(++y_index), small_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -349,6 +397,15 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts, get_button_pos_for_label(Strings::Fonts_()),
 			yForRow(++y_index), large_size);
 
+	buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_conversation_font, yesNo, conversation_font,
+			get_button_pos_for_label(Strings::Readableconversationfont_()), yForRow(++y_index), small_size);
+
+	buttons[id_conversation_font_size] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_conversation_font_size,
+			std::to_string(conversation_font_size) + " px",
+			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
+
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 
@@ -356,6 +413,47 @@ void GameDisplayOptions_gump::build_buttons() {
 
 	// Right align other setting buttons
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+}
+
+void GameDisplayOptions_gump::choose_conversation_font_size() {
+	bool escaped = false;
+	const int value = gwin->get_gump_man()->prompt_for_number(
+			5, conversation_font_default_size, 1, conversation_font_size, this, &escaped);
+	if (!escaped) {
+		conversation_font_size = value;
+		update_conversation_font_size_button();
+		gwin->set_all_dirty();
+	}
+}
+
+void GameDisplayOptions_gump::update_conversation_font_size_button() {
+	constexpr int small_size = 44;
+	// The exact row depends on which game/platform-specific options are present.
+	// Reuse the current button's y coordinate instead of assuming a fixed row.
+	const int button_y = buttons[id_conversation_font_size]
+			? buttons[id_conversation_font_size]->get_y()
+			: yForRow(16);
+	buttons[id_conversation_font_size] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_conversation_font_size,
+			std::to_string(conversation_font_size) + " px",
+			get_button_pos_for_label(Strings::Conversationfontsize_()), button_y, small_size);
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+}
+
+void GameDisplayOptions_gump::update_legacy_smooth_button() {
+	constexpr int legacy_row = 5;
+	const int small_size = 44;
+	if (modern_smooth) {
+		std::vector<std::string> disabled = {Strings::Disabled()};
+		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
+				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(disabled), 0,
+				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
+	} else {
+		std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
+		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
+				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
+				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
+	}
 }
 
 void GameDisplayOptions_gump::load_settings() {
@@ -380,6 +478,15 @@ void GameDisplayOptions_gump::load_settings() {
 	paperdolls       = sman->are_paperdolls_enabled();
 	text_bg          = gwin->get_text_bg() + 1;
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
+	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
+	rotate_world     = gwin->is_rotate_world_enabled() ? 1 : 0;
+	const int tau_ms = gwin->get_modern_movement_tau_ms();
+	modern_tau = 0;
+	for (size_t i = 1; i < std::size(modern_tau_values); ++i) {
+		if (std::abs(modern_tau_values[i] - tau_ms) < std::abs(modern_tau_values[modern_tau] - tau_ms)) {
+			modern_tau = static_cast<int>(i);
+		}
+	}
 
 	android_autolaunch = Android_getAutoLaunch ? Android_getAutoLaunch() : 0;
 	config->value("config/gameplay/language", value, "");
@@ -405,10 +512,18 @@ void GameDisplayOptions_gump::load_settings() {
 	} else {
 		fonts = 0;    // original
 	}
+	bool conversation_font_enabled = false;
+	config->value("config/gameplay/conversation_font/enabled", conversation_font_enabled, false);
+	conversation_font = conversation_font_enabled ? 1 : 0;
+
+	conversation_font_default_size = std::max(5, sman->get_text_height(0) - 4);
+	conversation_font_size = conversation_font_default_size;
+	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
+	conversation_font_size = std::clamp(conversation_font_size, 5, conversation_font_default_size);
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(18)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -416,13 +531,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(17), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(17), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(17), 50);
 
 	load_settings();
 	build_buttons();
@@ -461,6 +576,9 @@ void GameDisplayOptions_gump::save_settings() {
 	}
 	gwin->set_lerping_enabled(smooth_scrolling * 25);
 	config->set("config/gameplay/smooth_scrolling", smooth_scrolling * 25, false);
+	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
+	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
+	gwin->set_rotate_world_enabled(rotate_world != 0);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
 	config->set("config/gameplay/extended_intro", extended_intro ? "yes" : "no", false);
 	gwin->set_extended_intro(extended_intro);
@@ -484,11 +602,13 @@ void GameDisplayOptions_gump::save_settings() {
 	const char* fontcodes[] = {"original", "serif", "disabled"};
 	if (fonts >= 0 && size_t(fonts) < std::size(fontcodes)) {
 		config->set("config/gameplay/fonts", fontcodes[fonts], false);
-		// Reload fonts if font selection changed
-		Game::setup_fonts();
-		// Re-translate text messages with the correct UTF-8 map
-		Game::setup_text();
 	}
+	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
+	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
+	// Reload fonts after both font-related settings have been stored.
+	Game::setup_fonts();
+	// Re-translate text messages with the correct UTF-8 map.
+	Game::setup_text();
 
 	config->write_back();
 }
@@ -509,6 +629,9 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Hidemissingitems_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::TextBackground_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Modernsmoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Rotateworld45deg_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);
@@ -527,6 +650,12 @@ void GameDisplayOptions_gump::paint() {
 	}
 	if (buttons[id_fonts]) {
 		font->paint_text(iwin->get_ib8(), Strings::Fonts_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+	if (buttons[id_conversation_font]) {
+		font->paint_text(iwin->get_ib8(), Strings::Readableconversationfont_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+	if (buttons[id_conversation_font_size]) {
+		font->paint_text(iwin->get_ib8(), Strings::Conversationfontsize_(), x + label_margin, y + yForRow(++y_index) + 1);
 	}
 	gwin->set_painted();
 }

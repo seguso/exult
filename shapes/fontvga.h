@@ -88,6 +88,12 @@ public:
 	std::shared_ptr<Font> get_font(int fontnum) {
 		return (fontnum >= 0 && static_cast<unsigned int>(fontnum) < fonts.size()) ? (fonts[fontnum]) : nullptr;
 	}
+
+	void set_font(int fontnum, std::shared_ptr<Font> font) {
+		if (fontnum >= 0 && static_cast<unsigned int>(fontnum) < fonts.size() && font) {
+			fonts[fontnum] = std::move(font);
+		}
+	}
 };
 
 #endif

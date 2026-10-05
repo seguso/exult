@@ -32,6 +32,7 @@
 #include "exceptions.h"
 #include "fnames.h"
 #include "fontvga.h"
+#include "fontgen.h"
 #include "game.h"
 #include "gamewin.h"
 #include "istring.h"
@@ -40,6 +41,7 @@
 #include "utils.h"
 #include "vgafile.h"
 
+#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -75,6 +77,72 @@ static void override_vleads() {
 		vlead_override[7] = -5;
 	}
 }
+
+static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts, const Palette& pal) {
+	if (!fonts) {
+		return nullptr;
+	}
+
+	bool enabled = false;
+	config->value("config/gameplay/conversation_font/enabled", enabled, false);
+	if (!enabled) {
+		return nullptr;
+	}
+
+	std::string file;
+	std::string family;
+	config->value("config/gameplay/conversation_font/file", file, "");
+	config->value("config/gameplay/conversation_font/family", family, "");
+	if (family.empty() && file.empty()) {
+		family = "Tahoma";
+	}
+
+	// Gen_shadow adds one pixel on every side, so subtract two from the
+	// original font's total height to keep the final outlined result close to
+	// Exult's existing conversation text size.
+	int pixels = std::max(5, fonts->get_text_height(0) - 4);
+	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
+	pixels = std::clamp(pixels, 5, 32);
+
+	int hlead = -2;
+	int vlead = 0;
+	config->value("config/gameplay/conversation_font/hlead", hlead, -2);
+	config->value("config/gameplay/conversation_font/vlead", vlead, 0);
+
+	// Match the classic conversation colour scheme: bright yellow glyphs and
+	// transparent background, with a stronger two-pixel black outline for
+	// readability over the world.
+	const unsigned char fg     = static_cast<unsigned char>(pal.find_color(63, 63, 5));
+	const unsigned char bg     = 255;
+	const unsigned char shadow = static_cast<unsigned char>(pal.find_color(0, 0, 0));
+
+	const std::string font_path = file.empty() ? std::string() : get_system_path(file);
+	auto generated = Gen_runtime_font_shape(
+			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow, 2);
+	if (!generated) {
+		std::cerr << "Unable to load custom conversation font";
+		if (!file.empty()) {
+			std::cerr << " file '" << file << "'";
+		}
+		if (!family.empty()) {
+			std::cerr << " family '" << family << "'";
+		}
+		std::cerr << "; using the normal Exult font." << std::endl;
+		return nullptr;
+	}
+
+	auto result = std::make_shared<Font>(std::move(generated), hlead, vlead);
+	std::cout << "Using custom conversation font";
+	if (!family.empty()) {
+		std::cout << " '" << family << "'";
+	}
+	if (!file.empty()) {
+		std::cout << " from " << file;
+	}
+	std::cout << " at " << pixels << " px." << std::endl;
+	return result;
+}
+
 
 /*
  *  Singletons:
@@ -302,6 +370,7 @@ void Shape_manager::load() {
 	fonts = make_unique<Fonts_vga_file>();
 	override_vleads();
 	fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+	conversation_font = make_custom_conversation_font(fonts.get(), pal);
 
 	// Get translucency tables.
 	unique_ptr<unsigned char[]> ptr;    // We will delete THIS at the end, not blends!
@@ -474,6 +543,10 @@ void Shape_manager::reload_fonts(const File_spec& font_source, const File_spec& 
 	if (fonts) {
 		override_vleads();
 		fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+		// The readable conversation font is a runtime font layered on top of the
+		// selected built-in font set. Rebuild it whenever font settings are
+		// applied so toggling the option takes effect immediately.
+		conversation_font = make_custom_conversation_font(fonts.get(), pal);
 	}
 }
 
@@ -547,6 +620,32 @@ int Shape_manager::find_cursor(int fontnum, const char* text, int x, int y, int 
 
 std::shared_ptr<Font> Shape_manager::get_font(int fontnum) {
 	return fonts->get_font(fontnum);
+}
+
+std::shared_ptr<Font> Shape_manager::get_conversation_font() {
+	return conversation_font ? conversation_font : fonts->get_font(0);
+}
+
+int Shape_manager::paint_conversation_text_box(
+		const char* text, int x, int y, int w, int h, int vert_lead, bool pbreak, bool center, int shading, Cursor_info* cursor) {
+	if (shading >= 0) {
+		gwin->get_win()->fill_translucent8(0, w, h, x, y, xforms[shading]);
+	}
+	auto font = get_conversation_font();
+	if (!font) {
+		return 0;
+	}
+
+	// Keep the classic conversation line cadence even when the replacement
+	// font has taller Win32 metrics. The old call sites pass -1 to tighten
+	// the built-in font by one pixel; reproduce that same final line height.
+	int effective_vert_lead = vert_lead;
+	if (conversation_font && vert_lead == -1) {
+		const int target_line_height = fonts->get_text_line_height(0);
+		effective_vert_lead = target_line_height - font->get_text_height() - font->get_ver_lead();
+	}
+	return font->paint_text_box(
+			gwin->get_win()->get_ib8(), text, x, y, w, h, effective_vert_lead, pbreak, center, cursor);
 }
 
 Shape_manager::Cached_shape Shape_manager::cache_shape(int shape_kind, int shapenum, int framenum) {

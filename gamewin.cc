@@ -85,6 +85,7 @@
 #include "virstone.h"
 
 #include <cstdarg>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -317,7 +318,11 @@ Game_window::Game_window(
 		  allow_autonotes(false), allow_enhancements(false), in_exult_menu(false), extended_intro(false), load_palette_timer(0),
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
-		  scrolltx_lo(0), scrollty_lo(0), avposx_ld(0), avposy_ld(0), lerping_enabled(0) {
+		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_keyboard_enabled(false), modern_movement_tau_ms(150),
+		  smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
+		  smooth_cam_stage2_x(0.0), smooth_cam_stage2_y(0.0), smooth_cam_x(0.0), smooth_cam_y(0.0),
+		  smooth_cam_last_ticks(0), smooth_cam_valid(false) {
 	game_window = this;    // Set static ->.
 	clock       = new Game_clock(tqueue);
 	shape_man   = new Shape_manager();    // Create the single instance.
@@ -325,6 +330,7 @@ Game_window::Game_window(
 	// Create window.
 	win = new Image_window8(width, height, gwidth, gheight, scale, fullscreen, scaler, fillmode, fillsclr);
 	win->set_title("Exult Ultima VII Engine");
+	assert(World_view_transform::self_test());
 	pal = new Palette();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
@@ -384,8 +390,22 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	// Keep Exult's historical smooth-scrolling option intact and independent
+	// from our modern movement/camera package.
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
+
+	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
+	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
+	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
+	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
+	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
+	config->value("config/gameplay/rotate_world", rotate_world, false);
+	world_view.set_enabled(rotate_world);
+	resize_rotate_scene();
+	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -530,6 +550,160 @@ Game_window::~Game_window() {
 	// The single instance is gone; clear the static so get_instance() returns
 	// null (e.g. Mouse's destructor checks this before touching the window).
 	game_window = nullptr;
+}
+
+void Game_window::resize_rotate_scene() {
+	world_view.configure(win->get_game_width(), win->get_game_height());
+	if (!rotate_world) {
+		// Keep the default path allocation-free: the enlarged scene buffers only
+		// exist while the optional rotated-world view is enabled.
+		rotate_scene.reset();
+		rotate_scene_2x.reset();
+		return;
+	}
+
+	const int scene_size = world_view.get_scene_size();
+	auto buffer = win->create_buffer(scene_size, scene_size);
+	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
+	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
+
+	// Pixel-art-aware rotation uses a persistent 2x intermediate. Keep this
+	// buffer in ordinary 0-based coordinates; paint_rotated() maps logical
+	// scene coordinates into it after running the Scale2x reconstruction.
+	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
+	rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
+}
+
+void Game_window::set_rotate_world_enabled(bool enabled) {
+	rotate_world = enabled;
+	world_view.set_enabled(enabled);
+	resize_rotate_scene();
+	config->set("config/gameplay/rotate_world", enabled ? "yes" : "no", true);
+	set_all_dirty();
+	paint();
+}
+
+void Game_window::set_modern_movement_tau_ms(int ms) {
+	modern_movement_tau_ms = std::clamp(ms, 10, 500);
+	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, true);
+	reset_velocity_camera();
+}
+
+void Game_window::set_modern_keyboard_enabled(bool enabled) {
+	modern_keyboard_enabled = enabled;
+	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
+}
+
+void Game_window::set_smooth_scrolling_enabled(bool enabled) {
+	modern_movement_enabled = enabled;
+	config->set("config/gameplay/modern_movement", enabled ? "yes" : "no", true);
+	if (!enabled) {
+		mouse_walk_visual_dir = -1;
+	}
+	if (Mouse::mouse()) {
+		Mouse::mouse()->set_speed_cursor();
+	}
+	// Throw away any visual-camera lag immediately when switching modes so
+	// rendering and mouse hit-testing use the same origin from this frame on.
+	reset_velocity_camera();
+	scrolltx_lo = 0;
+	scrollty_lo = 0;
+	avposx_ld = 0;
+	avposy_ld = 0;
+	set_all_dirty();
+	paint();
+}
+
+void Game_window::display_to_world(int& x, int& y) const {
+	const World_view_point p = world_view.display_to_scene({static_cast<double>(x), static_cast<double>(y)});
+	x = static_cast<int>(std::lround(p.x));
+	y = static_cast<int>(std::lround(p.y));
+
+	// The velocity camera is purely visual: paint_velocity_camera() temporarily
+	// renders with a different scroll origin and then restores the logical
+	// tile scroll. Mouse hit-testing happens after that restore, so compensate
+	// for the difference between the origin the user is actually looking at
+	// and the current logical origin. During painting both origins coincide,
+	// making this adjustment naturally zero.
+	if (modern_movement_enabled && smooth_cam_valid) {
+		const int world_pixels = c_num_tiles * c_tilesize;
+		const auto wrapped_delta = [&](int visual, int logical) {
+			int d = visual - logical;
+			const int half = world_pixels / 2;
+			while (d > half) {
+				d -= world_pixels;
+			}
+			while (d < -half) {
+				d += world_pixels;
+			}
+			return d;
+		};
+		const int visual_x = static_cast<int>(std::lround(smooth_cam_x));
+		const int visual_y = static_cast<int>(std::lround(smooth_cam_y));
+		const int logical_x = scrolltx * c_tilesize + scrolltx_lo;
+		const int logical_y = scrollty * c_tilesize + scrollty_lo;
+		x += wrapped_delta(visual_x, logical_x);
+		y += wrapped_delta(visual_y, logical_y);
+	}
+}
+
+void Game_window::world_to_display(int& x, int& y) const {
+	// Inverse of display_to_world(): convert coordinates expressed relative to
+	// the current logical scroll origin into the visually rendered camera
+	// origin before applying the optional 45-degree world transform.
+	if (modern_movement_enabled && smooth_cam_valid) {
+		const int world_pixels = c_num_tiles * c_tilesize;
+		const auto wrapped_delta = [&](int visual, int logical) {
+			int d = visual - logical;
+			const int half = world_pixels / 2;
+			while (d > half) {
+				d -= world_pixels;
+			}
+			while (d < -half) {
+				d += world_pixels;
+			}
+			return d;
+		};
+		const int visual_x = static_cast<int>(std::lround(smooth_cam_x));
+		const int visual_y = static_cast<int>(std::lround(smooth_cam_y));
+		const int logical_x = scrolltx * c_tilesize + scrolltx_lo;
+		const int logical_y = scrollty * c_tilesize + scrollty_lo;
+		x -= wrapped_delta(visual_x, logical_x);
+		y -= wrapped_delta(visual_y, logical_y);
+	}
+
+	const World_view_point p = world_view.scene_to_display({static_cast<double>(x), static_cast<double>(y)});
+	x = static_cast<int>(std::lround(p.x));
+	y = static_cast<int>(std::lround(p.y));
+}
+
+void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
+	if (!rotate_world) {
+		x = 0;
+		y = 0;
+		w = get_width();
+		h = get_height();
+		return;
+	}
+	x = world_view.get_scene_x();
+	y = world_view.get_scene_y();
+	w = world_view.get_scene_size();
+	h = world_view.get_scene_size();
+}
+
+void Game_window::start_actor_from_display(int x, int y, int speed) {
+	display_to_world(x, y);
+	start_actor(x, y, speed, modern_movement_enabled);
+}
+
+void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
+	display_to_world(x, y);
+	start_actor_along_path(x, y, speed);
+}
+
+Game_object* Game_window::find_object_from_display(int x, int y) {
+	display_to_world(x, y);
+	return find_object(x, y);
 }
 
 /*
@@ -917,12 +1091,25 @@ void Game_window::resized(
 		unsigned int neww, unsigned int newh, bool newfs, unsigned int newgw, unsigned int newgh, unsigned int newsc,
 		unsigned int newsclr, Image_window::FillMode newfill, unsigned int newfillsclr) {
 	win->resized(neww, newh, newfs, newgw, newgh, newsc, newsclr, newfill, newfillsclr);
+	resize_rotate_scene();
 	pal->apply(false);
 	Shape_frame::set_to_render(win->get_ib8());
 	if (!main_actor) {    // In case we're before start.
 		return;
 	}
 	center_view(main_actor->get_tile());
+	if (modern_movement_enabled) {
+		// Video/scaler changes can leave transient sub-tile offsets from the
+		// previous viewport geometry.  The modern camera initializes from these
+		// values, so carrying them across a resize can start the new filter a few
+		// pixels out of phase and produce a visible snap/flicker.  Re-anchor the
+		// visual state to the newly centered logical camera.
+		scrolltx_lo = 0;
+		scrollty_lo = 0;
+		avposx_ld = 0;
+		avposy_ld = 0;
+		reset_velocity_camera();
+	}
 	paint();
 	// Do the following only if in game (not for menus)
 	if (!gump_man->gump_mode()) {
@@ -1135,6 +1322,7 @@ void Game_window::set_scrolls(Tile_coord cent    // Want center here.
 
 void Game_window::center_view(const Tile_coord& t) {
 	set_scrolls(t);
+	reset_velocity_camera();
 	set_all_dirty();
 }
 
@@ -1152,6 +1340,7 @@ void Game_window::set_camera_actor(Actor* a) {
 	camera_actor       = a;
 	const Tile_coord t = a->get_tile();
 	set_scrolls(t);    // Set scrolling around position,
+	reset_velocity_camera();
 	// and read in map there.
 	set_all_dirty();
 }
@@ -1744,7 +1933,8 @@ Gump* Game_window::get_dragging_gump() {
  */
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	// Avatar can move, don't sync the barge anymore.
 	landing_barge = nullptr;
@@ -1765,7 +1955,16 @@ void Game_window::start_actor_alt(
 		}
 	}
 
-	dir = Get_direction_NoWrap(ay - winy, winx - ax);
+	const int aim_dx = winx - ax;
+	const int aim_dy = winy - ay;
+	dir = Get_direction_NoWrap(-aim_dy, aim_dx);
+	const int requested_dir = dir;
+	// The movement grid is 8-way, but walking artwork only has the four
+	// principal facings. During continuous mouse steering, derive that facing
+	// from the exact requested vector and keep it stable while Bresenham-like
+	// correction steps alternate underneath.
+	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
+	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1790,50 +1989,53 @@ void Game_window::start_actor_alt(
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.
-	switch (dir) {
-	case north:
-		// cout << "NORTH" << endl;
-		ay -= delta;
-		break;
 
-	case northeast:
-		// cout << "NORTH EAST" << endl;
-		ay -= delta;
-		ax += delta;
-		break;
-
-	case east:
-		// cout << "EAST" << endl;
-		ax += delta;
-		break;
-
-	case southeast:
-		// cout << "SOUTH EAST" << endl;
-		ay += delta;
-		ax += delta;
-		break;
-
-	case south:
-		// cout << "SOUTH" << endl;
-		ay += delta;
-		break;
-
-	case southwest:
-		// cout << "SOUTH WEST" << endl;
-		ay += delta;
-		ax -= delta;
-		break;
-
-	case west:
-		// cout << "WEST" << endl;
-		ax -= delta;
-		break;
-
-	case northwest:
-		// cout << "NORTH WEST" << endl;
-		ay -= delta;
-		ax -= delta;
-		break;
+	if (modern_mouse_steering && dir == requested_dir && (aim_dx != 0 || aim_dy != 0)) {
+		// Mouse steering is not restricted to the eight animation directions.
+		// Aim a long temporary destination along the exact mouse->Avatar vector;
+		// the tile walker then naturally alternates cardinal/diagonal tile steps
+		// (Bresenham-style) so the *average* trajectory can have any angle. The
+		// actor artwork itself still uses the nearest of its 8 facing directions.
+		//
+		// Keyboard/WASD callers pass exact cardinal/diagonal vectors, so they
+		// remain strictly 8-way.
+		const int max_component = std::max(std::abs(aim_dx), std::abs(aim_dy));
+		ax += static_cast<int>(std::lround(static_cast<double>(aim_dx) * delta / max_component));
+		ay += static_cast<int>(std::lround(static_cast<double>(aim_dy) * delta / max_component));
+	} else {
+		// If collision handling deliberately redirected the first step, preserve
+		// the old 8-way detour for this call instead of immediately steering back
+		// into the obstacle.
+		switch (dir) {
+		case north:
+			ay -= delta;
+			break;
+		case northeast:
+			ay -= delta;
+			ax += delta;
+			break;
+		case east:
+			ax += delta;
+			break;
+		case southeast:
+			ay += delta;
+			ax += delta;
+			break;
+		case south:
+			ay += delta;
+			break;
+		case southwest:
+			ay += delta;
+			ax -= delta;
+			break;
+		case west:
+			ax -= delta;
+			break;
+		case northwest:
+			ay -= delta;
+			ax -= delta;
+			break;
+		}
 	}
 
 	const int lift       = main_actor->get_lift();
@@ -1859,7 +2061,8 @@ void Game_window::start_actor_alt(
 
 void Game_window::start_actor(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
 		return;    // Zzzzz....
@@ -1907,7 +2110,7 @@ void Game_window::start_actor(
 			}
 		}
 		// Going to use the alternative function for this at the moment
-		start_actor_alt(winx, winy, speed);
+		start_actor_alt(winx, winy, speed, mouse_steering);
 	}
 }
 
@@ -1950,6 +2153,7 @@ void Game_window::start_actor_along_path(
  */
 
 void Game_window::stop_actor() {
+	mouse_walk_visual_dir = -1;
 	if (moving_barge) {
 		moving_barge->stop();
 	} else {
@@ -2192,6 +2396,8 @@ void Game_window::show_items(
 	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;
+	int          world_x      = x;
+	int          world_y      = y;
 	if (gump) {
 		obj           = gump->find_object(gx, gy);
 		found_in_gump = (obj != nullptr);
@@ -2199,12 +2405,13 @@ void Game_window::show_items(
 			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
-		obj = find_object(x, y);
+		display_to_world(world_x, world_y);
+		obj = find_object(world_x, world_y);
 	}
 
 	if (item_menu) {
 		Game_object_map_xy mobjxy;
-		find_nearby_objects(mobjxy, x, y, gump);
+		find_nearby_objects(mobjxy, gump ? x : world_x, gump ? y : world_y, gump);
 		if (!mobjxy.empty() && Notebook_gump::get_instance() == nullptr) {
 			// Make sure menu is visible on the screen
 			Itemmenu_gump itemgump(&mobjxy, x, y);
@@ -2257,10 +2464,10 @@ void Game_window::show_items(
 		effects->add_text(namestr.c_str(), obj);
 	} else if (cheat.in_map_editor() && skip_lift > 0) {
 		// Show flat, but not when editing ter.
-		const ShapeID id = get_flat(x, y);
+		const ShapeID id = get_flat(world_x, world_y);
 		char          str[20];
 		snprintf(str, sizeof(str), "Flat %d:%d", id.get_shapenum(), id.get_framenum());
-		effects->add_text(str, x, y);
+		effects->add_text(str, world_x, world_y);
 	}
 	// If it's an actor and we want to grab the actor, grab it.
 	if (npc && cheat.grabbing_actor() && (npc->get_npc_num() || npc == main_actor)) {
@@ -2352,6 +2559,7 @@ void Game_window::paused_combat_select(
 	if (gump) {
 		return;    // Ignore if clicked on gump.
 	}
+	display_to_world(x, y);
 	Game_object* obj = find_object(x, y);
 	Actor*       npc = obj ? obj->as_actor() : nullptr;
 	if (!npc || !npc->is_in_party() || npc->get_flag(Obj_flags::asleep) || npc->is_dead() || npc->get_flag(Obj_flags::paralyzed)
@@ -2368,6 +2576,7 @@ void Game_window::paused_combat_select(
 	if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
 		return;
 	}
+	display_to_world(x, y);
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {                 // Nothing?  Walk there.
 		// Needs work if lift > 0.
@@ -2437,6 +2646,7 @@ void Game_window::double_clicked(
 
 	// If gump manager didn't handle it, we search the world for an object
 	if (!gump) {
+		display_to_world(x, y);
 		obj = find_object(x, y);
 		if (!avatar_can_act && obj && obj->as_actor() && obj->as_actor() == main_actor->as_actor()) {
 			ActionFileGump(nullptr);

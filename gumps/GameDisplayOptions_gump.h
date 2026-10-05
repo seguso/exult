@@ -36,12 +36,18 @@ private:
 	std::vector<std::string> sc_outline_txt;
 	int                      text_bg;
 	int                      smooth_scrolling;
+	int                      modern_smooth;
+	int                      modern_tau;
+	int                      rotate_world;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
 	int                      paperdolls;
 	int                      language;
 	int                      fonts;
+	int                      conversation_font;
+	int                      conversation_font_size;
+	int                      conversation_font_default_size;
 
 	enum button_ids {
 		id_first = 0,
@@ -55,6 +61,9 @@ private:
 		id_sb_hide_missing,
 		id_text_bg,
 		id_smooth_scrolling,
+		id_modern_smooth,
+		id_modern_tau,
+		id_rotate_world,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -62,6 +71,8 @@ private:
 		id_android_autolaunch,
 		id_language,
 		id_fonts,
+		id_conversation_font,
+		id_conversation_font_size,
 
 		id_count
 	};
@@ -76,6 +87,8 @@ public:
 	void close() override;
 
 	void build_buttons();
+	void update_legacy_smooth_button();
+	void update_conversation_font_size_button();
 
 	void load_settings();
 	void save_settings();
@@ -102,6 +115,12 @@ public:
 		fonts = state;
 	}
 
+	void toggle_conversation_font(int state) {
+		conversation_font = state;
+	}
+
+	void choose_conversation_font_size();
+
 	void toggle_sb_hide_missing(int state) {
 		sb_hide_missing = state;
 	}
@@ -112,6 +131,19 @@ public:
 
 	void toggle_smooth_scrolling(int state) {
 		smooth_scrolling = state;
+	}
+
+	void toggle_modern_smooth(int state) {
+		modern_smooth = state;
+		update_legacy_smooth_button();
+	}
+
+	void toggle_modern_tau(int state) {
+		modern_tau = state;
+	}
+
+	void toggle_rotate_world(int state) {
+		rotate_world = state;
 	}
 
 	void toggle_menu_intro(int state) {

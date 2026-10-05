@@ -41,6 +41,7 @@
 #include "perf.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 
 /*
@@ -328,6 +329,10 @@ void Game_render::increment_bbox_index() {
 void Game_window::paint(
 		int x, int y, int w, int h    // Rectangle to cover.
 ) {
+	if (rotate_world) {
+		paint_rotated(x, y, w, h);
+		return;
+	}
 	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 
 	if (!win->ready()) {
@@ -392,25 +397,210 @@ void Game_window::paint(
 
 	// Complete repaint?
 	if (!gx && !gy && gw == get_width() && gh == get_height() && main_actor) {
-		// Look for lights.
-		Actor*    party[9];    // Get party, including Avatar.
-		const int cnt           = get_party(party, 1);
-		int       carried_light = 0;
-		for (int i = 0; i < cnt; i++) {
-			carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
-		}
-		// Also check light spell.
-		if (special_light && clock->get_total_minutes() > special_light) {
-			// Just expired.
-			special_light = 0;
-			clock->set_palette();
-		}
-		// Set palette for lights.
-		clock->set_light_source(carried_light + light_sources, in_dungeon);
+		update_lighting(light_sources);
 	}
 
 	win->EndPaintIntoGuardBand();
 	win->clear_clip();
+}
+
+/*
+ *  Paint the world into an expanded logical buffer, rotate it into the
+ *  normal game buffer, then paint UI layers on top without rotating them.
+ */
+void Game_window::paint_rotated(int x, int y, int w, int h) {
+	ignore_unused_variable_warning(x);
+	ignore_unused_variable_warning(y);
+	ignore_unused_variable_warning(w);
+	ignore_unused_variable_warning(h);
+	if (!rotate_scene) {
+		resize_rotate_scene();
+	}
+
+	// Quantize camera translation only in the rotated view.  The renderer
+	// itself still scrolls by exact source pixels; this phase term makes the
+	// resampling lattice world-anchored, so a stationary object's contour does
+	// not change merely because smooth scrolling advanced by one pixel.
+	world_view.set_camera_pixel_origin(
+			static_cast<double>(scrolltx * c_tilesize + get_scrolltx_lo()),
+			static_cast<double>(scrollty * c_tilesize + get_scrollty_lo()));
+
+	const int display_width  = world_view.get_display_width();
+	const int display_height = world_view.get_display_height();
+	const int scene_size = world_view.get_scene_size();
+	const int scene_x    = -world_view.get_scene_offset_x();
+	const int scene_y    = -world_view.get_scene_offset_y();
+	rotate_scene->clear_clip();
+	rotate_scene->fill8(pal->get_border_index());
+	Image_buffer8* previous = push_render_target(rotate_scene.get());
+	rotate_scene->set_clip(scene_x, scene_y, scene_size, scene_size);
+	int light_sources = 0;
+	if (main_actor) {
+		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
+	}
+	effects->paint();
+	// A world object being dragged should go through the same rotated-world
+	// raster pipeline as when it is at rest. Painting it here preserves the
+	// exact Scale2x + rotate quality instead of promoting it to an unrotated UI
+	// overlay.
+	if (dragging && dragging->is_world_object_drag() && !dragging->is_over_gump()) {
+		dragging->paint_world_object();
+	}
+	rotate_scene->clear_clip();
+	pop_render_target(previous);
+
+	// The world is repainted in full for this first implementation.
+	int gx = 0;
+	int gy = 0;
+	int gw = display_width;
+	int gh = display_height;
+	win->BeginPaintIntoGuardBand(&gx, &gy, &gw, &gh);
+	win->set_clip(gx, gy, gw, gh);
+	win->fill8(pal->get_border_index());
+
+	// Reconstruct the 8-bit scene at 2x with the Scale2x/EPX neighbourhood
+	// rule before rotating it.  This is deliberately pixel-art-aware: diagonal
+	// runs that are only corner-connected at 1x get extra coverage at 2x, while
+	// interior colours (for example the lighter stripe inside a lamp post) stay
+	// distinct instead of being swallowed by a generic dark-edge bias.
+	rotate_scene_2x->clear_clip();
+	rotate_scene_2x->fill8(pal->get_border_index());
+	const auto scene_pixel = [&](int x, int y) {
+		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
+		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
+		return rotate_scene->get_pixel8(x, y);
+	};
+	for (int sy = 0; sy < scene_size; ++sy) {
+		const int y = scene_y + sy;
+		for (int sx = 0; sx < scene_size; ++sx) {
+			const int x = scene_x + sx;
+			const unsigned char e = scene_pixel(x, y);
+			const unsigned char b = scene_pixel(x, y - 1);
+			const unsigned char d = scene_pixel(x - 1, y);
+			const unsigned char f = scene_pixel(x + 1, y);
+			const unsigned char h = scene_pixel(x, y + 1);
+
+			unsigned char e0 = e;
+			unsigned char e1 = e;
+			unsigned char e2 = e;
+			unsigned char e3 = e;
+			if (b != h && d != f) {
+				if (d == b) e0 = d;
+				if (b == f) e1 = f;
+				if (d == h) e2 = d;
+				if (h == f) e3 = f;
+			}
+
+			const int hx = sx * 2;
+			const int hy = sy * 2;
+			rotate_scene_2x->put_pixel8(e0, hx, hy);
+			rotate_scene_2x->put_pixel8(e1, hx + 1, hy);
+			rotate_scene_2x->put_pixel8(e2, hx, hy + 1);
+			rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
+		}
+	}
+
+	// Rotate from the reconstructed 2x scene and area-sample each destination
+	// pixel at four quarter-pixel positions.  Unlike the previous dark-edge
+	// resolver this treats light and dark detail symmetrically.
+	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
+	rotate_blend_cache.fill(255);
+	const auto quantize_rgb = [&](int r, int g, int b) {
+		r = std::clamp(r, 0, 63);
+		g = std::clamp(g, 0, 63);
+		b = std::clamp(b, 0, 63);
+		const unsigned int key = static_cast<unsigned int>(r)
+				| (static_cast<unsigned int>(g) << 6)
+				| (static_cast<unsigned int>(b) << 12);
+		unsigned char& cached = rotate_blend_cache[key];
+		if (cached == 255) {
+			cached = static_cast<unsigned char>(pal->find_color(r, g, b));
+		}
+		return cached;
+	};
+	const auto sample_scene_2x = [&](const World_view_point& source) {
+		const double fx = (source.x - static_cast<double>(scene_x)) * 2.0 + 0.5;
+		const double fy = (source.y - static_cast<double>(scene_y)) * 2.0 + 0.5;
+		const int sx = static_cast<int>(std::floor(fx));
+		const int sy = static_cast<int>(std::floor(fy));
+		const int hi_size = scene_size * 2;
+		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
+			return static_cast<unsigned char>(pal->get_border_index());
+		}
+		return rotate_scene_2x->get_pixel8(sx, sy);
+	};
+	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+		if (a == b && a == c && a == d) {
+			return a;
+		}
+		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c) + pal->get_red(d) + 2) / 4;
+		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c) + pal->get_green(d) + 2) / 4;
+		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c) + pal->get_blue(d) + 2) / 4;
+		return quantize_rgb(r, g, blue);
+	};
+
+	const double source_dx = world_view.display_to_scene_x_step();
+	const double source_dy = world_view.display_to_scene_y_step();
+	for (int dy = 0; dy < display_height; ++dy) {
+		const double y0 = static_cast<double>(dy) + 0.25;
+		const double y1 = static_cast<double>(dy) + 0.75;
+		World_view_point source00 = world_view.display_to_scene({0.25, y0});
+		World_view_point source10 = world_view.display_to_scene({0.75, y0});
+		World_view_point source01 = world_view.display_to_scene({0.25, y1});
+		World_view_point source11 = world_view.display_to_scene({0.75, y1});
+		for (int dx = 0; dx < display_width; ++dx) {
+			win->put_pixel8(
+					blend4(
+							sample_scene_2x(source00), sample_scene_2x(source10),
+							sample_scene_2x(source01), sample_scene_2x(source11)),
+					dx, dy);
+			source00.x += source_dx;
+			source00.y += source_dy;
+			source10.x += source_dx;
+			source10.y += source_dy;
+			source01.x += source_dx;
+			source01.y += source_dy;
+			source11.x += source_dx;
+			source11.y += source_dy;
+		}
+	}
+
+	win->set_clip(0, 0, display_width, display_height);
+	gump_man->paint(false);
+	if (dragging) {
+		if (dragging->is_world_object_drag()) {
+			if (dragging->is_over_gump()) {
+				dragging->paint_gump_hover_overlay();
+			}
+		} else {
+			dragging->paint();
+		}
+	}
+	effects->paint_text();
+	gump_man->paint(true);
+	win->EndPaintIntoGuardBand();
+	win->clear_clip();
+
+	if (main_actor) {
+		update_lighting(light_sources);
+	}
+}
+
+void Game_window::update_lighting(int light_sources) {
+	if (!main_actor) {
+		return;
+	}
+	Actor* party[9];
+	const int cnt = get_party(party, 1);
+	int carried_light = 0;
+	for (int i = 0; i < cnt; ++i) {
+		carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
+	}
+	if (special_light && clock->get_total_minutes() > special_light) {
+		special_light = 0;
+		clock->set_palette();
+	}
+	clock->set_light_source(carried_light + light_sources, in_dungeon);
 }
 
 /*
@@ -429,6 +619,20 @@ void Game_window::lerp_reset() {
 	scrollty_lp = scrollty_l;
 	scrolltx_l  = scrolltx;
 	scrollty_l  = scrollty;
+
+	if (camera_actor) {
+		const Tile_coord t = camera_actor->get_tile();
+		if (!lerp_actor_valid) {
+			avtx_l = avtx_lp = t.tx;
+			avty_l = avty_lp = t.ty;
+			lerp_actor_valid = true;
+		} else {
+			avtx_lp = avtx_l;
+			avty_lp = avty_l;
+			avtx_l  = t.tx;
+			avty_l  = t.ty;
+		}
+	}
 }
 
 void Game_window::paint_lerped(int factor) {
@@ -441,6 +645,15 @@ void Game_window::paint_lerped(int factor) {
 
 	const int saved_scrolltx = scrolltx;
 	const int saved_scrollty = scrollty;
+
+	// Actor motion and camera motion intentionally use different curves.
+	// The actor follows a linear interpolation between discrete logical tile
+	// updates; the camera follows a slower cubic ease-in and catches up at the
+	// end of the segment. This breaks the rigid "avatar glued to screen center"
+	// constraint while keeping both endpoints exact.
+	const int actor_factor = factor;
+	const int64_t f = static_cast<int64_t>(factor);
+	const int camera_factor = static_cast<int>((f * f * f) / (static_cast<int64_t>(0x10000) * 0x10000));
 
 	scrolltx = scrolltx_l;
 	scrollty = scrollty_l;
@@ -462,46 +675,42 @@ void Game_window::paint_lerped(int factor) {
 		dy -= c_num_tiles;
 	}
 
-	// Only allow lerping to occur within say a 4 tile limit
 	if (dx > -4 && dx < 4 && dy > -4 && dy < 4) {
 		dx *= c_tilesize;
 		dy *= c_tilesize;
 		scrolltx *= c_tilesize;
 		scrollty *= c_tilesize;
 
-		scrolltx = scrolltx + (dx * (0x10000 - factor)) / 0x10000;
-		scrollty = scrollty + (dy * (0x10000 - factor)) / 0x10000;
+		scrolltx = scrolltx + (dx * (0x10000 - camera_factor)) / 0x10000;
+		scrollty = scrollty + (dy * (0x10000 - camera_factor)) / 0x10000;
 
 		dx = scrolltx % c_tilesize;
 		dy = scrollty % c_tilesize;
 
-		avposx_ld = scrolltx - saved_scrolltx * c_tilesize;
-		avposy_ld = scrollty - saved_scrollty * c_tilesize;
-
-		while (avposx_ld < -c_num_tiles * c_tilesize / 2) {
-			avposx_ld += c_num_tiles * c_tilesize;
-		}
-		while (avposx_ld > c_num_tiles * c_tilesize / 2) {
-			avposx_ld -= c_num_tiles * c_tilesize;
-		}
-		while (avposy_ld < -c_num_tiles * c_tilesize / 2) {
-			avposy_ld += c_num_tiles * c_tilesize;
-		}
-		while (avposy_ld > c_num_tiles * c_tilesize / 2) {
-			avposy_ld -= c_num_tiles * c_tilesize;
-		}
-
 		scrolltx = ((scrolltx / c_tilesize) + c_num_tiles) % c_num_tiles;
 		scrollty = ((scrollty / c_tilesize) + c_num_tiles) % c_num_tiles;
-
-		// printf ("f %05x %i-%i %i.%i\n", factor, scrolltx_lp, scrolltx_l,
-		// scrolltx, dx);
 	} else {
 		dx = 0;
 		dy = 0;
 	}
 
-	// Set pixel offset needed for lerping
+	// Interpolate the camera actor independently from the visual camera.
+	avposx_ld = 0;
+	avposy_ld = 0;
+	if (lerp_actor_valid) {
+		int adx = avtx_lp - avtx_l;
+		int ady = avty_lp - avty_l;
+		while (adx < -c_num_tiles / 2) adx += c_num_tiles;
+		while (adx > c_num_tiles / 2) adx -= c_num_tiles;
+		while (ady < -c_num_tiles / 2) ady += c_num_tiles;
+		while (ady > c_num_tiles / 2) ady -= c_num_tiles;
+		if (adx > -4 && adx < 4 && ady > -4 && ady < 4) {
+			avposx_ld = (adx * c_tilesize * (0x10000 - actor_factor)) / 0x10000;
+			avposy_ld = (ady * c_tilesize * (0x10000 - actor_factor)) / 0x10000;
+		}
+	}
+
+	// Set pixel offset needed for camera interpolation.
 	scrolltx_lo = dx;
 	scrollty_lo = dy;
 
@@ -511,6 +720,209 @@ void Game_window::paint_lerped(int factor) {
 	scrollty    = saved_scrollty;
 	scrolltx_lo = scrollty_lo = 0;
 	avposx_ld = avposy_ld = 0;
+}
+
+void Game_window::paint_current_view() {
+	if (!modern_movement_enabled || !smooth_cam_valid) {
+		paint();
+		return;
+	}
+
+	const int world_pixels = c_num_tiles * c_tilesize;
+	const auto wrap_pixel = [&](int p) {
+		p %= world_pixels;
+		if (p < 0) {
+			p += world_pixels;
+		}
+		return p;
+	};
+
+	const int saved_scrolltx = scrolltx;
+	const int saved_scrollty = scrollty;
+	const int saved_scrolltx_lo = scrolltx_lo;
+	const int saved_scrollty_lo = scrollty_lo;
+	const int saved_avposx_ld = avposx_ld;
+	const int saved_avposy_ld = avposy_ld;
+
+	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
+	const int wrapped_x = wrap_pixel(render_x);
+	const int wrapped_y = wrap_pixel(render_y);
+	scrolltx = wrapped_x / c_tilesize;
+	scrollty = wrapped_y / c_tilesize;
+	scrolltx_lo = wrapped_x % c_tilesize;
+	scrollty_lo = wrapped_y % c_tilesize;
+	avposx_ld = 0;
+	avposy_ld = 0;
+
+	paint();
+
+	scrolltx = saved_scrolltx;
+	scrollty = saved_scrollty;
+	scrolltx_lo = saved_scrolltx_lo;
+	scrollty_lo = saved_scrollty_lo;
+	avposx_ld = saved_avposx_ld;
+	avposy_ld = saved_avposy_ld;
+}
+
+void Game_window::reset_velocity_camera() {
+	smooth_cam_stage1_x = 0.0;
+	smooth_cam_stage1_y = 0.0;
+	smooth_cam_stage2_x = 0.0;
+	smooth_cam_stage2_y = 0.0;
+	smooth_cam_x = 0.0;
+	smooth_cam_y = 0.0;
+	smooth_cam_last_ticks = 0;
+	smooth_cam_valid = false;
+}
+
+bool Game_window::paint_velocity_camera(uint32 ticks) {
+	if (!camera_actor) {
+		reset_velocity_camera();
+		return false;
+	}
+
+	const int world_pixels = c_num_tiles * c_tilesize;
+	const double half_world = static_cast<double>(world_pixels) * 0.5;
+
+	// The logical target still moves in discrete tile-sized steps. Feed it
+	// through three identical first-order low-pass filters in cascade:
+	//
+	//   target -> stage 1 -> stage 2 -> rendered camera
+	//
+	// Each stage is a convex combination of its input and previous value, so a
+	// stationary step target is approached monotonically and can never be
+	// overshot. In the continuous-time equivalent H(s)=1/(1+tau*s)^3, camera
+	// position, velocity and acceleration are continuous even when the input
+	// target itself jumps.
+	const Tile_coord actor_pos = camera_actor->get_tile();
+	const int tw = get_width() / c_tilesize;
+	const int th = get_height() / c_tilesize;
+	double target_x = static_cast<double>((actor_pos.tx - tw / 2) * c_tilesize);
+	double target_y = static_cast<double>((actor_pos.ty - th / 2) * c_tilesize);
+
+	if (!smooth_cam_valid) {
+		// Start exactly at the currently rendered logical camera. Initializing all
+		// three stages to the same point avoids any startup transient.
+		const double initial_x = static_cast<double>(scrolltx * c_tilesize + scrolltx_lo);
+		const double initial_y = static_cast<double>(scrollty * c_tilesize + scrollty_lo);
+		smooth_cam_stage1_x = initial_x;
+		smooth_cam_stage1_y = initial_y;
+		smooth_cam_stage2_x = initial_x;
+		smooth_cam_stage2_y = initial_y;
+		smooth_cam_x = initial_x;
+		smooth_cam_y = initial_y;
+		smooth_cam_last_ticks = ticks;
+		smooth_cam_valid = true;
+		return false;
+	}
+
+	// Choose the wrapped target image nearest to the current unwrapped camera.
+	// Use the rendered stage as the reference so all three stages remain on one
+	// continuous unwrapped world image while crossing the map seam.
+	const auto nearest_wrapped = [&](double target, double current) {
+		double delta = target - current;
+		while (delta > half_world) {
+			delta -= world_pixels;
+		}
+		while (delta < -half_world) {
+			delta += world_pixels;
+		}
+		return current + delta;
+	};
+	target_x = nearest_wrapped(target_x, smooth_cam_x);
+	target_y = nearest_wrapped(target_y, smooth_cam_y);
+
+	uint32 elapsed_ms = ticks - smooth_cam_last_ticks;
+	smooth_cam_last_ticks = ticks;
+	if (elapsed_ms > 50) {
+		elapsed_ms = 50;
+	}
+	const double dt = static_cast<double>(elapsed_ms) / 1000.0;
+	if (dt <= 0.0) {
+		return false;
+	}
+
+	// Map/teleport discontinuities should not spend seconds flowing across the
+	// world. Normal walking produces only tile-sized target steps, nowhere near
+	// this threshold, so snap all stages together only for genuine jumps.
+	const double error_x = target_x - smooth_cam_x;
+	const double error_y = target_y - smooth_cam_y;
+	if (std::abs(error_x) > 128.0 || std::abs(error_y) > 128.0) {
+		smooth_cam_stage1_x = target_x;
+		smooth_cam_stage1_y = target_y;
+		smooth_cam_stage2_x = target_x;
+		smooth_cam_stage2_y = target_y;
+		smooth_cam_x = target_x;
+		smooth_cam_y = target_y;
+	}
+
+	const int old_render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int old_render_y = static_cast<int>(std::lround(smooth_cam_y));
+
+	// Time constant of each of the three cascaded stages. The effective group
+	// delay while following steady motion is roughly 3*tau (165 ms here).
+	// alpha is the exact frame-rate-independent update of one first-order stage.
+	const double tau = static_cast<double>(modern_movement_tau_ms) / 1000.0;
+	const double alpha = 1.0 - std::exp(-dt / tau);
+
+	// IMPORTANT: update all stages from the *previous* frame's stage values.
+	// Doing the assignments sequentially with freshly updated inputs would
+	// partially collapse the cascade and lose the intended third-order
+	// smoothness.
+	const double old_stage1_x = smooth_cam_stage1_x;
+	const double old_stage1_y = smooth_cam_stage1_y;
+	const double old_stage2_x = smooth_cam_stage2_x;
+	const double old_stage2_y = smooth_cam_stage2_y;
+	const double old_cam_x = smooth_cam_x;
+	const double old_cam_y = smooth_cam_y;
+
+	smooth_cam_stage1_x = old_stage1_x + alpha * (target_x - old_stage1_x);
+	smooth_cam_stage1_y = old_stage1_y + alpha * (target_y - old_stage1_y);
+	smooth_cam_stage2_x = old_stage2_x + alpha * (old_stage1_x - old_stage2_x);
+	smooth_cam_stage2_y = old_stage2_y + alpha * (old_stage1_y - old_stage2_y);
+	smooth_cam_x = old_cam_x + alpha * (old_stage2_x - old_cam_x);
+	smooth_cam_y = old_cam_y + alpha * (old_stage2_y - old_cam_y);
+
+	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
+	const bool camera_changed = render_x != old_render_x || render_y != old_render_y;
+	if (!camera_changed && !is_dirty()) {
+		return false;
+	}
+
+	const int saved_scrolltx = scrolltx;
+	const int saved_scrollty = scrollty;
+
+	const auto wrap_pixel = [&](int p) {
+		p %= world_pixels;
+		if (p < 0) {
+			p += world_pixels;
+		}
+		return p;
+	};
+	const int wrapped_x = wrap_pixel(render_x);
+	const int wrapped_y = wrap_pixel(render_y);
+	scrolltx = wrapped_x / c_tilesize;
+	scrollty = wrapped_y / c_tilesize;
+	scrolltx_lo = wrapped_x % c_tilesize;
+	scrollty_lo = wrapped_y % c_tilesize;
+
+	// The Avatar is deliberately not compensated back to screen centre: the
+	// camera is a true lagging follower, not an interpolation offset glued to
+	// the actor.
+	avposx_ld = 0;
+	avposy_ld = 0;
+
+	paint();
+
+	scrolltx = saved_scrolltx;
+	scrollty = saved_scrollty;
+	scrolltx_lo = 0;
+	scrollty_lo = 0;
+	avposx_ld = 0;
+	avposy_ld = 0;
+	return true;
 }
 
 /*

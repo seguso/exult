@@ -202,13 +202,20 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 
 	Image_window* iwin = gwin->get_win();
 	const float   f    = iwin->get_ui_scale_factor(ui_kind_for(g, is_hud));
+	// Anchor ordinary gump layers to the gump's own stable hotspot, not to
+	// the centre of the dirty bounds.  The dirty bounds include container
+	// contents and can therefore change as soon as an item is picked up.
+	// If scaling is active, centring the layer on those changing bounds makes
+	// the whole gump visibly jump by a few pixels when a protruding item is
+	// removed.  Keeping the gump hotspot fixed lets the layer bounds grow or
+	// shrink without moving the gump itself.
 	int           csx;
 	int           csy;
-	iwin->game_to_screen(b.x + b.w / 2, b.y + b.h / 2, false, csx, csy);
+	iwin->game_to_screen(g->get_x(), g->get_y(), false, csx, csy);
 	float dw = static_cast<float>(b.w) * f;
 	float dh = static_cast<float>(b.h) * f;
-	float dx = static_cast<float>(csx) - dw / 2.0f;
-	float dy = static_cast<float>(csy) - dh / 2.0f;
+	float dx = static_cast<float>(csx) - static_cast<float>(g->get_x() - b.x) * f;
+	float dy = static_cast<float>(csy) - static_cast<float>(g->get_y() - b.y) * f;
 	// HUD gumps (shortcut bar, face-stats) follow the gumps size setting via
 	// get_ui_scale_factor: Full = a fixed display size, Auto = the game area's
 	// native size (matches the main game layer), 1/2/3 interpolate.
@@ -575,7 +582,7 @@ void Gump_manager::add_gump(
 		} else {
 			set_kbd_focus(gump);
 		}
-		gwin->paint();
+		gwin->paint_current_view();
 		return;
 	}
 
@@ -688,7 +695,7 @@ void Gump_manager::add_gump(
 	}
 	const int sfx = Audio::game_sfx(14);
 	Audio::get_ptr()->play_sound_effect(sfx);    // The weird noise.
-	gwin->paint();                               // Show everything.
+	gwin->paint_current_view();                               // Show everything.
 }
 
 /*
@@ -726,7 +733,7 @@ void Gump_manager::close_all_gumps(bool pers) {
 	set_kbd_focus(nullptr);
 	gwin->get_npc_prox()->wait(4);    // Delay "barking" for 4 secs.
 	if (removed) {
-		gwin->paint();
+		gwin->paint_current_view();
 	}
 	if (touchui != nullptr && !modal_gump_count && non_persistent_count == 0 && !gwin->is_in_exult_menu()) {
 		touchui->showGameControls();
@@ -761,7 +768,7 @@ bool Gump_manager::double_clicked(
 		if (!gwin->main_actor_can_act()) {
 			if (gwin->get_double_click_closes_gumps()) {
 				gump->close();
-				gwin->paint();
+				gwin->paint_current_view();
 			}
 			return true;
 		}
@@ -776,7 +783,7 @@ bool Gump_manager::double_clicked(
 				btn->double_clicked(gx, gy);
 			} else if (gwin->get_double_click_closes_gumps()) {
 				gump->close();
-				gwin->paint();
+				gwin->paint_current_view();
 			}
 		}
 		return true;
@@ -1078,7 +1085,7 @@ bool Gump_manager::do_modal_gump(
 	}
 	add_gump(gump);
 	gump->run();
-	gwin->paint();    // Show everything now.
+	gwin->paint_current_view();    // Show everything now.
 	if (paint) {
 		paint->paint();
 	}
@@ -1105,7 +1112,7 @@ bool Gump_manager::do_modal_gump(
 		// overlay layer stays stale (looking like the click "did nothing").
 		const bool ran = gump->run();
 		if (ran || gwin->is_dirty() || got_event) {
-			gwin->paint();    // Paint each cycle.
+			gwin->paint_current_view();    // Paint each cycle.
 			if (paint) {
 				paint->paint();
 			}
@@ -1121,7 +1128,7 @@ bool Gump_manager::do_modal_gump(
 	remove_gump(gump);
 	Mouse::mouse()->set_shape(saveshape);
 	// Leave mouse off.
-	gwin->paint();
+	gwin->paint_current_view();
 	gwin->show(true);
 	// Resume the game
 	gwin->get_tqueue()->resume(SDL_GetTicks());

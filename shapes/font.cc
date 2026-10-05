@@ -65,7 +65,11 @@ static const char* Pass_space(const char* text) {
  */
 
 static const char* Pass_word(const char* text) {
-	while (*text && (*text != '^') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
+	// '*' is Exult's in-band page-break marker. Stop the current word before
+	// it even when it follows punctuation with no intervening space, so the
+	// main text-box loop can consume it as control syntax instead of painting
+	// the replacement TTF's visible asterisk glyph.
+	while (*text && (*text != '^') && (*text != '*') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
 		text++;
 	}
 	return text;
@@ -760,6 +764,11 @@ Font::Font(const File_spec& fname0, int index, int hlead, int vlead) {
 
 Font::Font(const File_spec& fname0, const File_spec& fname1, int index, int hlead, int vlead) {
 	load(fname0, fname1, index, hlead, vlead);
+}
+
+Font::Font(std::unique_ptr<Shape_file> shapes, int hlead, int vlead)
+		: hor_lead(hlead), ver_lead(vlead), font_shapes(std::move(shapes)) {
+	calc_highlow();
 }
 
 void Font::clean_up() {

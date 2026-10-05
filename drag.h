@@ -50,6 +50,8 @@ class Dragging_info : public Game_singletons {
 	int      readied_index;    // If it was a 'readied' item.
 	// Last mouse, paint positions:
 	int                 mousex, mousey, paintx, painty;
+	int                 world_grab_dx = 0, world_grab_dy = 0;
+	bool                has_world_grab = false;
 	Mouse::Mouse_shapes mouse_shape;       // Save starting mouse shape.
 	TileRect            rect;              // Rectangle to repaint.
 	bool                okay;              // True if drag constructed okay.
@@ -62,7 +64,11 @@ class Dragging_info : public Game_singletons {
 	int  item_layer_h = 0;
 	bool dropping     = false;    // Drop started: stop using the overlay layer
 								  //   (so a quantity slider paints above it).
-	void paint_obj_to_layer();    // Render dragged object into item_layer.
+	void paint_obj_to_layer(bool rotate_world_drag = true);    // Render dragged object into item_layer.
+	void paint_world_object();     // Paint world drag into the current world render target.
+	bool is_world_object_drag() const { return obj && !gump; }
+	bool is_over_gump() const;
+	void paint_gump_hover_overlay();
 	void free_item_layer();       // Destroy item_layer if present.
 
 	bool start(int x, int y);    // First motion.

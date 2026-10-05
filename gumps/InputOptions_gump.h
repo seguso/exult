@@ -39,6 +39,7 @@ private:
 	bool item_menu;
 	int  dpad_location;
 	bool touch_pathfind;
+	bool modern_keyboard;
 
 	enum button_ids {
 		id_first = 0,
@@ -55,6 +56,7 @@ private:
 		id_item_menu,
 		id_dpad_location,
 		id_touch_pathfind,
+		id_modern_keyboard,
 		id_count
 	};
 
@@ -108,6 +110,10 @@ public:
 
 	void toggle_touch_pathfind(int state) {
 		touch_pathfind = state;
+	}
+
+	void toggle_modern_keyboard(int state) {
+		modern_keyboard = state;
 	}
 
 	Gump_button* on_button(int mx, int my) override;

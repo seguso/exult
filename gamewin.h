@@ -25,6 +25,7 @@
 #include "flags.h"
 #include "iwin8.h"
 #include "rect.h"
+#include "worldview.h"
 #include "shapeid.h"
 #include "shapeinf.h"
 #include "tiles.h"
@@ -137,6 +138,15 @@ class Game_window {
 	int      scrolltx, scrollty;    // Top-left tile of screen.
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
+	bool rotate_world = false;
+	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
+	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
+	// the dominant requested direction instead of visibly snapping toward each
+	// one-tile correction step. -1 means no mouse-facing override.
+	int mouse_walk_visual_dir = -1;
+	World_view_transform world_view;
+	std::unique_ptr<Image_buffer8> rotate_scene;
+	std::unique_ptr<Image_buffer8> rotate_scene_2x;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
@@ -764,8 +774,12 @@ public:
 
 	// Paint scene at given tile.
 	void paint_map_at_tile(int x, int y, int w, int h, int toptx, int topty, int skip_above = 31);
+	// Repaint without changing the currently displayed modern-camera position.
+	void paint_current_view();
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
+	void paint_rotated(int x, int y, int w, int h);
+	void update_lighting(int light_sources);
 
 	void paint(TileRect& r) {
 		paint(r.x, r.y, r.w, r.h);
@@ -782,6 +796,19 @@ public:
 	void add_dirty(const TileRect& r) {    // Add rectangle to dirty area.
 		dirty = dirty.w > 0 ? dirty.add(r) : r;
 	}
+
+	bool is_rotate_world_enabled() const {
+		return rotate_world;
+	}
+
+	void set_rotate_world_enabled(bool enabled);
+	void display_to_world(int& x, int& y) const;
+	void world_to_display(int& x, int& y) const;
+	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
+	void start_actor_from_display(int x, int y, int speed = 125);
+	void start_actor_along_path_from_display(int x, int y, int speed = 125);
+	Game_object* find_object_from_display(int x, int y);
+	void resize_rotate_scene();
 
 	// Add dirty rect. for obj. Rets. false
 	//   if not on screen.
@@ -904,8 +931,11 @@ public:
 	void view_down();     // Move view down.
 	void view_up();       // Move view up.
 	// Start moving actor.
-	void start_actor_alt(int winx, int winy, int speed);
-	void start_actor(int winx, int winy, int speed = 125);
+	void start_actor_alt(int winx, int winy, int speed, bool mouse_steering = false);
+	void start_actor(int winx, int winy, int speed = 125, bool mouse_steering = false);
+	int get_mouse_walk_visual_dir() const {
+		return mouse_walk_visual_dir;
+	}
 	void start_actor_along_path(int winx, int winy, int speed = 125);
 	void stop_actor();    // Stop main actor.
 
@@ -974,13 +1004,37 @@ private:
 	// These are saved scroll positions
 	int scrolltx_l, scrollty_l;
 	int scrolltx_lp, scrollty_lp;
+	// Saved logical camera-actor tile positions.  These let the actor move
+	// visually between discrete tile updates independently of camera easing.
+	int avtx_l, avty_l;
+	int avtx_lp, avty_lp;
+	bool lerp_actor_valid;
 	// These are the pixel offset that needs to be subtracted from shape
 	// positions due to smooth scrolling
 	int scrolltx_lo, scrollty_lo;
 	// Delta for camera actor position in pixels due to lerping of position
 	int avposx_ld, avposy_ld;
-	// Is lerping enabled
+	// Legacy Exult smooth-scrolling amount (0..100).
 	int lerping_enabled;
+	// Our independent modern movement/camera package.
+	bool modern_movement_enabled;
+	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
+	// original Exult keymap and event-driven cardinal movement semantics.
+	bool modern_keyboard_enabled;
+	// Per-stage time constant for the modern 3-pole camera, in milliseconds.
+	int modern_movement_tau_ms;
+
+	// Experimental monotonic visual camera. Logical map scrolling stays
+	// tile-based; the discrete actor target passes through three identical
+	// first-order low-pass stages. The third stage is the rendered camera.
+	double smooth_cam_stage1_x;
+	double smooth_cam_stage1_y;
+	double smooth_cam_stage2_x;
+	double smooth_cam_stage2_y;
+	double smooth_cam_x;
+	double smooth_cam_y;
+	uint32 smooth_cam_last_ticks;
+	bool smooth_cam_valid;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
@@ -988,6 +1042,10 @@ public:
 
 	// (Re)paint the entire screen using a lerp factor 0-0x10000
 	void paint_lerped(int factor);
+
+	// Monotonic three-stage low-pass camera. Returns true if it painted a frame.
+	bool paint_velocity_camera(uint32 ticks);
+	void reset_velocity_camera();
 
 	inline int get_scrolltx_lo() const {
 		return scrolltx_lo;
@@ -1004,6 +1062,19 @@ public:
 	void set_lerping_enabled(int e) {
 		lerping_enabled = e;
 	}
+
+	bool is_modern_movement_enabled() const {
+		return modern_movement_enabled;
+	}
+	bool is_modern_keyboard_enabled() const {
+		return modern_keyboard_enabled;
+	}
+	void set_modern_keyboard_enabled(bool enabled);
+	int get_modern_movement_tau_ms() const {
+		return modern_movement_tau_ms;
+	}
+	void set_modern_movement_tau_ms(int ms);
+	void set_smooth_scrolling_enabled(bool enabled);
 
 	Game_render* get_render() {
 		return render;

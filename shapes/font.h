@@ -63,6 +63,7 @@ public:
 	Font();
 	Font(const File_spec& fname0, int index, int hlead = 0, int vlead = 1);
 	Font(const File_spec& fname0, const File_spec& fname1, int index, int hlead = 0, int vlead = 1);
+	Font(std::unique_ptr<Shape_file> shapes, int hlead = 0, int vlead = 0);
 	Font(Font&&) noexcept            = default;
 	Font& operator=(Font&&) noexcept = default;
 	~Font() noexcept                 = default;

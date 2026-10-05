@@ -132,12 +132,30 @@ Dragging_info::Dragging_info(
 			return;
 		}
 	} else if (x > 0 && y > 0 && x < gwin->get_width() && y < gwin->get_height()) {    // Not found in gump?
-		to_drag = gwin->find_object(x, y);
+		to_drag = gwin->find_object_from_display(x, y);
 		if (!to_drag) {
 			return;
 		}
-		// Get coord. where painted.
+		// Get the object's painted anchor. Preserve the exact point grabbed in
+		// unrotated object-local/world coordinates before converting the anchor
+		// into rotated display coordinates. If the drag later crosses into a
+		// gump, this lets the UI overlay keep that same point under the cursor
+		// while changing orientation.
 		gwin->get_shape_location(to_drag, paintx, painty);
+		// get_shape_location() is expressed relative to the logical scroll,
+		// while x/y are in the camera position actually shown to the user.
+		// This used to matter only for the 45-degree view; with the new lagging
+		// velocity camera it matters in the ordinary view too. Preserve the
+		// exact source pixel grabbed and convert the object anchor back to the
+		// displayed coordinate system before the drag starts, otherwise the item
+		// visibly jumps away from the hand by the current camera lag.
+		int grabx = x;
+		int graby = y;
+		gwin->display_to_world(grabx, graby);
+		world_grab_dx = grabx - paintx;
+		world_grab_dy = graby - painty;
+		has_world_grab = true;
+		gwin->world_to_display(paintx, painty);
 		old_pos  = to_drag->get_tile();
 		old_foot = to_drag->get_footprint();
 	}
@@ -247,7 +265,16 @@ bool Dragging_info::start(
 	rect.enlarge(deltax > deltay ? deltax : deltay);
 
 	TileRect crect = gwin->clip_to_win(rect);
-	gwin->paint(crect);    // Paint over obj's. area.
+	if (gwin->is_modern_movement_enabled()) {
+		// Starting a drag must not repaint through the logical/canonical camera
+		// while the modern camera is showing a lagged visual position.
+		gwin->add_dirty(crect);
+		gwin->paint_current_view();
+	} else {
+		// Preserve Exult's original partial repaint path when the experimental
+		// camera is disabled.
+		gwin->paint(crect);
+	}
 	return true;
 }
 
@@ -314,7 +341,7 @@ void Dragging_info::free_item_layer() {
  *  Render the dragged object into its own layer, scaled and placed to
  *  match the mouse-pointer layer.
  */
-void Dragging_info::paint_obj_to_layer() {
+void Dragging_info::paint_obj_to_layer(bool rotate_world_drag) {
 	Shape_frame* frame = obj->get_shape();
 	if (!frame) {
 		return;
@@ -327,20 +354,88 @@ void Dragging_info::paint_obj_to_layer() {
 		return;
 	}
 	Image_window* iwin = gwin->get_win();
-	// (Re)create the layer if missing or the shape size changed.
-	if (item_layer < 0 || item_layer_w != w || item_layer_h != h) {
+
+	int layer_w = w;
+	int layer_h = h;
+	int local_origin_x = -xleft;
+	int local_origin_y = -yabove;
+	std::unique_ptr<Image_buffer> rotated_owner;
+	Image_buffer8* rotated = nullptr;
+
+	if (gwin->is_rotate_world_enabled() && !gump && rotate_world_drag) {
+		// Only world-space drag overlays need to match the rotated world.
+		// Objects dragged from a gump/inventory are UI content: the gump itself
+		// is not rotated, so rotating the item here would make it visibly snap
+		// into the opposite orientation as soon as dragging starts.
+		auto src_owner = iwin->create_buffer(w, h);
+		auto* src = static_cast<Image_buffer8*>(src_owner.get());
+		src->clear_clip();
+		src->fill8(255);
+		Image_buffer8* prev = gwin->push_render_target(src);
+		if (obj->get_flag(Obj_flags::invisible)) {
+			obj->paint_invisible(xleft, yabove);
+		} else {
+			obj->paint_shape(xleft, yabove);
+		}
+		gwin->pop_render_target(prev);
+
+		constexpr double k = 0.7071067811865475244;
+		const double left   = -static_cast<double>(xleft);
+		const double top    = -static_cast<double>(yabove);
+		const double right  = left + static_cast<double>(w);
+		const double bottom = top + static_cast<double>(h);
+		const std::array<World_view_point, 4> corners = {{{left, top}, {right, top}, {right, bottom}, {left, bottom}}};
+		double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+		for (const auto& p : corners) {
+			const double rx = (p.x - p.y) * k;
+			const double ry = (p.x + p.y) * k;
+			min_x = std::min(min_x, rx);
+			min_y = std::min(min_y, ry);
+			max_x = std::max(max_x, rx);
+			max_y = std::max(max_y, ry);
+		}
+		const int origin_x = static_cast<int>(std::floor(min_x)) - 1;
+		const int origin_y = static_cast<int>(std::floor(min_y)) - 1;
+		layer_w = static_cast<int>(std::ceil(max_x)) - origin_x + 1;
+		layer_h = static_cast<int>(std::ceil(max_y)) - origin_y + 1;
+		local_origin_x = origin_x;
+		local_origin_y = origin_y;
+
+		rotated_owner = iwin->create_buffer(layer_w, layer_h);
+		rotated = static_cast<Image_buffer8*>(rotated_owner.get());
+		rotated->clear_clip();
+		rotated->fill8(255);
+		for (int dy = 0; dy < layer_h; ++dy) {
+			for (int dx = 0; dx < layer_w; ++dx) {
+				const double rx = static_cast<double>(origin_x + dx) + 0.5;
+				const double ry = static_cast<double>(origin_y + dy) + 0.5;
+				const double lx = (rx + ry) * k + static_cast<double>(xleft);
+				const double ly = (-rx + ry) * k + static_cast<double>(yabove);
+				const int sxp = static_cast<int>(std::floor(lx));
+				const int syp = static_cast<int>(std::floor(ly));
+				if (sxp >= 0 && sxp < w && syp >= 0 && syp < h) {
+					const unsigned char pix = src->get_pixel8(sxp, syp);
+					if (pix != 255) {
+						rotated->put_pixel8(pix, dx, dy);
+					}
+				}
+			}
+		}
+	}
+
+	// (Re)create the layer if missing or its raster size changed.
+	if (item_layer < 0 || item_layer_w != layer_w || item_layer_h != layer_h) {
 		if (item_layer >= 0) {
 			gwin->destroy_layer(item_layer);
 			item_layer = -1;
 		}
-		item_layer = gwin->create_layer("item", w, h, 255, 0, item_layer_z);
+		item_layer = gwin->create_layer("item", layer_w, layer_h, 255, 0, item_layer_z);
 		if (item_layer < 0) {
 			return;
 		}
-		// Derive scale/placement settings from the mouse-pointer layer.
 		gwin->layer_set_ui_kind(item_layer, Image_window::UiLayerMousePointer);
-		item_layer_w = w;
-		item_layer_h = h;
+		item_layer_w = layer_w;
+		item_layer_h = layer_h;
 	}
 	gwin->layer_set_z(item_layer, item_layer_z);
 
@@ -349,62 +444,93 @@ void Dragging_info::paint_obj_to_layer() {
 		return;
 	}
 	lbuf->clear_clip();
-	lbuf->fill8(255);    // Fully transparent.
-	Image_buffer8* prev = gwin->push_render_target(lbuf);
-	// Paint the shape at its origin within the layer buffer.
-	if (obj->get_flag(Obj_flags::invisible)) {
-		obj->paint_invisible(xleft, yabove);
+	lbuf->fill8(255);
+	if (rotated) {
+		lbuf->copy8(rotated->get_bits(), layer_w, layer_h, 0, 0);
 	} else {
-		obj->paint_shape(xleft, yabove);
+		Image_buffer8* prev = gwin->push_render_target(lbuf);
+		if (obj->get_flag(Obj_flags::invisible)) {
+			obj->paint_invisible(xleft, yabove);
+		} else {
+			obj->paint_shape(xleft, yabove);
+		}
+		gwin->pop_render_target(prev);
 	}
-	gwin->pop_render_target(prev);
 	gwin->layer_set_dirty(item_layer);
 
-	// Size the dragged item to match the mouse pointer, but ENLARGE ONLY: never
-	// shrink it below its native (game -> screen) size. So compute the item's
-	// native world scale, then grow each axis up to the pointer scale if the
-	// pointer is larger; if the pointer would shrink it, keep it native.
-	float     sx    = 1.0f;
-	float     sy    = 1.0f;
+	float sx = 1.0f;
+	float sy = 1.0f;
 	const int gamew = iwin->get_game_width();
 	const int gameh = iwin->get_game_height();
 	if (gamew > 0 && gameh > 0) {
-		int gx0;
-		int gy0;
-		int gx1;
-		int gy1;
+		int gx0, gy0, gx1, gy1;
 		iwin->game_to_screen(0, 0, false, gx0, gy0);
 		iwin->game_to_screen(gamew, gameh, false, gx1, gy1);
 		sx = static_cast<float>(gx1 - gx0) / static_cast<float>(gamew);
 		sy = static_cast<float>(gy1 - gy0) / static_cast<float>(gameh);
-		if (sx <= 0.0f) {
-			sx = 1.0f;
-		}
-		if (sy <= 0.0f) {
-			sy = 1.0f;
-		}
+		if (sx <= 0.0f) sx = 1.0f;
+		if (sy <= 0.0f) sy = 1.0f;
 	}
 	if (Mouse::mouse()) {
 		float px = sx;
 		float py = sy;
 		Mouse::mouse()->get_pointer_scale(px, py);
-		if (px > sx) {
-			sx = px;    // Enlarge to the pointer size.
-		}
-		if (py > sy) {
-			sy = py;
-		}
+		if (px > sx) sx = px;
+		if (py > sy) sy = py;
 	}
-	int cx;
-	int cy;
-	iwin->game_to_screen(mousex, mousey, false, cx, cy);
-	const float ox = static_cast<float>(cx) + static_cast<float>(paintx - mousex) * sx;
-	const float oy = static_cast<float>(cy) + static_cast<float>(painty - mousey) * sy;
-	const int   dx = static_cast<int>(ox - xleft * sx);
-	const int   dy = static_cast<int>(oy - yabove * sy);
-	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(w * sx), static_cast<int>(h * sy));
+
+	int dx;
+	int dy;
+	if (!rotate_world_drag && has_world_grab) {
+		// We are switching a world drag into an unrotated gump/UI overlay.
+		// Anchor the same source pixel that was originally grabbed, rather than
+		// anchoring the shape origin. This prevents the item from jumping when
+		// its orientation changes at the world/gump boundary.
+		int cursor_sx, cursor_sy;
+		iwin->game_to_screen(mousex, mousey, false, cursor_sx, cursor_sy);
+		const float grab_from_left = static_cast<float>(world_grab_dx + xleft);
+		const float grab_from_top  = static_cast<float>(world_grab_dy + yabove);
+		dx = static_cast<int>(std::lround(static_cast<float>(cursor_sx) - grab_from_left * sx));
+		dy = static_cast<int>(std::lround(static_cast<float>(cursor_sy) - grab_from_top * sy));
+	} else {
+		int anchor_sx, anchor_sy;
+		iwin->game_to_screen(paintx, painty, false, anchor_sx, anchor_sy);
+		dx = static_cast<int>(static_cast<float>(anchor_sx) + local_origin_x * sx);
+		dy = static_cast<int>(static_cast<float>(anchor_sy) + local_origin_y * sy);
+	}
+	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(layer_w * sx), static_cast<int>(layer_h * sy));
 	gwin->layer_set_visible(item_layer, true);
 }
+
+void Dragging_info::paint_world_object() {
+	if (!obj || gump) {
+		return;
+	}
+	int wx = paintx;
+	int wy = painty;
+	gwin->display_to_world(wx, wy);
+	if (obj->get_flag(Obj_flags::invisible)) {
+		obj->paint_invisible(wx, wy);
+	} else {
+		obj->paint_shape(wx, wy);
+	}
+}
+
+
+bool Dragging_info::is_over_gump() const {
+	return obj && gumpman->find_gump(mousex, mousey) != nullptr;
+}
+
+void Dragging_info::paint_gump_hover_overlay() {
+	if (!obj) {
+		return;
+	}
+	// Once a world item crosses into a gump, present it in the same unrotated
+	// UI orientation used by the gump itself.  It stays above the gump while
+	// hovering and will therefore not disappear behind the container.
+	paint_obj_to_layer(false);
+}
+
 
 /*
  *  Paint object being moved.
@@ -474,7 +600,7 @@ bool Dragging_info::drop(
 		mouse_widget->mouse_up(wx, wy, Gump::MouseButton::Left);
 		mouse_widget = nullptr;
 		widget_gump  = nullptr;
-		gwin->paint();
+		gwin->paint_current_view();
 		return true;
 	}
 	if (button) {
@@ -504,7 +630,7 @@ bool Dragging_info::drop(
 	obj  = nullptr;    // Clear so we don't paint them.
 	gump = nullptr;
 	free_item_layer();    // Object returns to the main layer.
-	gwin->paint();
+	gwin->paint_current_view();
 	return handled;
 }
 
@@ -599,8 +725,28 @@ bool Dragging_info::drop_on_gump(
 	if (on_gump != gump) {    // Not moving within same gump?
 		possible_theft = true;
 	}
+	// The mouse position above is mapped into the target gump's own layer
+	// coordinates. Do the same for the dragged object's hotspot: paintx/painty
+	// are kept in raw game/display coordinates while dragging, but Gump::add()
+	// interprets sx/sy in the gump's coordinate system. Passing the raw hotspot
+	// here makes the object snap by the layer scaling/offset when it is dropped.
+	int hotspot_x = paintx;
+	int hotspot_y = painty;
+	if (has_world_grab) {
+		// A world item hovering over a gump is rendered as unrotated UI content.
+		// paint_obj_to_layer(false) keeps the exact source pixel originally
+		// grabbed under the cursor, so the visual hotspot is mouse minus that
+		// saved source-space grab offset.  Use the same hotspot for the actual
+		// drop; paintx/painty still follow the world/display drag anchor and do
+		// not match the UI overlay once rotation/camera transforms are involved.
+		hotspot_x = x - world_grab_dx;
+		hotspot_y = y - world_grab_dy;
+	}
+	int gsx = hotspot_x;
+	int gsy = hotspot_y;
+	gumpman->map_game_to_gump(on_gump, hotspot_x, hotspot_y, gsx, gsy);
 	// Add, and allow to combine.
-	if (!on_gump->add(to_drop, gx, gy, paintx, painty, false, true)) {
+	if (!on_gump->add(to_drop, gx, gy, gsx, gsy, false, true)) {
 		// Failed.
 		if (to_drop != obj.get()) {
 			// Watch for partial drop.
@@ -620,6 +766,9 @@ bool Dragging_info::drop_on_gump(
  */
 
 static bool Is_inaccessible(Game_window* gwin, Game_object* obj, int x, int y) {
+	// x/y here come from get_shape_rect() after the object has been moved, so
+	// they are already world-scene coordinates. Do not apply the inverse
+	// display rotation a second time.
 	Game_object* block = gwin->find_object(x, y);
 	return block && block != obj && !block->is_dragable();
 }
@@ -646,16 +795,22 @@ bool Dragging_info::drop_on_map(
 	if (max_lift >= skip) {    // Don't drop where we cannot see.
 		max_lift = skip - 1;
 	}
-	// Drop where we last painted it.
+	// Drop where we last painted it. paintx/y are display coordinates while
+	// dragging: that is true not only for the 45-degree view, but also for the
+	// lagging velocity camera. drop_at_lift() expects coordinates relative to
+	// the logical/world camera origin, so always convert through the same
+	// display->world mapping used by hit-testing. When neither rotation nor the
+	// modern camera is active this conversion is a no-op.
 	int posx = paintx;
 	int posy = painty;
 	if (posx == -1000) {    // Unless we never painted.
 		posx = x;
 		posy = y;
 	}
+	gwin->display_to_world(posx, posy);
 	int lift;
 	// Was it dropped on something?
-	Game_object* found   = gwin->find_object(x, y);
+	Game_object* found   = gwin->find_object_from_display(x, y);
 	int          dropped = 0;    // 1 when dropped.
 	if (found && found != obj.get()) {
 		if (!Check_weight(gwin, to_drop, found)) {

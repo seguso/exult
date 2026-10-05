@@ -392,7 +392,7 @@ void ActionTryKeys(const int* params) {
 	if (gump) {
 		obj = gump->find_object(gx, gy);
 	} else {    // Search rest of world.
-		obj = gwin->find_object(x, y);
+		obj = gwin->find_object_from_display(x, y);
 	}
 	if (!obj) {
 		return;
@@ -491,7 +491,7 @@ void ActionUseHealingItems(const int* params) {
 	if (!is_party_item(340, 1) || !Get_click(x, y, Mouse::greenselect)) {
 		return;
 	}
-	Game_object* obj = gwin->find_object(x, y);
+	Game_object* obj = gwin->find_object_from_display(x, y);
 	if (obj) {
 		Actor* target = obj->as_actor();
 		if (target && target->get_property(Actor::health) < target->get_property(Actor::strength)) {
@@ -582,60 +582,85 @@ int get_walking_speed(const int* params) {
 	return 200 * gwin->get_std_delay() / speed;
 }
 
+static void start_keyboard_walk(Game_window* gwin, int screen_dx, int screen_dy, int speed) {
+	const bool transformed_movement = gwin->is_rotate_world_enabled() || gwin->is_modern_movement_enabled()
+									 || gwin->is_modern_keyboard_enabled();
+	if (!transformed_movement) {
+		// Preserve Exult's historical keyboard-walk targeting exactly when all
+		// experimental movement/view options are disabled.
+		gwin->start_actor(gwin->get_width() / 2 + screen_dx * 50, gwin->get_height() / 2 + screen_dy * 50, speed);
+		return;
+	}
+
+	// With a transformed/lagged view, keyboard directions are display-relative.
+	int world_dx = screen_dx;
+	int world_dy = screen_dy;
+	if (gwin->is_rotate_world_enabled()) {
+		world_dx = screen_dx + screen_dy;
+		world_dy = -screen_dx + screen_dy;
+	}
+
+	// Aim from the Avatar's actual rendered position rather than screen centre.
+	int ax = 0;
+	int ay = 0;
+	gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
+	gwin->start_actor(ax + world_dx * 50, ay + world_dy * 50, speed);
+}
+
 //  { ActionWalkWest, 0, "Walk west", normal_keys, NONE },
 void ActionWalkWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2, speed);
+	start_keyboard_walk(gwin, -1, 0, speed);
 }
 
 //  { ActionWalkEast, 0, "Walk east", normal_keys, NONE },
 void ActionWalkEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2, speed);
+	start_keyboard_walk(gwin, 1, 0, speed);
 }
 
 //  { ActionWalkNorth, 0, "Walk north", normal_keys, NONE },
 void ActionWalkNorth(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 - 50, speed);
+	start_keyboard_walk(gwin, 0, -1, speed);
 }
 
 //  { ActionWalkSouth, 0, "Walk south", normal_keys, NONE },
 void ActionWalkSouth(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 + 50, speed);
+	start_keyboard_walk(gwin, 0, 1, speed);
 }
 
 //  { ActionWalkNorthEast, 0, "Walk north-east", normal_keys, NONE },
 void ActionWalkNorthEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 - 50, speed);
+	start_keyboard_walk(gwin, 1, -1, speed);
 }
 
 //  { ActionWalkSouthEast, 0, "Walk south-east", normal_keys, NONE },
 void ActionWalkSouthEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 + 50, speed);
+	start_keyboard_walk(gwin, 1, 1, speed);
 }
 
 //  { ActionWalkNorthWest, 0, "Walk north-west", normal_keys, NONE },
 void ActionWalkNorthWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 - 50, speed);
+	start_keyboard_walk(gwin, -1, -1, speed);
 }
 
 //  { ActionWalkSouthWest, 0, "Walk south-west", normal_keys, NONE },
 void ActionWalkSouthWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 + 50, speed);
+	start_keyboard_walk(gwin, -1, 1, speed);
 }
 
 //  { ActionStopWalking, 0, "Stop Walking", cheat_keys, NONE },
@@ -983,4 +1008,17 @@ void ActionToggleBBoxes(const int* /*params*/) {
 
 void ActionPerfMetrics(const int* /*params*/) {
 	PerformanceTimer::IncMode();
+}
+
+void ActionToggleRotateWorld(const int* params) {
+	ignore_unused_variable_warning(params);
+	Game_window* gwin = Game_window::get_instance();
+	gwin->set_rotate_world_enabled(!gwin->is_rotate_world_enabled());
+}
+
+void ActionToggleSmoothScrolling(const int* params) {
+	ignore_unused_variable_warning(params);
+	Game_window* gwin = Game_window::get_instance();
+	gwin->set_smooth_scrolling_enabled(!gwin->is_modern_movement_enabled());
+	Mouse::mouse()->set_speed_cursor();
 }

@@ -224,6 +224,86 @@ static int                  left_down_x = 0, left_down_y = 0;
 static int                  joy_aim_x = 0, joy_aim_y = 0;
 Mouse::Avatar_Speed_Factors joy_speed_factor  = Mouse::medium_speed_factor;
 static Uint32               last_speed_cursor = 0;    // When we last updated the mouse cursor
+
+// Keyboard movement speed is a persistent runtime mode: normal play starts at
+// Exult's fast speed, and a standalone tap of either Shift key toggles between
+// fast and medium. Shift used as a modifier for another key (e.g. Shift+Q or
+// the displaced Shift+W/A/S/D bindings) does not toggle the speed.
+static bool   keyboard_medium_speed         = false;
+static bool   lshift_speed_toggle_candidate = false;
+static bool   rshift_speed_toggle_candidate = false;
+static int    keyboard_speed_layer          = -1;
+static Uint32 keyboard_speed_feedback_until = 0;
+
+static void hide_keyboard_speed_feedback() {
+	if (keyboard_speed_layer >= 0 && gwin) {
+		gwin->destroy_layer(keyboard_speed_layer);
+	}
+	keyboard_speed_layer          = -1;
+	keyboard_speed_feedback_until = 0;
+}
+
+static void show_keyboard_speed_feedback() {
+	if (!gwin) {
+		return;
+	}
+	hide_keyboard_speed_feedback();
+
+	const char* text = keyboard_medium_speed ? "Speed: medium" : "Speed: fast";
+	Shape_manager* sman = Shape_manager::get_instance();
+	if (!sman) {
+		return;
+	}
+
+	const int pad = 2;
+	const int w   = sman->get_text_width(0, text) + 2 * pad;
+	const int h   = sman->get_text_height(0) + 2 * pad;
+	keyboard_speed_layer = gwin->create_layer("Keyboard speed", w, h, 255, 0, (1 << 20) - 2);
+	if (keyboard_speed_layer < 0) {
+		return;
+	}
+	gwin->layer_set_ui_kind(keyboard_speed_layer, Image_window::UiLayerTextEffects);
+
+	Image_buffer8* buf = gwin->get_layer_ibuf(keyboard_speed_layer);
+	if (!buf) {
+		hide_keyboard_speed_feedback();
+		return;
+	}
+	buf->clear_clip();
+	buf->fill8(255);
+	Image_buffer8* prev = gwin->push_render_target(buf);
+	sman->paint_text(0, text, pad, pad);
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(keyboard_speed_layer);
+
+	Image_window* iwin = gwin->get_win();
+	int sx = 0;
+	int sy = 0;
+	iwin->game_to_screen(6, 6, false, sx, sy);
+	const float scale = iwin->get_ui_scale_factor(Image_window::UiLayerTextEffects);
+	gwin->layer_set_dest(
+			keyboard_speed_layer, sx, sy,
+			static_cast<int>(std::lround(static_cast<double>(w) * scale)),
+			static_cast<int>(std::lround(static_cast<double>(h) * scale)));
+	gwin->layer_set_visible(keyboard_speed_layer, true);
+	keyboard_speed_feedback_until = SDL_GetTicks() + 1500;
+}
+
+static bool is_keyboard_movement_scancode(SDL_Scancode scancode) {
+	switch (scancode) {
+	case SDL_SCANCODE_W:
+	case SDL_SCANCODE_A:
+	case SDL_SCANCODE_S:
+	case SDL_SCANCODE_D:
+	case SDL_SCANCODE_UP:
+	case SDL_SCANCODE_DOWN:
+	case SDL_SCANCODE_LEFT:
+	case SDL_SCANCODE_RIGHT:
+		return true;
+	default:
+		return false;
+	}
+}
 #if defined _WIN32
 void do_cleanup_output() {
 	cleanup_output("std");
@@ -1292,7 +1372,7 @@ static void Select_for_combo(
 	gwin->get_win()->screen_to_game(event.button.x, event.button.y, false, x, y);
 	// int tx = (gwin->get_scrolltx() + x/c_tilesize)%c_num_tiles;
 	// int ty = (gwin->get_scrollty() + y/c_tilesize)%c_num_tiles;
-	Game_object* obj = gwin->find_object(x, y);
+	Game_object* obj = gwin->find_object_from_display(x, y);
 	if (obj) {
 		if (dragging && obj == last_obj) {
 			return;
@@ -1333,18 +1413,16 @@ static void Handle_events() {
 	uint32 last_fps = 0;
 #endif
 	/*
+	 *  State for Exult's original segment-based smooth scrolling. It is only
+	 *  used while our independent modern movement package is disabled.
+	 */
+	int  last_x = -1;
+	int  last_y = -1;
+	int  lerp_mswait = 0;
+	bool lerp_stop_anchored = false;
+	/*
 	 *  Main event loop.
 	 */
-	int last_x = -1;
-	int last_y = -1;
-	// Interpolation duration (ms) for the current smooth-scroll
-	// segment. Captured when the scroll actually changes so the glide always
-	// runs at the speed of the step that produced it.
-	int lerp_mswait = 0;
-	// True once the final catch-up glide has been shortened after the camera
-	// actor stopped (see the stop-skate handling below). Reset on each new
-	// step so it only ever fires once per stop.
-	bool lerp_stop_anchored = false;
 	while (!quitting_time) {
 #ifdef USE_EXULTSTUDIO
 		Server_delay();    // Handle requests.
@@ -1363,6 +1441,9 @@ static void Handle_events() {
 
 		// Get current time.
 		const uint32 ticks = SDL_GetTicks();
+		if (keyboard_speed_layer >= 0 && ticks >= keyboard_speed_feedback_until) {
+			hide_keyboard_speed_feedback();
+		}
 #if defined(_WIN32) && defined(USE_EXULTSTUDIO)
 		if (ticks - Game::get_ticks() < 10) {
 			// Reducing processor usage with a slight delay.
@@ -1399,7 +1480,7 @@ static void Handle_events() {
 			int       y  = Mouse::mouse()->get_mousey();
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
-				gwin->start_actor(x, y, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
 			} else if (ticks > last_rest) {
 				const int resttime = ticks - last_rest;
 				gwin->get_main_actor()->resting(resttime);
@@ -1424,6 +1505,64 @@ static void Handle_events() {
 			show_items_clicked = false;
 		}
 
+		// Optional modern keyboard movement. When disabled, do not inspect or
+		// consume WASD/arrow state here: the original Exult keybinder remains the
+		// sole owner of those keys and keeps its historical bindings/semantics.
+		static int keyboard_walk_dx = 0;
+		static int keyboard_walk_dy = 0;
+		if (gwin->is_modern_keyboard_enabled()) {
+			const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
+			const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
+			const bool* key_state = SDL_GetKeyboardState(nullptr);
+			int keyboard_dx = 0;
+			int keyboard_dy = 0;
+			if (plain_movement_keys) {
+				keyboard_dx += (key_state[SDL_SCANCODE_D] || key_state[SDL_SCANCODE_RIGHT]) ? 1 : 0;
+				keyboard_dx -= (key_state[SDL_SCANCODE_A] || key_state[SDL_SCANCODE_LEFT]) ? 1 : 0;
+				keyboard_dy += (key_state[SDL_SCANCODE_S] || key_state[SDL_SCANCODE_DOWN]) ? 1 : 0;
+				keyboard_dy -= (key_state[SDL_SCANCODE_W] || key_state[SDL_SCANCODE_UP]) ? 1 : 0;
+			}
+			keyboard_dx = std::clamp(keyboard_dx, -1, 1);
+			keyboard_dy = std::clamp(keyboard_dy, -1, 1);
+
+			if (keyboard_dx != 0 || keyboard_dy != 0) {
+				if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
+					const int keyboard_speed_params[] = {keyboard_medium_speed ? 1 : 0};
+					if (keyboard_dy < 0 && keyboard_dx < 0) {
+						ActionWalkNorthWest(keyboard_speed_params);
+					} else if (keyboard_dy < 0 && keyboard_dx > 0) {
+						ActionWalkNorthEast(keyboard_speed_params);
+					} else if (keyboard_dy > 0 && keyboard_dx < 0) {
+						ActionWalkSouthWest(keyboard_speed_params);
+					} else if (keyboard_dy > 0 && keyboard_dx > 0) {
+						ActionWalkSouthEast(keyboard_speed_params);
+					} else if (keyboard_dy < 0) {
+						ActionWalkNorth(keyboard_speed_params);
+					} else if (keyboard_dy > 0) {
+						ActionWalkSouth(keyboard_speed_params);
+					} else if (keyboard_dx < 0) {
+						ActionWalkWest(keyboard_speed_params);
+					} else {
+						ActionWalkEast(keyboard_speed_params);
+					}
+				}
+			} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
+					   && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
+				gwin->stop_actor();
+			}
+			keyboard_walk_dx = keyboard_dx;
+			keyboard_walk_dy = keyboard_dy;
+		} else {
+			// The option may be switched off at runtime from the Input Options
+			// gump. Clear any state owned by the modern keyboard path immediately.
+			if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
+				&& !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
+				gwin->stop_actor();
+			}
+			keyboard_walk_dx = 0;
+			keyboard_walk_dy = 0;
+		}
+
 		if (joy_aim_x != 0 || joy_aim_y != 0) {
 			// Calculate the player speed
 			const int speed = 200 * gwin->get_std_delay() / static_cast<int>(joy_speed_factor);
@@ -1432,84 +1571,77 @@ static void Handle_events() {
 			gwin->start_actor(joy_aim_x, joy_aim_y, speed);
 		}
 
-		// Lerping stuff...
-		const int lerp    = gwin->is_lerping_enabled();
-		bool      didlerp = false;
+		const bool modern_movement = gwin->is_modern_movement_enabled();
 
 		// Update gumps every frame (drives auto-repeat for held
-		// slider/spinner arrows).  Must run even when nothing is dirty.
+		// slider/spinner arrows). Must run even when nothing is dirty.
 		if (!gwin->main_actor_dont_move()) {
 			gwin->get_gump_man()->update_gumps();
 		}
 
-		if (lerp) {
-			// Always repaint,
-			Actor*        act   = gwin->get_camera_actor();
-			Barge_object* barge = gwin->get_moving_barge();
-
-			const bool slow_walk = !barge && act && act->get_frame_time() * 2 >= 3 * gwin->get_std_delay();
-
-			// Force a reset if position changed
-			if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
-				// printf ("%i: %i -> %i, %i -> %i\n", ticks, last_x,
-				// gwin->get_scrolltx(), last_y, gwin->get_scrollty());
-				gwin->lerp_reset();
-				last_repaint = ticks;
-				// A real step happened, so any pending stop-glide shortening no
-				// longer applies; allow it to fire again once we next stop.
-				lerp_stop_anchored = false;
-				const int ft       = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
-																						: (act ? act->get_frame_time() : 0);
-				if (ft > 0) {
-					lerp_mswait = (ft * lerp) / 100;
-				}
-			}
-			last_x = gwin->get_scrolltx();
-			last_y = gwin->get_scrollty();
-
-			int mswait = lerp_mswait;
-			if (mswait <= 0) {
-				mswait = (gwin->get_std_delay() * lerp) / 100;
-			}
-
-			// Shorten the final catch-up glide once the camera actor has
-			// stopped.
-			if (!lerp_stop_anchored && lerp_mswait > 0 && !gwin->is_moving()) {
-				const int stopwait = (gwin->get_std_delay() * lerp) / 100;
-				if (stopwait > 0 && stopwait < mswait) {
-					int factor = ((ticks - last_repaint) * 0x10000) / mswait;
-					if (factor < 0) {
-						factor = 0;
-					}
-					if (factor > 0x10000) {
-						factor = 0x10000;
-					}
-					// Pick last_repaint so the factor is unchanged right now but
-					// advances at the faster (stopwait) rate from here on.
-					last_repaint = ticks - (factor * stopwait) / 0x10000;
-					lerp_mswait  = stopwait;
-					mswait       = stopwait;
-				}
-				lerp_stop_anchored = true;
-			}
-
-			// Is lerping (smooth scrolling) enabled
-			if (mswait && ticks < (last_repaint + mswait * 2)) {
-				// Slow walk doesn't use smooth scrolling.
-				const int factor = slow_walk ? 0x10000 : ((ticks - last_repaint) * 0x10000) / mswait;
-				gwin->paint_lerped(factor);
-				didlerp = true;
-			}
-		}
-		if (!lerp || !didlerp) {       // No lerping
-			if (gwin->is_dirty()) {    // Note the ending else in the above #if!
+		if (modern_movement) {
+			// Our independent monotonic three-stage camera.
+			const bool camera_painted = gwin->paint_velocity_camera(ticks);
+			if (!camera_painted && gwin->is_dirty()) {
 				gwin->paint_dirty();
 			}
-			// Reset it for lerping.
-			last_x = last_y = -1;
+		} else {
+			// Original Exult smooth-scrolling/lerp path. Keeping this separate is
+			// important: the legacy percentage in Game Display remains meaningful
+			// whenever Modern smooth scrolling is off.
+			const int lerp = gwin->is_lerping_enabled();
+			bool didlerp = false;
+			if (lerp) {
+				Actor* act = gwin->get_camera_actor();
+				Barge_object* barge = gwin->get_moving_barge();
+				const bool slow_walk = !barge && act && act->get_frame_time() * 2 >= 3 * gwin->get_std_delay();
+
+				if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
+					gwin->lerp_reset();
+					last_repaint = ticks;
+					lerp_stop_anchored = false;
+					const int ft = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
+																	 : (act ? act->get_frame_time() : 0);
+					if (ft > 0) {
+						lerp_mswait = (ft * lerp) / 100;
+					}
+				}
+				last_x = gwin->get_scrolltx();
+				last_y = gwin->get_scrollty();
+
+				int mswait = lerp_mswait;
+				if (mswait <= 0) {
+					mswait = (gwin->get_std_delay() * lerp) / 100;
+				}
+				if (!lerp_stop_anchored && lerp_mswait > 0 && !gwin->is_moving()) {
+					const int stopwait = (gwin->get_std_delay() * lerp) / 100;
+					if (stopwait > 0 && stopwait < mswait) {
+						int factor = ((ticks - last_repaint) * 0x10000) / mswait;
+						factor = std::clamp(factor, 0, 0x10000);
+						last_repaint = ticks - (factor * stopwait) / 0x10000;
+						lerp_mswait = stopwait;
+						mswait = stopwait;
+					}
+					lerp_stop_anchored = true;
+				}
+				if (mswait && ticks < (last_repaint + mswait * 2)) {
+					const int factor = slow_walk ? 0x10000 : ((ticks - last_repaint) * 0x10000) / mswait;
+					gwin->paint_lerped(factor);
+					didlerp = true;
+				}
+			}
+			if (!lerp || !didlerp) {
+				if (gwin->is_dirty()) {
+					gwin->paint_dirty();
+				}
+				last_x = last_y = -1;
+			}
 		}
-		// update mousecursor appearance if needed
-		if (last_speed_cursor + 100 < SDL_GetTicks() && !dragging) {
+
+		// Continuous cursor angle needs a 60-Hz-ish refresh; the classic cursor
+		// keeps Exult's original slower cadence.
+		const uint32 cursor_interval = modern_movement ? 16 : 100;
+		if (last_speed_cursor + cursor_interval < SDL_GetTicks() && !dragging) {
 			last_speed_cursor = SDL_GetTicks();
 			Mouse::mouse()->set_speed_cursor();
 			Mouse::mouse_update = true;
@@ -1864,7 +1996,7 @@ static void Handle_event(SDL_Event& event) {
 			} else if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
 				// Try removing old queue entry.
 				gwin->get_tqueue()->remove(gwin->get_main_actor());
-				gwin->start_actor(x, y, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
 			}
 		}
 		break;
@@ -1949,14 +2081,14 @@ static void Handle_event(SDL_Event& event) {
 				// Last right click not within .5 secs (not a doubleclick or
 				// rapid right clicking)?
 				if (gwin->get_allow_right_pathfind() == 1 && curtime - last_b3_click > 500 && gwin->main_actor_can_act_charmed()) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 				}
 
 				// Last right click within .5 secs (doubleclick)?
 				else if (
 						gwin->get_allow_right_pathfind() == 2 && curtime - last_b3_click < 500
 						&& gwin->main_actor_can_act_charmed()) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 				}
 
 				else {
@@ -1999,7 +2131,7 @@ static void Handle_event(SDL_Event& event) {
 				}
 				if (gwin->get_touch_pathfind() && avatar_can_act && gwin->main_actor_can_act_charmed() && !dragging
 					&& !gump_man->find_gump(x, y, false)) {
-					gwin->start_actor_along_path(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_along_path_from_display(x, y, Mouse::mouse()->avatar_speed);
 					dragging = dragged = false;
 					break;
 				}
@@ -2065,7 +2197,7 @@ static void Handle_event(SDL_Event& event) {
 		// Dragging with right?
 		else if ((event.motion.state & SDL_BUTTON_RMASK) && !right_on_gump) {
 			if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
-				gwin->start_actor(mx, my, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(mx, my, Mouse::mouse()->avatar_speed);
 			}
 		}
 #ifdef USE_EXULTSTUDIO    // Painting?
@@ -2103,12 +2235,52 @@ static void Handle_event(SDL_Event& event) {
 		gwin->get_gump_man()->okay_to_quit();
 		break;
 	case SDL_EVENT_KEY_DOWN:    // Keystroke.
-	case SDL_EVENT_KEY_UP:
-		if (!dragging &&    // ESC while dragging causes crashes.
+	case SDL_EVENT_KEY_UP: {
+		const bool is_lshift = event.key.scancode == SDL_SCANCODE_LSHIFT;
+		const bool is_rshift = event.key.scancode == SDL_SCANCODE_RSHIFT;
+		const bool is_shift  = is_lshift || is_rshift;
+
+		const bool modern_keyboard = gwin->is_modern_keyboard_enabled();
+		if (modern_keyboard) {
+			if (event.type == SDL_EVENT_KEY_DOWN) {
+				if (is_shift && !event.key.repeat) {
+					if (is_lshift) {
+						lshift_speed_toggle_candidate = true;
+					} else {
+						rshift_speed_toggle_candidate = true;
+					}
+				} else if (!is_shift) {
+					// Shift is being used as a modifier for another key, not as the
+					// standalone speed toggle.
+					lshift_speed_toggle_candidate = false;
+					rshift_speed_toggle_candidate = false;
+				}
+			} else if (is_shift) {
+				const bool toggle_speed = is_lshift ? lshift_speed_toggle_candidate : rshift_speed_toggle_candidate;
+				if (is_lshift) {
+					lshift_speed_toggle_candidate = false;
+				} else {
+					rshift_speed_toggle_candidate = false;
+				}
+				if (toggle_speed) {
+					keyboard_medium_speed = !keyboard_medium_speed;
+					show_keyboard_speed_feedback();
+				}
+			}
+		} else {
+			lshift_speed_toggle_candidate = false;
+			rshift_speed_toggle_candidate = false;
+		}
+
+		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
+		const bool plain_movement_key = modern_keyboard && is_keyboard_movement_scancode(event.key.scancode)
+									 && (event.key.mod & move_mods) == 0;
+		if (!plain_movement_key && !dragging &&    // ESC while dragging causes crashes.
 			!gwin->get_gump_man()->handle_kbd_event(&event)) {
 			keybinder->HandleEvent(event);
 		}
 		break;
+	}
 	case SDL_EVENT_DROP_TEXT:
 	case SDL_EVENT_DROP_FILE: {
 #ifdef USE_EXULTSTUDIO

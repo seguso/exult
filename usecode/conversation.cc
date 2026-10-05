@@ -628,7 +628,11 @@ void Conversation::show_npc_message(const char* msg) {
 			lbuf->fill8(conv_transparent);
 			paint_faces(true);
 		}
-		height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, info->large_face, -1);
+		if (info->large_face) {
+			height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, true, -1);
+		} else {
+			height = sman->paint_conversation_text_box(msg, box.x, box.y, box.w, box.h, -1, true, false, -1);
+		}
 		if (lbuf) {
 			lbuf->clear_clip();
 			gwin->pop_render_target(prev);
@@ -711,8 +715,15 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	const TileRect sbox        = get_conv_rect();
 	int            x           = 0;
 	int            y           = 0;    // Keep track of coords. in box.
+	auto           normal_font = sman->get_conversation_font();
+	auto           original_font = sman->get_font(0);
+	const bool     custom_font = normal_font && original_font && normal_font != original_font;
 	const int      line_height = sman->get_text_line_height(0);
-	const int      space_width = sman->get_text_width(0, " ");
+	const int      space_width = custom_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
+	const int      marker_width = custom_font ? original_font->get_text_width("\x7f") : 0;
+	constexpr int  marker_gap = 2;
+	const int      custom_y_offset
+			= custom_font ? original_font->get_text_baseline() - normal_font->get_text_baseline() : 0;
 
 	// Get main actor's portrait, checking for Petra flag.
 	int shape = Shapeinfo_lookup::GetFaceReplacement(0);
@@ -782,10 +793,9 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	}
 	// First pass: determine positions and draw all backgrounds.
 	for (int i = 0; i < num_choices; i++) {
-		char text[256];
-		text[0] = 127;    // A circle.
-		strcpy(&text[1], choices[i]);
-		const int width = sman->get_text_width(0, text);
+		const int width = custom_font
+				? marker_width + marker_gap + normal_font->get_text_width(choices[i])
+				: sman->get_text_width(0, (std::string("\x7f") + choices[i]).c_str());
 		if (x > 0 && x + width >= tbox.w) {
 			// Start a new line.
 			x = 0;
@@ -814,10 +824,20 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	}
 	// Second pass: draw all text on top of backgrounds.
 	for (int i = 0; i < num_choices; i++) {
-		char text[256];
-		text[0] = 127;    // A circle.
-		strcpy(&text[1], choices[i]);
-		sman->paint_text(0, text, conv_choices[i].x, conv_choices[i].y);
+		if (custom_font) {
+			// Keep Exult's original bullet glyph exactly where it was, and only
+			// replace the answer text itself. This preserves the familiar marker
+			// spacing/baseline while using the readable custom font.
+			sman->paint_text(original_font, "\x7f", conv_choices[i].x, conv_choices[i].y);
+			sman->paint_text(
+					normal_font, choices[i], conv_choices[i].x + marker_width + marker_gap,
+					conv_choices[i].y + custom_y_offset);
+		} else {
+			char text[256];
+			text[0] = 127;
+			strcpy(&text[1], choices[i]);
+			sman->paint_text(0, text, conv_choices[i].x, conv_choices[i].y);
+		}
 	}
 	avatar_face.enlarge((3 * c_tilesize) / 4);    // Encloses entire area.
 	avatar_face = avatar_face.intersect(sbox);
@@ -924,9 +944,12 @@ void Conversation::paint_faces(bool text) {
 		}
 		if (text) {    // Show text too?
 			const TileRect& box = finfo->text_rect;
-			// Use red for Guardian, snake.
-			const int font = finfo->large_face ? 7 : 0;
-			sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, -1);
+			if (finfo->large_face) {
+				// Guardian/serpent keeps its original red font.
+				sman->paint_text_box(7, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, true, -1);
+			} else {
+				sman->paint_conversation_text_box(finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, false, -1);
+			}
 		}
 	}
 }
