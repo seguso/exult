@@ -319,8 +319,7 @@ Game_window::Game_window(
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
 		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
-		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_keyboard_enabled(false),
-		  modern_mouse_steering_enabled(false), modern_movement_tau_ms(150),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_keyboard_enabled(false), modern_movement_tau_ms(150),
 		  smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
 		  smooth_cam_stage2_x(0.0), smooth_cam_stage2_y(0.0), smooth_cam_x(0.0), smooth_cam_y(0.0),
 		  smooth_cam_last_ticks(0), smooth_cam_valid(false) {
@@ -400,8 +399,6 @@ Game_window::Game_window(
 	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
 	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
-	config->value("config/gameplay/modern_mouse_steering", modern_mouse_steering_enabled, false);
-	config->set("config/gameplay/modern_mouse_steering", modern_mouse_steering_enabled, false);
 	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
@@ -597,20 +594,15 @@ void Game_window::set_modern_keyboard_enabled(bool enabled) {
 	config->set("config/gameplay/modern_keyboard", enabled, true);
 }
 
-void Game_window::set_modern_mouse_steering_enabled(bool enabled) {
-	modern_mouse_steering_enabled = enabled;
-	config->set("config/gameplay/modern_mouse_steering", enabled, true);
+void Game_window::set_smooth_scrolling_enabled(bool enabled) {
+	modern_movement_enabled = enabled;
+	config->set("config/gameplay/modern_movement", enabled, true);
 	if (!enabled) {
 		mouse_walk_visual_dir = -1;
 	}
 	if (Mouse::mouse()) {
 		Mouse::mouse()->set_speed_cursor();
 	}
-}
-
-void Game_window::set_smooth_scrolling_enabled(bool enabled) {
-	modern_movement_enabled = enabled;
-	config->set("config/gameplay/modern_movement", enabled, true);
 	// Throw away any visual-camera lag immediately when switching modes so
 	// rendering and mouse hit-testing use the same origin from this frame on.
 	reset_velocity_camera();
@@ -701,7 +693,7 @@ void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 
 void Game_window::start_actor_from_display(int x, int y, int speed) {
 	display_to_world(x, y);
-	start_actor(x, y, speed, modern_mouse_steering_enabled);
+	start_actor(x, y, speed, modern_movement_enabled);
 }
 
 void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
@@ -1959,7 +1951,7 @@ void Game_window::start_actor_alt(
 	// principal facings. During continuous mouse steering, derive that facing
 	// from the exact requested vector and keep it stable while Bresenham-like
 	// correction steps alternate underneath.
-	const bool modern_mouse_steering = mouse_steering && modern_mouse_steering_enabled;
+	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
