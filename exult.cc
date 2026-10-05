@@ -1505,53 +1505,63 @@ static void Handle_events() {
 			show_items_clicked = false;
 		}
 
-		// Combine held arrows/WASD into one 8-way direction.  The keybinder is
-		// event-oriented, so pressing Up then Right used to start two independent
-		// cardinal actions and whichever event arrived last won.  Polling the held
-		// state gives deterministic diagonals and also makes WASD independent of
-		// whatever bindings were present in the packaged defaultkeys resource.
+		// Optional modern keyboard movement. When disabled, do not inspect or
+		// consume WASD/arrow state here: the original Exult keybinder remains the
+		// sole owner of those keys and keeps its historical bindings/semantics.
 		static int keyboard_walk_dx = 0;
 		static int keyboard_walk_dy = 0;
-		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
-		const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
-		const bool* key_state = SDL_GetKeyboardState(nullptr);
-		int keyboard_dx = 0;
-		int keyboard_dy = 0;
-		if (plain_movement_keys) {
-			keyboard_dx += (key_state[SDL_SCANCODE_D] || key_state[SDL_SCANCODE_RIGHT]) ? 1 : 0;
-			keyboard_dx -= (key_state[SDL_SCANCODE_A] || key_state[SDL_SCANCODE_LEFT]) ? 1 : 0;
-			keyboard_dy += (key_state[SDL_SCANCODE_S] || key_state[SDL_SCANCODE_DOWN]) ? 1 : 0;
-			keyboard_dy -= (key_state[SDL_SCANCODE_W] || key_state[SDL_SCANCODE_UP]) ? 1 : 0;
-		}
-		keyboard_dx = std::clamp(keyboard_dx, -1, 1);
-		keyboard_dy = std::clamp(keyboard_dy, -1, 1);
-
-		if (keyboard_dx != 0 || keyboard_dy != 0) {
-			if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
-				const int keyboard_speed_params[] = {keyboard_medium_speed ? 1 : 0};
-				if (keyboard_dy < 0 && keyboard_dx < 0) {
-					ActionWalkNorthWest(keyboard_speed_params);
-				} else if (keyboard_dy < 0 && keyboard_dx > 0) {
-					ActionWalkNorthEast(keyboard_speed_params);
-				} else if (keyboard_dy > 0 && keyboard_dx < 0) {
-					ActionWalkSouthWest(keyboard_speed_params);
-				} else if (keyboard_dy > 0 && keyboard_dx > 0) {
-					ActionWalkSouthEast(keyboard_speed_params);
-				} else if (keyboard_dy < 0) {
-					ActionWalkNorth(keyboard_speed_params);
-				} else if (keyboard_dy > 0) {
-					ActionWalkSouth(keyboard_speed_params);
-				} else if (keyboard_dx < 0) {
-					ActionWalkWest(keyboard_speed_params);
-				} else {
-					ActionWalkEast(keyboard_speed_params);
-				}
+		if (gwin->is_modern_keyboard_enabled()) {
+			const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
+			const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
+			const bool* key_state = SDL_GetKeyboardState(nullptr);
+			int keyboard_dx = 0;
+			int keyboard_dy = 0;
+			if (plain_movement_keys) {
+				keyboard_dx += (key_state[SDL_SCANCODE_D] || key_state[SDL_SCANCODE_RIGHT]) ? 1 : 0;
+				keyboard_dx -= (key_state[SDL_SCANCODE_A] || key_state[SDL_SCANCODE_LEFT]) ? 1 : 0;
+				keyboard_dy += (key_state[SDL_SCANCODE_S] || key_state[SDL_SCANCODE_DOWN]) ? 1 : 0;
+				keyboard_dy -= (key_state[SDL_SCANCODE_W] || key_state[SDL_SCANCODE_UP]) ? 1 : 0;
 			}
-		} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0) && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
-			gwin->stop_actor();
+			keyboard_dx = std::clamp(keyboard_dx, -1, 1);
+			keyboard_dy = std::clamp(keyboard_dy, -1, 1);
+
+			if (keyboard_dx != 0 || keyboard_dy != 0) {
+				if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
+					const int keyboard_speed_params[] = {keyboard_medium_speed ? 1 : 0};
+					if (keyboard_dy < 0 && keyboard_dx < 0) {
+						ActionWalkNorthWest(keyboard_speed_params);
+					} else if (keyboard_dy < 0 && keyboard_dx > 0) {
+						ActionWalkNorthEast(keyboard_speed_params);
+					} else if (keyboard_dy > 0 && keyboard_dx < 0) {
+						ActionWalkSouthWest(keyboard_speed_params);
+					} else if (keyboard_dy > 0 && keyboard_dx > 0) {
+						ActionWalkSouthEast(keyboard_speed_params);
+					} else if (keyboard_dy < 0) {
+						ActionWalkNorth(keyboard_speed_params);
+					} else if (keyboard_dy > 0) {
+						ActionWalkSouth(keyboard_speed_params);
+					} else if (keyboard_dx < 0) {
+						ActionWalkWest(keyboard_speed_params);
+					} else {
+						ActionWalkEast(keyboard_speed_params);
+					}
+				}
+			} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
+					   && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
+				gwin->stop_actor();
+			}
+			keyboard_walk_dx = keyboard_dx;
+			keyboard_walk_dy = keyboard_dy;
+		} else {
+			// The option may be switched off at runtime from the Input Options
+			// gump. Clear any state owned by the modern keyboard path immediately.
+			if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
+				&& !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
+				gwin->stop_actor();
+			}
+			keyboard_walk_dx = 0;
+			keyboard_walk_dy = 0;
 		}
-		keyboard_walk_dx = keyboard_dx;
-		keyboard_walk_dy = keyboard_dy;
 
 		if (joy_aim_x != 0 || joy_aim_y != 0) {
 			// Calculate the player speed
@@ -2230,35 +2240,41 @@ static void Handle_event(SDL_Event& event) {
 		const bool is_rshift = event.key.scancode == SDL_SCANCODE_RSHIFT;
 		const bool is_shift  = is_lshift || is_rshift;
 
-		if (event.type == SDL_EVENT_KEY_DOWN) {
-			if (is_shift && !event.key.repeat) {
-				if (is_lshift) {
-					lshift_speed_toggle_candidate = true;
-				} else {
-					rshift_speed_toggle_candidate = true;
+		const bool modern_keyboard = gwin->is_modern_keyboard_enabled();
+		if (modern_keyboard) {
+			if (event.type == SDL_EVENT_KEY_DOWN) {
+				if (is_shift && !event.key.repeat) {
+					if (is_lshift) {
+						lshift_speed_toggle_candidate = true;
+					} else {
+						rshift_speed_toggle_candidate = true;
+					}
+				} else if (!is_shift) {
+					// Shift is being used as a modifier for another key, not as the
+					// standalone speed toggle.
+					lshift_speed_toggle_candidate = false;
+					rshift_speed_toggle_candidate = false;
 				}
-			} else if (!is_shift) {
-				// Shift is being used as a modifier for another key, not as the
-				// standalone speed toggle.
-				lshift_speed_toggle_candidate = false;
-				rshift_speed_toggle_candidate = false;
+			} else if (is_shift) {
+				const bool toggle_speed = is_lshift ? lshift_speed_toggle_candidate : rshift_speed_toggle_candidate;
+				if (is_lshift) {
+					lshift_speed_toggle_candidate = false;
+				} else {
+					rshift_speed_toggle_candidate = false;
+				}
+				if (toggle_speed) {
+					keyboard_medium_speed = !keyboard_medium_speed;
+					show_keyboard_speed_feedback();
+				}
 			}
-		} else if (is_shift) {
-			const bool toggle_speed = is_lshift ? lshift_speed_toggle_candidate : rshift_speed_toggle_candidate;
-			if (is_lshift) {
-				lshift_speed_toggle_candidate = false;
-			} else {
-				rshift_speed_toggle_candidate = false;
-			}
-			if (toggle_speed) {
-				keyboard_medium_speed = !keyboard_medium_speed;
-				show_keyboard_speed_feedback();
-			}
+		} else {
+			lshift_speed_toggle_candidate = false;
+			rshift_speed_toggle_candidate = false;
 		}
 
 		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
-		const bool plain_movement_key
-				= is_keyboard_movement_scancode(event.key.scancode) && (event.key.mod & move_mods) == 0;
+		const bool plain_movement_key = modern_keyboard && is_keyboard_movement_scancode(event.key.scancode)
+									 && (event.key.mod & move_mods) == 0;
 		if (!plain_movement_key && !dragging &&    // ESC while dragging causes crashes.
 			!gwin->get_gump_man()->handle_kbd_event(&event)) {
 			keybinder->HandleEvent(event);
