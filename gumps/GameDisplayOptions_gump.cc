@@ -230,6 +230,22 @@ public:
 	static auto Serif() {
 		return get_text_msg(0x5DA - msg_file_start);
 	}
+
+	static auto Modernsmoothscrolling_() {
+		return get_text_msg(0x5DB - msg_file_start);
+	}
+
+	static auto Smoothcameratau_() {
+		return get_text_msg(0x5DC - msg_file_start);
+	}
+
+	static auto Rotateworld45deg_() {
+		return get_text_msg(0x5DD - msg_file_start);
+	}
+
+	static auto Readableconversationfont_() {
+		return get_text_msg(0x5DE - msg_file_start);
+	}
 };
 
 using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
@@ -322,7 +338,7 @@ void GameDisplayOptions_gump::build_buttons() {
 
 	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
-			get_button_pos_for_label("Modern smooth scrolling:"), yForRow(++y_index), small_size);
+			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
 
 	std::vector<std::string> tau_text;
 	for (int value : modern_tau_values) {
@@ -330,11 +346,11 @@ void GameDisplayOptions_gump::build_buttons() {
 	}
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_tau, std::move(tau_text), modern_tau,
-			get_button_pos_for_label("Smooth camera tau:"), yForRow(++y_index), small_size);
+			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
 
 	buttons[id_rotate_world] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_rotate_world, yesNo, rotate_world,
-			get_button_pos_for_label("Rotate world 45 deg:"), yForRow(++y_index), small_size);
+			get_button_pos_for_label(Strings::Rotateworld45deg_()), yForRow(++y_index), small_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -373,6 +389,10 @@ void GameDisplayOptions_gump::build_buttons() {
 	buttons[id_fonts] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts, get_button_pos_for_label(Strings::Fonts_()),
 			yForRow(++y_index), large_size);
+
+	buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_conversation_font, yesNo, conversation_font,
+			get_button_pos_for_label(Strings::Readableconversationfont_()), yForRow(++y_index), small_size);
 
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
@@ -455,10 +475,13 @@ void GameDisplayOptions_gump::load_settings() {
 	} else {
 		fonts = 0;    // original
 	}
+	bool conversation_font_enabled = false;
+	config->value("config/gameplay/conversation_font/enabled", conversation_font_enabled, false);
+	conversation_font = conversation_font_enabled ? 1 : 0;
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(16)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(17)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -466,13 +489,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(15), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(16), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(15), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(16), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(15), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(16), 50);
 
 	load_settings();
 	build_buttons();
@@ -537,11 +560,12 @@ void GameDisplayOptions_gump::save_settings() {
 	const char* fontcodes[] = {"original", "serif", "disabled"};
 	if (fonts >= 0 && size_t(fonts) < std::size(fontcodes)) {
 		config->set("config/gameplay/fonts", fontcodes[fonts], false);
-		// Reload fonts if font selection changed
-		Game::setup_fonts();
-		// Re-translate text messages with the correct UTF-8 map
-		Game::setup_text();
 	}
+	config->set("config/gameplay/conversation_font/enabled", conversation_font != 0, false);
+	// Reload fonts after both font-related settings have been stored.
+	Game::setup_fonts();
+	// Re-translate text messages with the correct UTF-8 map.
+	Game::setup_text();
 
 	config->write_back();
 }
@@ -562,9 +586,9 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Hidemissingitems_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::TextBackground_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), "Modern smooth scrolling:", x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), "Smooth camera tau:", x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), "Rotate world 45 deg:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Modernsmoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Rotateworld45deg_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);
@@ -583,6 +607,9 @@ void GameDisplayOptions_gump::paint() {
 	}
 	if (buttons[id_fonts]) {
 		font->paint_text(iwin->get_ib8(), Strings::Fonts_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+	if (buttons[id_conversation_font]) {
+		font->paint_text(iwin->get_ib8(), Strings::Readableconversationfont_(), x + label_margin, y + yForRow(++y_index) + 1);
 	}
 	gwin->set_painted();
 }
