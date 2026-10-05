@@ -725,9 +725,21 @@ bool Dragging_info::drop_on_gump(
 	// are kept in raw game/display coordinates while dragging, but Gump::add()
 	// interprets sx/sy in the gump's coordinate system. Passing the raw hotspot
 	// here makes the object snap by the layer scaling/offset when it is dropped.
-	int gsx = paintx;
-	int gsy = painty;
-	gumpman->map_game_to_gump(on_gump, paintx, painty, gsx, gsy);
+	int hotspot_x = paintx;
+	int hotspot_y = painty;
+	if (has_world_grab) {
+		// A world item hovering over a gump is rendered as unrotated UI content.
+		// paint_obj_to_layer(false) keeps the exact source pixel originally
+		// grabbed under the cursor, so the visual hotspot is mouse minus that
+		// saved source-space grab offset.  Use the same hotspot for the actual
+		// drop; paintx/painty still follow the world/display drag anchor and do
+		// not match the UI overlay once rotation/camera transforms are involved.
+		hotspot_x = x - world_grab_dx;
+		hotspot_y = y - world_grab_dy;
+	}
+	int gsx = hotspot_x;
+	int gsy = hotspot_y;
+	gumpman->map_game_to_gump(on_gump, hotspot_x, hotspot_y, gsx, gsy);
 	// Add, and allow to combine.
 	if (!on_gump->add(to_drop, gx, gy, gsx, gsy, false, true)) {
 		// Failed.
