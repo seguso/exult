@@ -225,6 +225,70 @@ static int                  joy_aim_x = 0, joy_aim_y = 0;
 Mouse::Avatar_Speed_Factors joy_speed_factor  = Mouse::medium_speed_factor;
 static Uint32               last_speed_cursor = 0;    // When we last updated the mouse cursor
 
+// Keyboard movement speed is a persistent runtime mode: normal play starts at
+// Exult's fast speed, and a standalone tap of either Shift key toggles between
+// fast and medium. Shift used as a modifier for another key (e.g. Shift+Q or
+// the displaced Shift+W/A/S/D bindings) does not toggle the speed.
+static bool   keyboard_medium_speed         = false;
+static bool   lshift_speed_toggle_candidate = false;
+static bool   rshift_speed_toggle_candidate = false;
+static int    keyboard_speed_layer          = -1;
+static Uint32 keyboard_speed_feedback_until = 0;
+
+static void hide_keyboard_speed_feedback() {
+	if (keyboard_speed_layer >= 0 && gwin) {
+		gwin->destroy_layer(keyboard_speed_layer);
+	}
+	keyboard_speed_layer          = -1;
+	keyboard_speed_feedback_until = 0;
+}
+
+static void show_keyboard_speed_feedback() {
+	if (!gwin) {
+		return;
+	}
+	hide_keyboard_speed_feedback();
+
+	const char* text = keyboard_medium_speed ? "Speed: medium" : "Speed: fast";
+	Shape_manager* sman = Shape_manager::get_instance();
+	if (!sman) {
+		return;
+	}
+
+	const int pad = 2;
+	const int w   = sman->get_text_width(0, text) + 2 * pad;
+	const int h   = sman->get_text_height(0) + 2 * pad;
+	keyboard_speed_layer = gwin->create_layer("Keyboard speed", w, h, 255, 0, (1 << 20) - 2);
+	if (keyboard_speed_layer < 0) {
+		return;
+	}
+	gwin->layer_set_ui_kind(keyboard_speed_layer, Image_window::UiLayerTextEffects);
+
+	Image_buffer8* buf = gwin->get_layer_ibuf(keyboard_speed_layer);
+	if (!buf) {
+		hide_keyboard_speed_feedback();
+		return;
+	}
+	buf->clear_clip();
+	buf->fill8(255);
+	Image_buffer8* prev = gwin->push_render_target(buf);
+	sman->paint_text(0, text, pad, pad);
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(keyboard_speed_layer);
+
+	Image_window* iwin = gwin->get_win();
+	int sx = 0;
+	int sy = 0;
+	iwin->game_to_screen(6, 6, false, sx, sy);
+	const float scale = iwin->get_ui_scale_factor(Image_window::UiLayerTextEffects);
+	gwin->layer_set_dest(
+			keyboard_speed_layer, sx, sy,
+			static_cast<int>(std::lround(static_cast<double>(w) * scale)),
+			static_cast<int>(std::lround(static_cast<double>(h) * scale)));
+	gwin->layer_set_visible(keyboard_speed_layer, true);
+	keyboard_speed_feedback_until = SDL_GetTicks() + 1500;
+}
+
 static bool is_keyboard_movement_scancode(SDL_Scancode scancode) {
 	switch (scancode) {
 	case SDL_SCANCODE_W:
@@ -1377,6 +1441,9 @@ static void Handle_events() {
 
 		// Get current time.
 		const uint32 ticks = SDL_GetTicks();
+		if (keyboard_speed_layer >= 0 && ticks >= keyboard_speed_feedback_until) {
+			hide_keyboard_speed_feedback();
+		}
 #if defined(_WIN32) && defined(USE_EXULTSTUDIO)
 		if (ticks - Game::get_ticks() < 10) {
 			// Reducing processor usage with a slight delay.
@@ -1461,22 +1528,23 @@ static void Handle_events() {
 
 		if (keyboard_dx != 0 || keyboard_dy != 0) {
 			if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
+				const int keyboard_speed_params[] = {keyboard_medium_speed ? 1 : 0};
 				if (keyboard_dy < 0 && keyboard_dx < 0) {
-					ActionWalkNorthWest(nullptr);
+					ActionWalkNorthWest(keyboard_speed_params);
 				} else if (keyboard_dy < 0 && keyboard_dx > 0) {
-					ActionWalkNorthEast(nullptr);
+					ActionWalkNorthEast(keyboard_speed_params);
 				} else if (keyboard_dy > 0 && keyboard_dx < 0) {
-					ActionWalkSouthWest(nullptr);
+					ActionWalkSouthWest(keyboard_speed_params);
 				} else if (keyboard_dy > 0 && keyboard_dx > 0) {
-					ActionWalkSouthEast(nullptr);
+					ActionWalkSouthEast(keyboard_speed_params);
 				} else if (keyboard_dy < 0) {
-					ActionWalkNorth(nullptr);
+					ActionWalkNorth(keyboard_speed_params);
 				} else if (keyboard_dy > 0) {
-					ActionWalkSouth(nullptr);
+					ActionWalkSouth(keyboard_speed_params);
 				} else if (keyboard_dx < 0) {
-					ActionWalkWest(nullptr);
+					ActionWalkWest(keyboard_speed_params);
 				} else {
-					ActionWalkEast(nullptr);
+					ActionWalkEast(keyboard_speed_params);
 				}
 			}
 		} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0) && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
@@ -2158,6 +2226,36 @@ static void Handle_event(SDL_Event& event) {
 		break;
 	case SDL_EVENT_KEY_DOWN:    // Keystroke.
 	case SDL_EVENT_KEY_UP: {
+		const bool is_lshift = event.key.scancode == SDL_SCANCODE_LSHIFT;
+		const bool is_rshift = event.key.scancode == SDL_SCANCODE_RSHIFT;
+		const bool is_shift  = is_lshift || is_rshift;
+
+		if (event.type == SDL_EVENT_KEY_DOWN) {
+			if (is_shift && !event.key.repeat) {
+				if (is_lshift) {
+					lshift_speed_toggle_candidate = true;
+				} else {
+					rshift_speed_toggle_candidate = true;
+				}
+			} else if (!is_shift) {
+				// Shift is being used as a modifier for another key, not as the
+				// standalone speed toggle.
+				lshift_speed_toggle_candidate = false;
+				rshift_speed_toggle_candidate = false;
+			}
+		} else if (is_shift) {
+			const bool toggle_speed = is_lshift ? lshift_speed_toggle_candidate : rshift_speed_toggle_candidate;
+			if (is_lshift) {
+				lshift_speed_toggle_candidate = false;
+			} else {
+				rshift_speed_toggle_candidate = false;
+			}
+			if (toggle_speed) {
+				keyboard_medium_speed = !keyboard_medium_speed;
+				show_keyboard_speed_feedback();
+			}
+		}
+
 		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
 		const bool plain_movement_key
 				= is_keyboard_movement_scancode(event.key.scancode) && (event.key.mod & move_mods) == 0;
