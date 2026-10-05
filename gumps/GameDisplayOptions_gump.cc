@@ -249,6 +249,10 @@ public:
 	static const char* Readableconversationfont_() {
 		return "Readable conversation font:";
 	}
+
+	static const char* Conversationfontsize_() {
+		return "Conversation font size:";
+	}
 };
 
 using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
@@ -397,12 +401,38 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_conversation_font, yesNo, conversation_font,
 			get_button_pos_for_label(Strings::Readableconversationfont_()), yForRow(++y_index), small_size);
 
+	buttons[id_conversation_font_size] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_conversation_font_size,
+			std::to_string(conversation_font_size) + " px",
+			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
+
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 
 	HorizontalArrangeWidgets(tcb::span(buttons.data() + id_ok, 3));
 
 	// Right align other setting buttons
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+}
+
+void GameDisplayOptions_gump::choose_conversation_font_size() {
+	bool escaped = false;
+	const int value = gumpman->prompt_for_number(
+			5, conversation_font_default_size, 1, conversation_font_size, this, &escaped);
+	if (!escaped) {
+		conversation_font_size = value;
+		update_conversation_font_size_button();
+		gwin->set_all_dirty();
+	}
+}
+
+void GameDisplayOptions_gump::update_conversation_font_size_button() {
+	constexpr int small_size = 44;
+	const int row = 16;
+	buttons[id_conversation_font_size] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_conversation_font_size,
+			std::to_string(conversation_font_size) + " px",
+			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(row), small_size);
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
 
@@ -481,10 +511,15 @@ void GameDisplayOptions_gump::load_settings() {
 	bool conversation_font_enabled = false;
 	config->value("config/gameplay/conversation_font/enabled", conversation_font_enabled, false);
 	conversation_font = conversation_font_enabled ? 1 : 0;
+
+	conversation_font_default_size = std::max(5, sman->get_text_height(0) - 4);
+	conversation_font_size = conversation_font_default_size;
+	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
+	conversation_font_size = std::clamp(conversation_font_size, 5, conversation_font_default_size);
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(17)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(18)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -492,13 +527,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(16), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(17), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(16), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(17), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(16), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(17), 50);
 
 	load_settings();
 	build_buttons();
@@ -565,6 +600,7 @@ void GameDisplayOptions_gump::save_settings() {
 		config->set("config/gameplay/fonts", fontcodes[fonts], false);
 	}
 	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
+	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
 	// Reload fonts after both font-related settings have been stored.
 	Game::setup_fonts();
 	// Re-translate text messages with the correct UTF-8 map.
@@ -613,6 +649,9 @@ void GameDisplayOptions_gump::paint() {
 	}
 	if (buttons[id_conversation_font]) {
 		font->paint_text(iwin->get_ib8(), Strings::Readableconversationfont_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+	if (buttons[id_conversation_font_size]) {
+		font->paint_text(iwin->get_ib8(), Strings::Conversationfontsize_(), x + label_margin, y + yForRow(++y_index) + 1);
 	}
 	gwin->set_painted();
 }
