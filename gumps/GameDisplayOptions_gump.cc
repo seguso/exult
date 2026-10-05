@@ -21,8 +21,11 @@
 #endif
 #include "istring.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <iostream>
+#include <iterator>
 
 #ifdef __GNUC__
 #	pragma GCC diagnostic push
