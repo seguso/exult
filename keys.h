@@ -99,7 +99,8 @@ public:
 
 	void LoadFromFile(const char* filename);
 	void LoadFromPatch();
-	void LoadDefaults();	void ShowHelp() const;
+	void LoadDefaults();
+	void ShowHelp() const;
 	void ShowCheatHelp() const;
 	void ShowMapeditHelp() const;
 	void ShowBrowserKeys() const;
