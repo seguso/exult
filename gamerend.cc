@@ -723,13 +723,14 @@ void Game_window::paint_lerped(int factor) {
 }
 
 void Game_window::reset_velocity_camera() {
-	smooth_cam_valid = false;
-	smooth_cam_target_valid = false;
-	smooth_cam_vx = 0.0;
-	smooth_cam_vy = 0.0;
-	smooth_cam_actor_vx = 0.0;
-	smooth_cam_actor_vy = 0.0;
+	smooth_cam_stage1_x = 0.0;
+	smooth_cam_stage1_y = 0.0;
+	smooth_cam_stage2_x = 0.0;
+	smooth_cam_stage2_y = 0.0;
+	smooth_cam_x = 0.0;
+	smooth_cam_y = 0.0;
 	smooth_cam_last_ticks = 0;
+	smooth_cam_valid = false;
 }
 
 bool Game_window::paint_velocity_camera(uint32 ticks) {
@@ -741,36 +742,42 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	const int world_pixels = c_num_tiles * c_tilesize;
 	const double half_world = static_cast<double>(world_pixels) * 0.5;
 
-	if (!smooth_cam_valid) {
-		smooth_cam_x = static_cast<double>(scrolltx * c_tilesize);
-		smooth_cam_y = static_cast<double>(scrollty * c_tilesize);
-		smooth_cam_vx = 0.0;
-		smooth_cam_vy = 0.0;
-		smooth_cam_actor_vx = 0.0;
-		smooth_cam_actor_vy = 0.0;
-		smooth_cam_last_ticks = ticks;
-		smooth_cam_valid = true;
-		return false;
-	}
-
-	uint32 elapsed_ms = ticks - smooth_cam_last_ticks;
-	smooth_cam_last_ticks = ticks;
-	if (elapsed_ms > 50) {
-		elapsed_ms = 50;
-	}
-	const double dt = static_cast<double>(elapsed_ms) / 1000.0;
-	if (dt <= 0.0) {
-		return false;
-	}
-
+	// The logical target still moves in discrete tile-sized steps. Feed it
+	// through three identical first-order low-pass filters in cascade:
+	//
+	//   target -> stage 1 -> stage 2 -> rendered camera
+	//
+	// Each stage is a convex combination of its input and previous value, so a
+	// stationary step target is approached monotonically and can never be
+	// overshot. In the continuous-time equivalent H(s)=1/(1+tau*s)^3, camera
+	// position, velocity and acceleration are continuous even when the input
+	// target itself jumps.
 	const Tile_coord actor_pos = camera_actor->get_tile();
 	const int tw = get_width() / c_tilesize;
 	const int th = get_height() / c_tilesize;
 	double target_x = static_cast<double>((actor_pos.tx - tw / 2) * c_tilesize);
 	double target_y = static_cast<double>((actor_pos.ty - th / 2) * c_tilesize);
 
+	if (!smooth_cam_valid) {
+		// Start exactly at the currently rendered logical camera. Initializing all
+		// three stages to the same point avoids any startup transient.
+		const double initial_x = static_cast<double>(scrolltx * c_tilesize + scrolltx_lo);
+		const double initial_y = static_cast<double>(scrollty * c_tilesize + scrollty_lo);
+		smooth_cam_stage1_x = initial_x;
+		smooth_cam_stage1_y = initial_y;
+		smooth_cam_stage2_x = initial_x;
+		smooth_cam_stage2_y = initial_y;
+		smooth_cam_x = initial_x;
+		smooth_cam_y = initial_y;
+		smooth_cam_last_ticks = ticks;
+		smooth_cam_valid = true;
+		return false;
+	}
+
 	// Choose the wrapped target image nearest to the current unwrapped camera.
-	auto nearest_wrapped = [&](double target, double current) {
+	// Use the rendered stage as the reference so all three stages remain on one
+	// continuous unwrapped world image while crossing the map seam.
+	const auto nearest_wrapped = [&](double target, double current) {
 		double delta = target - current;
 		while (delta > half_world) {
 			delta -= world_pixels;
@@ -783,86 +790,56 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	target_x = nearest_wrapped(target_x, smooth_cam_x);
 	target_y = nearest_wrapped(target_y, smooth_cam_y);
 
-	// Estimate the Avatar's average visual velocity from successive logical
-	// target steps. This is the key difference from the previous controller:
-	// while the Avatar is moving, the camera tracks that velocity instead of
-	// trying to brake to a halt at every discrete tile target.
-	if (!smooth_cam_target_valid) {
-		smooth_cam_target_x = target_x;
-		smooth_cam_target_y = target_y;
-		smooth_cam_target_valid = true;
+	uint32 elapsed_ms = ticks - smooth_cam_last_ticks;
+	smooth_cam_last_ticks = ticks;
+	if (elapsed_ms > 50) {
+		elapsed_ms = 50;
 	}
-	const double target_step_x = target_x - smooth_cam_target_x;
-	const double target_step_y = target_y - smooth_cam_target_y;
-	if (std::abs(target_step_x) > 0.001 || std::abs(target_step_y) > 0.001) {
-		int frame_ms = camera_actor->get_frame_time();
-		if (frame_ms <= 0) {
-			frame_ms = get_std_delay();
-		}
-		frame_ms = std::max(frame_ms, 1);
-		smooth_cam_actor_vx = target_step_x * 1000.0 / static_cast<double>(frame_ms);
-		smooth_cam_actor_vy = target_step_y * 1000.0 / static_cast<double>(frame_ms);
-		smooth_cam_target_x = target_x;
-		smooth_cam_target_y = target_y;
-	}
-	if (!camera_actor->is_moving()) {
-		smooth_cam_actor_vx = 0.0;
-		smooth_cam_actor_vy = 0.0;
+	const double dt = static_cast<double>(elapsed_ms) / 1000.0;
+	if (dt <= 0.0) {
+		return false;
 	}
 
+	// Map/teleport discontinuities should not spend seconds flowing across the
+	// world. Normal walking produces only tile-sized target steps, nowhere near
+	// this threshold, so snap all stages together only for genuine jumps.
 	const double error_x = target_x - smooth_cam_x;
 	const double error_y = target_y - smooth_cam_y;
-
-	// Teleports/map changes are the one case where carrying camera velocity is
-	// undesirable. Normal walking never produces an error anywhere near this.
 	if (std::abs(error_x) > 128.0 || std::abs(error_y) > 128.0) {
+		smooth_cam_stage1_x = target_x;
+		smooth_cam_stage1_y = target_y;
+		smooth_cam_stage2_x = target_x;
+		smooth_cam_stage2_y = target_y;
 		smooth_cam_x = target_x;
 		smooth_cam_y = target_y;
-		smooth_cam_vx = 0.0;
-		smooth_cam_vy = 0.0;
-		smooth_cam_target_x = target_x;
-		smooth_cam_target_y = target_y;
-		smooth_cam_actor_vx = 0.0;
-		smooth_cam_actor_vy = 0.0;
 	}
 
 	const int old_render_x = static_cast<int>(std::lround(smooth_cam_x));
 	const int old_render_y = static_cast<int>(std::lround(smooth_cam_y));
 
-	const bool actor_moving = camera_actor->is_moving();
-	const double actor_speed = std::hypot(smooth_cam_actor_vx, smooth_cam_actor_vy);
-	// Keep acceleration deliberately low while following a moving Avatar.
-	// At slow walk the logical target advances only once per long animation
-	// step; a strong controller visibly speeds up after each step and slows
-	// down before the next one.  Let velocity change much more gradually so
-	// those target pulses are averaged out over time.
-	const double max_acceleration = actor_moving ? std::max(20.0, actor_speed * 2.0) : 240.0;
-	const auto advance_axis = [&](double target, double actor_velocity, double& pos, double& velocity) {
-		const double error = target - pos;
-		double desired_velocity;
-		if (actor_moving) {
-			// Follow the Avatar's average speed, allowing only a small correction
-			// for accumulated lag. This prevents slow walking from producing
-			// move-stop-move-stop camera motion between tile updates.
-			const double correction_cap = std::max(4.0, std::abs(actor_velocity) * 0.25);
-			const double correction = std::clamp(error * 2.0, -correction_cap, correction_cap);
-			desired_velocity = actor_velocity + correction;
-		} else {
-			// Once the Avatar actually stops, smoothly settle on the exact target.
-			const double stop_speed = std::sqrt(2.0 * max_acceleration * std::abs(error));
-			desired_velocity = std::min(64.0, stop_speed);
-			if (error < 0.0) {
-				desired_velocity = -desired_velocity;
-			}
-		}
-		const double max_dv = max_acceleration * dt;
-		const double dv = std::clamp(desired_velocity - velocity, -max_dv, max_dv);
-		velocity += dv;
-		pos += velocity * dt;
-	};
+	// Time constant of each of the three cascaded stages. The effective group
+	// delay while following steady motion is roughly 3*tau (165 ms here).
+	// alpha is the exact frame-rate-independent update of one first-order stage.
+	constexpr double tau = 0.055;
+	const double alpha = 1.0 - std::exp(-dt / tau);
 
-	advance_axis(target_x, smooth_cam_actor_vx, smooth_cam_x, smooth_cam_vx);
-	advance_axis(target_y, smooth_cam_actor_vy, smooth_cam_y, smooth_cam_vy);
+	// IMPORTANT: update all stages from the *previous* frame's stage values.
+	// Doing the assignments sequentially with freshly updated inputs would
+	// partially collapse the cascade and lose the intended third-order
+	// smoothness.
+	const double old_stage1_x = smooth_cam_stage1_x;
+	const double old_stage1_y = smooth_cam_stage1_y;
+	const double old_stage2_x = smooth_cam_stage2_x;
+	const double old_stage2_y = smooth_cam_stage2_y;
+	const double old_cam_x = smooth_cam_x;
+	const double old_cam_y = smooth_cam_y;
+
+	smooth_cam_stage1_x = old_stage1_x + alpha * (target_x - old_stage1_x);
+	smooth_cam_stage1_y = old_stage1_y + alpha * (target_y - old_stage1_y);
+	smooth_cam_stage2_x = old_stage2_x + alpha * (old_stage1_x - old_stage2_x);
+	smooth_cam_stage2_y = old_stage2_y + alpha * (old_stage1_y - old_stage2_y);
+	smooth_cam_x = old_cam_x + alpha * (old_stage2_x - old_cam_x);
+	smooth_cam_y = old_cam_y + alpha * (old_stage2_y - old_cam_y);
 
 	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
 	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
@@ -888,8 +865,9 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	scrolltx_lo = wrapped_x % c_tilesize;
 	scrollty_lo = wrapped_y % c_tilesize;
 
-	// Deliberately do not compensate the camera actor. It is allowed to move
-	// away from exact screen center while the velocity-driven camera catches up.
+	// The Avatar is deliberately not compensated back to screen centre: the
+	// camera is a true lagging follower, not an interpolation offset glued to
+	// the actor.
 	avposx_ld = 0;
 	avposy_ld = 0;
 
@@ -903,7 +881,6 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	avposy_ld = 0;
 	return true;
 }
-
 
 /*
  *  Paint the flat (non-rle) shapes in a chunk.
