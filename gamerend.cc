@@ -722,6 +722,49 @@ void Game_window::paint_lerped(int factor) {
 	avposx_ld = avposy_ld = 0;
 }
 
+void Game_window::paint_current_view() {
+	if (!modern_movement_enabled || !smooth_cam_valid) {
+		paint();
+		return;
+	}
+
+	const int world_pixels = c_num_tiles * c_tilesize;
+	const auto wrap_pixel = [&](int p) {
+		p %= world_pixels;
+		if (p < 0) {
+			p += world_pixels;
+		}
+		return p;
+	};
+
+	const int saved_scrolltx = scrolltx;
+	const int saved_scrollty = scrollty;
+	const int saved_scrolltx_lo = scrolltx_lo;
+	const int saved_scrollty_lo = scrollty_lo;
+	const int saved_avposx_ld = avposx_ld;
+	const int saved_avposy_ld = avposy_ld;
+
+	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
+	const int wrapped_x = wrap_pixel(render_x);
+	const int wrapped_y = wrap_pixel(render_y);
+	scrolltx = wrapped_x / c_tilesize;
+	scrollty = wrapped_y / c_tilesize;
+	scrolltx_lo = wrapped_x % c_tilesize;
+	scrollty_lo = wrapped_y % c_tilesize;
+	avposx_ld = 0;
+	avposy_ld = 0;
+
+	paint();
+
+	scrolltx = saved_scrolltx;
+	scrollty = saved_scrollty;
+	scrolltx_lo = saved_scrolltx_lo;
+	scrollty_lo = saved_scrollty_lo;
+	avposx_ld = saved_avposx_ld;
+	avposy_ld = saved_avposy_ld;
+}
+
 void Game_window::reset_velocity_camera() {
 	smooth_cam_stage1_x = 0.0;
 	smooth_cam_stage1_y = 0.0;
