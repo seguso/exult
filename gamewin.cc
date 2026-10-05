@@ -319,7 +319,8 @@ Game_window::Game_window(
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
 		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
-		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_keyboard_enabled(false), modern_movement_tau_ms(150),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_keyboard_enabled(false),
+		  modern_mouse_steering_enabled(false), modern_movement_tau_ms(150),
 		  smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
 		  smooth_cam_stage2_x(0.0), smooth_cam_stage2_y(0.0), smooth_cam_x(0.0), smooth_cam_y(0.0),
 		  smooth_cam_last_ticks(0), smooth_cam_valid(false) {
@@ -331,7 +332,6 @@ Game_window::Game_window(
 	win = new Image_window8(width, height, gwidth, gheight, scale, fullscreen, scaler, fillmode, fillsclr);
 	win->set_title("Exult Ultima VII Engine");
 	assert(World_view_transform::self_test());
-	resize_rotate_scene();
 	pal = new Palette();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
@@ -400,11 +400,14 @@ Game_window::Game_window(
 	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
 	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
+	config->value("config/gameplay/modern_mouse_steering", modern_mouse_steering_enabled, false);
+	config->set("config/gameplay/modern_mouse_steering", modern_mouse_steering_enabled, false);
 	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	world_view.set_enabled(rotate_world);
+	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
@@ -554,13 +557,20 @@ Game_window::~Game_window() {
 
 void Game_window::resize_rotate_scene() {
 	world_view.configure(win->get_game_width(), win->get_game_height());
-	const int scene_size = world_view.get_scene_size();
+	if (!rotate_world) {
+		// Keep the default path allocation-free: the enlarged scene buffers only
+		// exist while the optional rotated-world view is enabled.
+		rotate_scene.reset();
+		rotate_scene_2x.reset();
+		return;
+	}
 
+	const int scene_size = world_view.get_scene_size();
 	auto buffer = win->create_buffer(scene_size, scene_size);
 	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
 	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
 
-	// Pixel-art-aware rotation uses a persistent 2x intermediate.  Keep this
+	// Pixel-art-aware rotation uses a persistent 2x intermediate. Keep this
 	// buffer in ordinary 0-based coordinates; paint_rotated() maps logical
 	// scene coordinates into it after running the Scale2x reconstruction.
 	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
@@ -570,6 +580,7 @@ void Game_window::resize_rotate_scene() {
 void Game_window::set_rotate_world_enabled(bool enabled) {
 	rotate_world = enabled;
 	world_view.set_enabled(enabled);
+	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", enabled, true);
 	set_all_dirty();
 	paint();
@@ -586,13 +597,20 @@ void Game_window::set_modern_keyboard_enabled(bool enabled) {
 	config->set("config/gameplay/modern_keyboard", enabled, true);
 }
 
-void Game_window::set_smooth_scrolling_enabled(bool enabled) {
-	modern_movement_enabled = enabled;
-	config->set("config/gameplay/modern_movement", enabled, true);
+void Game_window::set_modern_mouse_steering_enabled(bool enabled) {
+	modern_mouse_steering_enabled = enabled;
+	config->set("config/gameplay/modern_mouse_steering", enabled, true);
 	if (!enabled) {
 		mouse_walk_visual_dir = -1;
 	}
+	if (Mouse::mouse()) {
+		Mouse::mouse()->set_speed_cursor();
+	}
+}
 
+void Game_window::set_smooth_scrolling_enabled(bool enabled) {
+	modern_movement_enabled = enabled;
+	config->set("config/gameplay/modern_movement", enabled, true);
 	// Throw away any visual-camera lag immediately when switching modes so
 	// rendering and mouse hit-testing use the same origin from this frame on.
 	reset_velocity_camera();
@@ -615,7 +633,7 @@ void Game_window::display_to_world(int& x, int& y) const {
 	// for the difference between the origin the user is actually looking at
 	// and the current logical origin. During painting both origins coincide,
 	// making this adjustment naturally zero.
-	if (smooth_cam_valid) {
+	if (modern_movement_enabled && smooth_cam_valid) {
 		const int world_pixels = c_num_tiles * c_tilesize;
 		const auto wrapped_delta = [&](int visual, int logical) {
 			int d = visual - logical;
@@ -641,7 +659,7 @@ void Game_window::world_to_display(int& x, int& y) const {
 	// Inverse of display_to_world(): convert coordinates expressed relative to
 	// the current logical scroll origin into the visually rendered camera
 	// origin before applying the optional 45-degree world transform.
-	if (smooth_cam_valid) {
+	if (modern_movement_enabled && smooth_cam_valid) {
 		const int world_pixels = c_num_tiles * c_tilesize;
 		const auto wrapped_delta = [&](int visual, int logical) {
 			int d = visual - logical;
@@ -683,7 +701,7 @@ void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 
 void Game_window::start_actor_from_display(int x, int y, int speed) {
 	display_to_world(x, y);
-	start_actor(x, y, speed, true);
+	start_actor(x, y, speed, modern_mouse_steering_enabled);
 }
 
 void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
@@ -1941,7 +1959,7 @@ void Game_window::start_actor_alt(
 	// principal facings. During continuous mouse steering, derive that facing
 	// from the exact requested vector and keep it stable while Bresenham-like
 	// correction steps alternate underneath.
-	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
+	const bool modern_mouse_steering = mouse_steering && modern_mouse_steering_enabled;
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
