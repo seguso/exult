@@ -418,7 +418,7 @@ void Gump::remove(Game_object* obj) {
 	box.shift(x, y);               // Set box to screen location.
 
 	gwin->set_all_dirty();
-	gwin->paint_dirty();
+	gwin->paint_current_view();
 }
 
 /*
