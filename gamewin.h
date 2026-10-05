@@ -774,6 +774,8 @@ public:
 
 	// Paint scene at given tile.
 	void paint_map_at_tile(int x, int y, int w, int h, int toptx, int topty, int skip_above = 31);
+	// Repaint without changing the currently displayed modern-camera position.
+	void paint_current_view();
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
 	void paint_rotated(int x, int y, int w, int h);
