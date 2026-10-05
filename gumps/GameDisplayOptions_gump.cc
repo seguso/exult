@@ -236,7 +236,7 @@ using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
 using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gump>;
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
 
-static constexpr int modern_tau_values[] = {25, 35, 45, 55, 70, 90, 120};
+static constexpr int modern_tau_values[] = {25, 35, 45, 55, 70, 90, 120, 150, 180, 220, 300, 400, 500};
 
 // Android stuff
 
