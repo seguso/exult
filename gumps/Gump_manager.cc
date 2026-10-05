@@ -202,13 +202,20 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 
 	Image_window* iwin = gwin->get_win();
 	const float   f    = iwin->get_ui_scale_factor(ui_kind_for(g, is_hud));
+	// Anchor ordinary gump layers to the gump's own stable hotspot, not to
+	// the centre of the dirty bounds.  The dirty bounds include container
+	// contents and can therefore change as soon as an item is picked up.
+	// If scaling is active, centring the layer on those changing bounds makes
+	// the whole gump visibly jump by a few pixels when a protruding item is
+	// removed.  Keeping the gump hotspot fixed lets the layer bounds grow or
+	// shrink without moving the gump itself.
 	int           csx;
 	int           csy;
-	iwin->game_to_screen(b.x + b.w / 2, b.y + b.h / 2, false, csx, csy);
+	iwin->game_to_screen(g->get_x(), g->get_y(), false, csx, csy);
 	float dw = static_cast<float>(b.w) * f;
 	float dh = static_cast<float>(b.h) * f;
-	float dx = static_cast<float>(csx) - dw / 2.0f;
-	float dy = static_cast<float>(csy) - dh / 2.0f;
+	float dx = static_cast<float>(csx) - static_cast<float>(g->get_x() - b.x) * f;
+	float dy = static_cast<float>(csy) - static_cast<float>(g->get_y() - b.y) * f;
 	// HUD gumps (shortcut bar, face-stats) follow the gumps size setting via
 	// get_ui_scale_factor: Full = a fixed display size, Auto = the game area's
 	// native size (matches the main game layer), 1/2/3 interpolate.
