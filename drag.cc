@@ -265,7 +265,11 @@ bool Dragging_info::start(
 	rect.enlarge(deltax > deltay ? deltax : deltay);
 
 	TileRect crect = gwin->clip_to_win(rect);
-	gwin->paint(crect);    // Paint over obj's. area.
+	gwin->add_dirty(crect);
+	// Starting a drag must not repaint through the logical/canonical camera:
+	// with modern smooth scrolling the user may currently be looking at a
+	// lagged visual camera position. Repaint the current visual view instead.
+	gwin->paint_current_view();
 	return true;
 }
 
@@ -591,7 +595,7 @@ bool Dragging_info::drop(
 		mouse_widget->mouse_up(wx, wy, Gump::MouseButton::Left);
 		mouse_widget = nullptr;
 		widget_gump  = nullptr;
-		gwin->paint();
+		gwin->paint_current_view();
 		return true;
 	}
 	if (button) {
@@ -621,7 +625,7 @@ bool Dragging_info::drop(
 	obj  = nullptr;    // Clear so we don't paint them.
 	gump = nullptr;
 	free_item_layer();    // Object returns to the main layer.
-	gwin->paint();
+	gwin->paint_current_view();
 	return handled;
 }
 
