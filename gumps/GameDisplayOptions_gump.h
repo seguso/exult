@@ -36,6 +36,9 @@ private:
 	std::vector<std::string> sc_outline_txt;
 	int                      text_bg;
 	int                      smooth_scrolling;
+	int                      modern_smooth;
+	int                      modern_tau;
+	int                      rotate_world;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -55,6 +58,9 @@ private:
 		id_sb_hide_missing,
 		id_text_bg,
 		id_smooth_scrolling,
+		id_modern_smooth,
+		id_modern_tau,
+		id_rotate_world,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -76,6 +82,7 @@ public:
 	void close() override;
 
 	void build_buttons();
+	void update_legacy_smooth_button();
 
 	void load_settings();
 	void save_settings();
@@ -112,6 +119,19 @@ public:
 
 	void toggle_smooth_scrolling(int state) {
 		smooth_scrolling = state;
+	}
+
+	void toggle_modern_smooth(int state) {
+		modern_smooth = state;
+		update_legacy_smooth_button();
+	}
+
+	void toggle_modern_tau(int state) {
+		modern_tau = state;
+	}
+
+	void toggle_rotate_world(int state) {
+		rotate_world = state;
 	}
 
 	void toggle_menu_intro(int state) {
