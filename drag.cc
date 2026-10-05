@@ -265,11 +265,16 @@ bool Dragging_info::start(
 	rect.enlarge(deltax > deltay ? deltax : deltay);
 
 	TileRect crect = gwin->clip_to_win(rect);
-	gwin->add_dirty(crect);
-	// Starting a drag must not repaint through the logical/canonical camera:
-	// with modern smooth scrolling the user may currently be looking at a
-	// lagged visual camera position. Repaint the current visual view instead.
-	gwin->paint_current_view();
+	if (gwin->is_modern_movement_enabled()) {
+		// Starting a drag must not repaint through the logical/canonical camera
+		// while the modern camera is showing a lagged visual position.
+		gwin->add_dirty(crect);
+		gwin->paint_current_view();
+	} else {
+		// Preserve Exult's original partial repaint path when the experimental
+		// camera is disabled.
+		gwin->paint(crect);
+	}
 	return true;
 }
 
