@@ -1021,6 +1021,8 @@ private:
 	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
 	// original Exult keymap and event-driven cardinal movement semantics.
 	bool modern_keyboard_enabled;
+	// Optional continuous-angle mouse steering and matching smooth arrow.
+	bool modern_mouse_steering_enabled;
 	// Per-stage time constant for the modern 3-pole camera, in milliseconds.
 	int modern_movement_tau_ms;
 
@@ -1070,6 +1072,10 @@ public:
 		return modern_keyboard_enabled;
 	}
 	void set_modern_keyboard_enabled(bool enabled);
+	bool is_modern_mouse_steering_enabled() const {
+		return modern_mouse_steering_enabled;
+	}
+	void set_modern_mouse_steering_enabled(bool enabled);
 	int get_modern_movement_tau_ms() const {
 		return modern_movement_tau_ms;
 	}
