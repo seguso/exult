@@ -1015,19 +1015,17 @@ private:
 	// Is lerping enabled
 	int lerping_enabled;
 
-	// Experimental velocity-driven visual camera. Logical map scrolling stays
-	// tile-based; these values only control the rendered camera position.
+	// Experimental monotonic visual camera. Logical map scrolling stays
+	// tile-based; the discrete actor target passes through three identical
+	// first-order low-pass stages. The third stage is the rendered camera.
+	double smooth_cam_stage1_x;
+	double smooth_cam_stage1_y;
+	double smooth_cam_stage2_x;
+	double smooth_cam_stage2_y;
 	double smooth_cam_x;
 	double smooth_cam_y;
-	double smooth_cam_vx;
-	double smooth_cam_vy;
-	double smooth_cam_target_x;
-	double smooth_cam_target_y;
-	double smooth_cam_actor_vx;
-	double smooth_cam_actor_vy;
 	uint32 smooth_cam_last_ticks;
 	bool smooth_cam_valid;
-	bool smooth_cam_target_valid;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
@@ -1036,7 +1034,7 @@ public:
 	// (Re)paint the entire screen using a lerp factor 0-0x10000
 	void paint_lerped(int factor);
 
-	// Velocity-driven camera experiment. Returns true if it painted a frame.
+	// Monotonic three-stage low-pass camera. Returns true if it painted a frame.
 	bool paint_velocity_camera(uint32 ticks);
 	void reset_velocity_camera();
 
