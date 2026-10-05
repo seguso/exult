@@ -720,8 +720,16 @@ bool Dragging_info::drop_on_gump(
 	if (on_gump != gump) {    // Not moving within same gump?
 		possible_theft = true;
 	}
+	// The mouse position above is mapped into the target gump's own layer
+	// coordinates. Do the same for the dragged object's hotspot: paintx/painty
+	// are kept in raw game/display coordinates while dragging, but Gump::add()
+	// interprets sx/sy in the gump's coordinate system. Passing the raw hotspot
+	// here makes the object snap by the layer scaling/offset when it is dropped.
+	int gsx = paintx;
+	int gsy = painty;
+	gumpman->map_game_to_gump(on_gump, paintx, painty, gsx, gsy);
 	// Add, and allow to combine.
-	if (!on_gump->add(to_drop, gx, gy, paintx, painty, false, true)) {
+	if (!on_gump->add(to_drop, gx, gy, gsx, gsy, false, true)) {
 		// Failed.
 		if (to_drop != obj.get()) {
 			// Watch for partial drop.
