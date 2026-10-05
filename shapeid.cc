@@ -543,6 +543,10 @@ void Shape_manager::reload_fonts(const File_spec& font_source, const File_spec& 
 	if (fonts) {
 		override_vleads();
 		fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+		// The readable conversation font is a runtime font layered on top of the
+		// selected built-in font set. Rebuild it whenever font settings are
+		// applied so toggling the option takes effect immediately.
+		conversation_font = make_custom_conversation_font(fonts.get(), pal);
 	}
 }
 
