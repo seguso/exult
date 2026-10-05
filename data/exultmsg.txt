@@ -220,10 +220,6 @@
 0x5D8:Built-in fonts:
 0x5D9:Original
 0x5DA:Serif
-0x5DB:Modern smooth scrolling:
-0x5DC:Smooth camera tau:
-0x5DD:Rotate world 45 deg:
-0x5DE:Readable conversation font:
 
 # Gamemenu_gump.cc
 0x5E0:Load/Save Game
@@ -326,13 +322,11 @@
 0x654:Pickup
 0x655:Move to
 0x656:Do nothing
-0x657:Modern keyboard movement:
 
 #Notebook_gump.cc
 0x658:Day
 0x659:am
 0x65A:pm
-0x65B:Continuous mouse steering:
 
 #Newfile_gump.cc
 #Info Box Strings
