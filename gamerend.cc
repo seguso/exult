@@ -820,7 +820,7 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	// Time constant of each of the three cascaded stages. The effective group
 	// delay while following steady motion is roughly 3*tau (165 ms here).
 	// alpha is the exact frame-rate-independent update of one first-order stage.
-	constexpr double tau = 0.055;
+	const double tau = static_cast<double>(modern_movement_tau_ms) / 1000.0;
 	const double alpha = 1.0 - std::exp(-dt / tau);
 
 	// IMPORTANT: update all stages from the *previous* frame's stage values.
