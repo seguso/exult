@@ -233,6 +233,8 @@ using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
 using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gump>;
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
 
+static constexpr int modern_tau_values[] = {25, 35, 45, 55, 70, 90, 120};
+
 // Android stuff
 
 bool (*GameDisplayOptions_gump::Android_getAutoLaunch)()     = nullptr;
@@ -244,7 +246,13 @@ void GameDisplayOptions_gump::SetAndroidAutoLaunchFPtrs(void (*setter)(bool), bo
 }
 
 Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
-	for (auto& btn : buttons) {
+	for (size_t i = 0; i < buttons.size(); ++i) {
+		// Legacy smooth scrolling is intentionally unavailable while the modern
+		// camera package is active; its percentage is a different algorithm.
+		if (modern_smooth && i == id_smooth_scrolling) {
+			continue;
+		}
+		auto& btn = buttons[i];
 		auto found = btn ? btn->on_button(mx, my) : nullptr;
 		if (found) {
 			return found;
@@ -306,10 +314,24 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_text_bg, std::move(textbgcolor), text_bg,
 			get_button_pos_for_label(Strings::TextBackground_()), yForRow(++y_index), large_size);
 
-	std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
-	buttons[id_smooth_scrolling]         = std::make_unique<GameDisplayTextToggle>(
-            this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
-            get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(++y_index), small_size);
+	++y_index;
+	update_legacy_smooth_button();
+
+	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
+			get_button_pos_for_label("Modern smooth scrolling:"), yForRow(++y_index), small_size);
+
+	std::vector<std::string> tau_text;
+	for (int value : modern_tau_values) {
+		tau_text.emplace_back(std::to_string(value) + " ms");
+	}
+	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_tau, std::move(tau_text), modern_tau,
+			get_button_pos_for_label("Smooth camera tau:"), yForRow(++y_index), small_size);
+
+	buttons[id_rotate_world] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_rotate_world, yesNo, rotate_world,
+			get_button_pos_for_label("Rotate world 45 deg:"), yForRow(++y_index), small_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -358,6 +380,22 @@ void GameDisplayOptions_gump::build_buttons() {
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
 
+void GameDisplayOptions_gump::update_legacy_smooth_button() {
+	constexpr int legacy_row = 5;
+	const int small_size = 44;
+	if (modern_smooth) {
+		std::vector<std::string> disabled = {Strings::Disabled()};
+		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
+				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(disabled), 0,
+				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
+	} else {
+		std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
+		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
+				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
+				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
+	}
+}
+
 void GameDisplayOptions_gump::load_settings() {
 	string value;
 	config->value("config/gameplay/skip_intro", value, "no");
@@ -379,7 +417,16 @@ void GameDisplayOptions_gump::load_settings() {
 	const string pdolls;
 	paperdolls       = sman->are_paperdolls_enabled();
 	text_bg          = gwin->get_text_bg() + 1;
-	smooth_scrolling = gwin->is_lerping_enabled() / 25;
+	smooth_scrolling = std::clamp(gwin->is_lerping_enabled() / 25, 0, 4);
+	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
+	rotate_world     = gwin->is_rotate_world_enabled() ? 1 : 0;
+	const int tau_ms = gwin->get_modern_movement_tau_ms();
+	modern_tau = 0;
+	for (size_t i = 1; i < std::size(modern_tau_values); ++i) {
+		if (std::abs(modern_tau_values[i] - tau_ms) < std::abs(modern_tau_values[modern_tau] - tau_ms)) {
+			modern_tau = static_cast<int>(i);
+		}
+	}
 
 	android_autolaunch = Android_getAutoLaunch ? Android_getAutoLaunch() : 0;
 	config->value("config/gameplay/language", value, "");
@@ -408,7 +455,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(16)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -416,13 +463,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(15), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(15), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(15), 50);
 
 	load_settings();
 	build_buttons();
@@ -461,6 +508,9 @@ void GameDisplayOptions_gump::save_settings() {
 	}
 	gwin->set_lerping_enabled(smooth_scrolling * 25);
 	config->set("config/gameplay/smooth_scrolling", smooth_scrolling * 25, false);
+	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
+	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
+	gwin->set_rotate_world_enabled(rotate_world != 0);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
 	config->set("config/gameplay/extended_intro", extended_intro ? "yes" : "no", false);
 	gwin->set_extended_intro(extended_intro);
@@ -509,6 +559,9 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Hidemissingitems_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::TextBackground_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Modern smooth scrolling:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Smooth camera tau:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Rotate world 45 deg:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);
