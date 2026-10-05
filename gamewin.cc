@@ -396,16 +396,16 @@ Game_window::Game_window(
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
-	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
+	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
-	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
+	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	world_view.set_enabled(rotate_world);
 	resize_rotate_scene();
-	config->set("config/gameplay/rotate_world", rotate_world, false);
+	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -578,7 +578,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 	rotate_world = enabled;
 	world_view.set_enabled(enabled);
 	resize_rotate_scene();
-	config->set("config/gameplay/rotate_world", enabled, true);
+	config->set("config/gameplay/rotate_world", enabled ? "yes" : "no", true);
 	set_all_dirty();
 	paint();
 }
@@ -591,12 +591,12 @@ void Game_window::set_modern_movement_tau_ms(int ms) {
 
 void Game_window::set_modern_keyboard_enabled(bool enabled) {
 	modern_keyboard_enabled = enabled;
-	config->set("config/gameplay/modern_keyboard", enabled, true);
+	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
 }
 
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {
 	modern_movement_enabled = enabled;
-	config->set("config/gameplay/modern_movement", enabled, true);
+	config->set("config/gameplay/modern_movement", enabled ? "yes" : "no", true);
 	if (!enabled) {
 		mouse_walk_visual_dir = -1;
 	}
@@ -1098,6 +1098,18 @@ void Game_window::resized(
 		return;
 	}
 	center_view(main_actor->get_tile());
+	if (modern_movement_enabled) {
+		// Video/scaler changes can leave transient sub-tile offsets from the
+		// previous viewport geometry.  The modern camera initializes from these
+		// values, so carrying them across a resize can start the new filter a few
+		// pixels out of phase and produce a visible snap/flicker.  Re-anchor the
+		// visual state to the newly centered logical camera.
+		scrolltx_lo = 0;
+		scrollty_lo = 0;
+		avposx_ld = 0;
+		avposy_ld = 0;
+		reset_velocity_camera();
+	}
 	paint();
 	// Do the following only if in game (not for menus)
 	if (!gump_man->gump_mode()) {
