@@ -1012,8 +1012,12 @@ private:
 	int scrolltx_lo, scrollty_lo;
 	// Delta for camera actor position in pixels due to lerping of position
 	int avposx_ld, avposy_ld;
-	// Is lerping enabled
+	// Legacy Exult smooth-scrolling amount (0..100).
 	int lerping_enabled;
+	// Our independent modern movement/camera package (Shift+Q).
+	bool modern_movement_enabled;
+	// Per-stage time constant for the modern 3-pole camera, in milliseconds.
+	int modern_movement_tau_ms;
 
 	// Experimental monotonic visual camera. Logical map scrolling stays
 	// tile-based; the discrete actor target passes through three identical
@@ -1054,6 +1058,13 @@ public:
 		lerping_enabled = e;
 	}
 
+	bool is_modern_movement_enabled() const {
+		return modern_movement_enabled;
+	}
+	int get_modern_movement_tau_ms() const {
+		return modern_movement_tau_ms;
+	}
+	void set_modern_movement_tau_ms(int ms);
 	void set_smooth_scrolling_enabled(bool enabled);
 
 	Game_render* get_render() {
