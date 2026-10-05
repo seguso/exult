@@ -394,7 +394,6 @@ Game_window::Game_window(
 	// Keep Exult's historical smooth-scrolling option intact and independent
 	// from our modern movement/camera package.
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
-	lerping_enabled = std::clamp(lerping_enabled, 0, 100);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
