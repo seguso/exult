@@ -231,20 +231,23 @@ public:
 		return get_text_msg(0x5DA - msg_file_start);
 	}
 
-	static auto Modernsmoothscrolling_() {
-		return get_text_msg(0x5DB - msg_file_start);
+	// Keep the experimental labels self-contained for now. The generated
+	// message resource is not rebuilt by every development build, which made
+	// newly-added message IDs render as blank labels.
+	static const char* Modernsmoothscrolling_() {
+		return "Modern smooth scrolling:";
 	}
 
-	static auto Smoothcameratau_() {
-		return get_text_msg(0x5DC - msg_file_start);
+	static const char* Smoothcameratau_() {
+		return "Smooth camera tau:";
 	}
 
-	static auto Rotateworld45deg_() {
-		return get_text_msg(0x5DD - msg_file_start);
+	static const char* Rotateworld45deg_() {
+		return "Rotate world 45 deg:";
 	}
 
-	static auto Readableconversationfont_() {
-		return get_text_msg(0x5DE - msg_file_start);
+	static const char* Readableconversationfont_() {
+		return "Readable conversation font:";
 	}
 };
 
