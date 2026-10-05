@@ -717,13 +717,13 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	int            y           = 0;    // Keep track of coords. in box.
 	auto           normal_font = sman->get_conversation_font();
 	auto           original_font = sman->get_font(0);
+	const bool     custom_font = normal_font && original_font && normal_font != original_font;
 	const int      line_height = sman->get_text_line_height(0);
-	const int      space_width = normal_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
-	const int      marker_width = original_font ? original_font->get_text_width("\x7f") : sman->get_text_width(0, "\x7f");
+	const int      space_width = custom_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
+	const int      marker_width = custom_font ? original_font->get_text_width("\x7f") : 0;
 	constexpr int  marker_gap = 2;
-	const int      custom_y_offset = (normal_font && original_font)
-			? original_font->get_text_baseline() - normal_font->get_text_baseline()
-			: 0;
+	const int      custom_y_offset
+			= custom_font ? original_font->get_text_baseline() - normal_font->get_text_baseline() : 0;
 
 	// Get main actor's portrait, checking for Petra flag.
 	int shape = Shapeinfo_lookup::GetFaceReplacement(0);
@@ -793,7 +793,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	}
 	// First pass: determine positions and draw all backgrounds.
 	for (int i = 0; i < num_choices; i++) {
-		const int width = normal_font
+		const int width = custom_font
 				? marker_width + marker_gap + normal_font->get_text_width(choices[i])
 				: sman->get_text_width(0, (std::string("\x7f") + choices[i]).c_str());
 		if (x > 0 && x + width >= tbox.w) {
@@ -824,7 +824,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	}
 	// Second pass: draw all text on top of backgrounds.
 	for (int i = 0; i < num_choices; i++) {
-		if (normal_font && original_font) {
+		if (custom_font) {
 			// Keep Exult's original bullet glyph exactly where it was, and only
 			// replace the answer text itself. This preserves the familiar marker
 			// spacing/baseline while using the readable custom font.
