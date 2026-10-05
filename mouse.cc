@@ -260,7 +260,12 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 			unsigned char e1 = e;
 			unsigned char e2 = e;
 			unsigned char e3 = e;
-			if (b != h && d != f) {
+			// Treat transparency as coverage, not as an ordinary Scale2x colour.
+			// Allowing EPX to replace a transparent source pixel with one of its
+			// opaque neighbours creates tiny coloured islands just outside the
+			// cursor silhouette. After bilinear rotation those become the bright
+			// white/orange/green speckles visible at only some residual angles.
+			if (e != 255 && b != h && d != f) {
 				e0 = d == b ? d : e;
 				e1 = b == f ? f : e;
 				e2 = d == h ? d : e;
