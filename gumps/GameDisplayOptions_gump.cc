@@ -420,7 +420,7 @@ void GameDisplayOptions_gump::load_settings() {
 	const string pdolls;
 	paperdolls       = sman->are_paperdolls_enabled();
 	text_bg          = gwin->get_text_bg() + 1;
-	smooth_scrolling = std::clamp(gwin->is_lerping_enabled() / 25, 0, 4);
+	smooth_scrolling = gwin->is_lerping_enabled() / 25;
 	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
 	rotate_world     = gwin->is_rotate_world_enabled() ? 1 : 0;
 	const int tau_ms = gwin->get_modern_movement_tau_ms();
