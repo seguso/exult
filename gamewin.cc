@@ -319,7 +319,8 @@ Game_window::Game_window(
 		  plasma_start_color(0), plasma_cycle_range(0), skip_lift(255), paint_eggs(false), paint_egg_areas(0), armageddon(false),
 		  walk_in_formation(false), debug(0), blits(0), scrolltx_l(0), scrollty_l(0), scrolltx_lp(0), scrollty_lp(0),
 		  avtx_l(0), avty_l(0), avtx_lp(0), avty_lp(0), lerp_actor_valid(false), scrolltx_lo(0), scrollty_lo(0),
-		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
+		  avposx_ld(0), avposy_ld(0), lerping_enabled(0), modern_movement_enabled(false), modern_movement_tau_ms(55),
+		  smooth_cam_stage1_x(0.0), smooth_cam_stage1_y(0.0),
 		  smooth_cam_stage2_x(0.0), smooth_cam_stage2_y(0.0), smooth_cam_x(0.0), smooth_cam_y(0.0),
 		  smooth_cam_last_ticks(0), smooth_cam_valid(false) {
 	game_window = this;    // Set static ->.
@@ -390,15 +391,20 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
-	// Keep the experimental modern movement package separate from Exult's
-	// historical smooth_scrolling setting. Earlier development builds wrote
-	// smooth_scrolling=100 into existing configs, which would otherwise make
-	// the new package start enabled forever. The modern package is opt-in and
-	// defaults OFF.
-	bool modern_movement_enabled = false;
+	// Keep Exult's historical smooth-scrolling option intact and independent
+	// from our modern movement/camera package.
+	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
+	lerping_enabled = std::clamp(lerping_enabled, 0, 100);
+	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
+
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
-	lerping_enabled = modern_movement_enabled ? 100 : 0;
 	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
+	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 55);
+	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 250);
+	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
+	config->value("config/gameplay/rotate_world", rotate_world, false);
+	world_view.set_enabled(rotate_world);
+	config->set("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -563,12 +569,19 @@ void Game_window::resize_rotate_scene() {
 void Game_window::set_rotate_world_enabled(bool enabled) {
 	rotate_world = enabled;
 	world_view.set_enabled(enabled);
+	config->set("config/gameplay/rotate_world", enabled, true);
 	set_all_dirty();
 	paint();
 }
 
+void Game_window::set_modern_movement_tau_ms(int ms) {
+	modern_movement_tau_ms = std::clamp(ms, 10, 250);
+	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, true);
+	reset_velocity_camera();
+}
+
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {
-	lerping_enabled = enabled ? 100 : 0;
+	modern_movement_enabled = enabled;
 	config->set("config/gameplay/modern_movement", enabled, true);
 	if (!enabled) {
 		mouse_walk_visual_dir = -1;
