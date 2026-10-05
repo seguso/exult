@@ -1485,10 +1485,7 @@ static void Handle_events() {
 			gwin->start_actor(joy_aim_x, joy_aim_y, speed);
 		}
 
-		// Smooth-camera experiment. Unlike the stock segment lerp, the visual
-		// camera owns persistent position and velocity. Actor tile updates only
-		// move its target; they never directly reposition the camera.
-		const bool smooth_camera = gwin->is_lerping_enabled() > 0;
+		const bool modern_movement = gwin->is_modern_movement_enabled();
 
 		// Update gumps every frame (drives auto-repeat for held
 		// slider/spinner arrows). Must run even when nothing is dirty.
@@ -1496,16 +1493,69 @@ static void Handle_events() {
 			gwin->get_gump_man()->update_gumps();
 		}
 
-		bool camera_painted = false;
-		if (smooth_camera) {
-			camera_painted = gwin->paint_velocity_camera(ticks);
-		}
-		if (!camera_painted && gwin->is_dirty()) {
-			gwin->paint_dirty();
+		if (modern_movement) {
+			// Our independent monotonic three-stage camera.
+			const bool camera_painted = gwin->paint_velocity_camera(ticks);
+			if (!camera_painted && gwin->is_dirty()) {
+				gwin->paint_dirty();
+			}
+		} else {
+			// Original Exult smooth-scrolling/lerp path. Keeping this separate is
+			// important: the legacy percentage in Game Display remains meaningful
+			// whenever Modern smooth scrolling is off.
+			const int lerp = gwin->is_lerping_enabled();
+			bool didlerp = false;
+			if (lerp) {
+				Actor* act = gwin->get_camera_actor();
+				Barge_object* barge = gwin->get_moving_barge();
+				const bool slow_walk = !barge && act && act->get_frame_time() * 2 >= 3 * gwin->get_std_delay();
+
+				if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
+					gwin->lerp_reset();
+					last_repaint = ticks;
+					lerp_stop_anchored = false;
+					const int ft = (barge && barge->contains(gwin->get_main_actor())) ? barge->get_frame_time()
+																	 : (act ? act->get_frame_time() : 0);
+					if (ft > 0) {
+						lerp_mswait = (ft * lerp) / 100;
+					}
+				}
+				last_x = gwin->get_scrolltx();
+				last_y = gwin->get_scrollty();
+
+				int mswait = lerp_mswait;
+				if (mswait <= 0) {
+					mswait = (gwin->get_std_delay() * lerp) / 100;
+				}
+				if (!lerp_stop_anchored && lerp_mswait > 0 && !gwin->is_moving()) {
+					const int stopwait = (gwin->get_std_delay() * lerp) / 100;
+					if (stopwait > 0 && stopwait < mswait) {
+						int factor = ((ticks - last_repaint) * 0x10000) / mswait;
+						factor = std::clamp(factor, 0, 0x10000);
+						last_repaint = ticks - (factor * stopwait) / 0x10000;
+						lerp_mswait = stopwait;
+						mswait = stopwait;
+					}
+					lerp_stop_anchored = true;
+				}
+				if (mswait && ticks < (last_repaint + mswait * 2)) {
+					const int factor = slow_walk ? 0x10000 : ((ticks - last_repaint) * 0x10000) / mswait;
+					gwin->paint_lerped(factor);
+					didlerp = true;
+				}
+			}
+			if (!lerp || !didlerp) {
+				if (gwin->is_dirty()) {
+					gwin->paint_dirty();
+				}
+				last_x = last_y = -1;
+			}
 		}
 
-		// update mousecursor appearance if needed
-		if (last_speed_cursor + 16 < SDL_GetTicks() && !dragging) {
+		// Continuous cursor angle needs a 60-Hz-ish refresh; the classic cursor
+		// keeps Exult's original slower cadence.
+		const uint32 cursor_interval = modern_movement ? 16 : 100;
+		if (last_speed_cursor + cursor_interval < SDL_GetTicks() && !dragging) {
 			last_speed_cursor = SDL_GetTicks();
 			Mouse::mouse()->set_speed_cursor();
 			Mouse::mouse_update = true;
