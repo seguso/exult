@@ -716,7 +716,7 @@ void Usecode_internal::show_npc_face(
 		gwin->set_all_dirty();
 		init_conversation();    // jsf-Added 4/20/01 for SI-Lydia.
 	}
-	gwin->paint_dirty();
+	gwin->paint_current_view();
 	conv->show_face(shape, frame, slot);
 	//	user_choice = 0;     // Seems like a good idea.
 	// Also seems to create a conversation bug in Test of Love :-(
