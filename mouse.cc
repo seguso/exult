@@ -391,11 +391,20 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 			double premul_g = 0.0;
 			double premul_b = 0.0;
 			int opaque_samples = 0;
+			bool has_dark_support = false;
 			for (int i = 0; i < 4; ++i) {
 				double sr, sg, sb, sa;
 				rgba_for_index(hi_at(sample_x[i], sample_y[i]), sr, sg, sb, sa);
 				if (sa > 0.0) {
 					++opaque_samples;
+					// The steering arrows have a dark outline.  A legitimate outer
+					// antialiasing sample should normally include that outline among
+					// its opaque support.  Bright-only support is interior colour
+					// leaking directly into transparency.
+					const double luminance = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+					if (luminance < 96.0) {
+						has_dark_support = true;
+					}
 				}
 				const double wa = weights[i] * sa;
 				alpha += wa;
@@ -413,6 +422,12 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 			// samples; real antialiased edges normally have support from multiple
 			// opaque texels (or high coverage from the nearest one).
 			if (opaque_samples == 1 && alpha < 0.75) {
+				continue;
+			}
+			// Also reject partial edge samples that contain only bright interior
+			// colours and no dark outline support. These are the remaining white/
+			// green fringe pixels that can survive the one-tap test at some angles.
+			if (alpha < 0.98 && !has_dark_support) {
 				continue;
 			}
 			const int rr = static_cast<int>(std::lround(premul_r / alpha));
