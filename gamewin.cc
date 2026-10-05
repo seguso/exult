@@ -400,7 +400,7 @@ Game_window::Game_window(
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->set("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 55);
-	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 250);
+	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	world_view.set_enabled(rotate_world);
@@ -575,7 +575,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 }
 
 void Game_window::set_modern_movement_tau_ms(int ms) {
-	modern_movement_tau_ms = std::clamp(ms, 10, 250);
+	modern_movement_tau_ms = std::clamp(ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, true);
 	reset_velocity_camera();
 }
