@@ -318,6 +318,15 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 		g = std::clamp((g + 3) & ~7, 0, 255);
 		b = std::clamp((b + 3) & ~7, 0, 255);
 		a = std::clamp((a + 7) & ~15, 0, 255);
+		// index_argb uses a zero entry as the sentinel for "no ARGB override;
+		// fall back to the live game palette".  Very faint black AA samples can
+		// quantize to A=R=G=B=0, which would therefore turn into an unrelated
+		// live-palette colour (often a bright white/orange speck).  Never allocate
+		// such an entry: once alpha quantizes to zero, use the real transparent
+		// index instead.
+		if (a == 0) {
+			return 255;
+		}
 		const uint32 packed = (static_cast<uint32>(a) << 24) | (static_cast<uint32>(r) << 16)
 							  | (static_cast<uint32>(g) << 8) | static_cast<uint32>(b);
 		const auto found = generated_index.find(packed);
