@@ -686,7 +686,7 @@ void Mouse::set_speed_cursor() {
 		// renderer rotates the selected frame only by the small residual from its
 		// nearest 45-degree direction, preserving the original art while making
 		// the pointer line up with mouse -> Avatar continuously.
-		if (gwin->is_lerping_enabled() > 0 && (dx != 0 || dy != 0)) {
+		if (gwin->is_modern_movement_enabled() && (dx != 0 || dy != 0)) {
 			constexpr double pi = 3.14159265358979323846;
 			const double exact_screen_angle = std::atan2(static_cast<double>(mousey - ay), static_cast<double>(mousex - ax));
 			const double base_screen_angle = (-90.0 + 45.0 * static_cast<int>(dir)) * pi / 180.0;
