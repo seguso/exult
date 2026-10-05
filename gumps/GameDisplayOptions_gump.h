@@ -46,6 +46,8 @@ private:
 	int                      language;
 	int                      fonts;
 	int                      conversation_font;
+	int                      conversation_font_size;
+	int                      conversation_font_default_size;
 
 	enum button_ids {
 		id_first = 0,
@@ -70,6 +72,7 @@ private:
 		id_language,
 		id_fonts,
 		id_conversation_font,
+		id_conversation_font_size,
 
 		id_count
 	};
@@ -85,6 +88,7 @@ public:
 
 	void build_buttons();
 	void update_legacy_smooth_button();
+	void update_conversation_font_size_button();
 
 	void load_settings();
 	void save_settings();
@@ -114,6 +118,8 @@ public:
 	void toggle_conversation_font(int state) {
 		conversation_font = state;
 	}
+
+	void choose_conversation_font_size();
 
 	void toggle_sb_hide_missing(int state) {
 		sb_hide_missing = state;
