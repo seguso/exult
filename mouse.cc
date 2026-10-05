@@ -390,9 +390,13 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 			double premul_r = 0.0;
 			double premul_g = 0.0;
 			double premul_b = 0.0;
+			int opaque_samples = 0;
 			for (int i = 0; i < 4; ++i) {
 				double sr, sg, sb, sa;
 				rgba_for_index(hi_at(sample_x[i], sample_y[i]), sr, sg, sb, sa);
+				if (sa > 0.0) {
+					++opaque_samples;
+				}
 				const double wa = weights[i] * sa;
 				alpha += wa;
 				premul_r += sr * wa;
@@ -400,6 +404,15 @@ void Mouse::draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans)
 				premul_b += sb * wa;
 			}
 			if (alpha <= 0.01) {
+				continue;
+			}
+			// A single diagonally-touched opaque Scale2x texel can leak a bright
+			// interior highlight into otherwise transparent space.  It shows up as
+			// an isolated white/orange/green speck just outside the black outline at
+			// certain residual angles.  Suppress only these low-coverage one-tap
+			// samples; real antialiased edges normally have support from multiple
+			// opaque texels (or high coverage from the nearest one).
+			if (opaque_samples == 1 && alpha < 0.75) {
 				continue;
 			}
 			const int rr = static_cast<int>(std::lround(premul_r / alpha));
