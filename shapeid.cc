@@ -83,13 +83,8 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 		return nullptr;
 	}
 
-#ifdef _WIN32
-	constexpr bool default_enabled = true;
-#else
-	constexpr bool default_enabled = false;
-#endif
 	bool enabled = false;
-	config->value("config/gameplay/conversation_font/enabled", enabled, default_enabled);
+	config->value("config/gameplay/conversation_font/enabled", enabled, false);
 	if (!enabled) {
 		return nullptr;
 	}
