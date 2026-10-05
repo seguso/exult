@@ -32,7 +32,8 @@ class Shape_file;
 #ifdef HAVE_FREETYPE2
 class Shape;
 bool Gen_font_shape(
-		Shape* shape, const char* fontfile, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1);
+		Shape* shape, const char* fontfile, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1,
+		int shadow_radius = 1);
 #endif
 
 // Build a runtime Shape font from a TTF/system font. On Windows, fontfile
@@ -40,5 +41,6 @@ bool Gen_font_shape(
 // for the duration of glyph generation. family is required on Windows.
 // Returns nullptr on platforms/builds without an available runtime rasterizer.
 std::unique_ptr<Shape_file> Gen_runtime_font_shape(
-		const char* fontfile, const char* family, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1);
+		const char* fontfile, const char* family, int nframes, int pixels_ht, unsigned char fg, unsigned char bg, int shadow = -1,
+		int shadow_radius = 1);
 #endif /* INCL_FONTGEN */
