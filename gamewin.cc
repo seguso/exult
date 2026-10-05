@@ -778,7 +778,6 @@ void Game_window::init_files(bool cycle) {
 		}
 	}
 	keybinder->LoadFromPatch();
-	keybinder->ApplyMovementOverrides();
 	cycle_load_palette();
 
 	int fps;    // Init. animation speed.
