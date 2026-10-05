@@ -720,7 +720,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	const int      line_height = sman->get_text_line_height(0);
 	const int      space_width = normal_font ? normal_font->get_text_width(" ") : sman->get_text_width(0, " ");
 	const int      marker_width = original_font ? original_font->get_text_width("\x7f") : sman->get_text_width(0, "\x7f");
-	constexpr int  marker_gap = 1;
+	constexpr int  marker_gap = 2;
 	const int      custom_y_offset = (normal_font && original_font)
 			? original_font->get_text_baseline() - normal_font->get_text_baseline()
 			: 0;
