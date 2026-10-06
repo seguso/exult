@@ -441,6 +441,59 @@ namespace {
 		}
 	}
 
+	void Trace_post_lamp_object_contribution(
+			Game_object* obj,
+			const Lamp_paint_snapshot& before) {
+		if (!last_lamp_postpaint.valid || !before.valid || !obj) {
+			return;
+		}
+
+		Game_window* gwin = Game_window::get_instance();
+		auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+		int changed = 0;
+		std::vector<std::string> samples;
+
+		for (int y = 0; y < before.height; ++y) {
+			for (int x = 0; x < before.width; ++x) {
+				const unsigned char oldpix =
+						before.pixels[y * before.width + x];
+				const unsigned char newpix =
+						buf->get_pixel8(before.left + x, before.top + y);
+				if (oldpix == newpix) {
+					continue;
+				}
+				changed++;
+				if (samples.size() < 16) {
+					samples.push_back(
+							std::to_string(x) + "," + std::to_string(y) + ":" +
+							std::to_string(static_cast<int>(oldpix)) + "->" +
+							std::to_string(static_cast<int>(newpix)));
+				}
+			}
+		}
+
+		if (changed == 0) {
+			return;
+		}
+
+		const Tile_coord t = obj->get_tile();
+		std::ofstream out("exult-lamppost-postobjects.log", std::ios::out | std::ios::app);
+		if (out.good()) {
+			out << "shape=" << obj->get_shapenum()
+				<< " frame=" << obj->get_framenum()
+				<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+				<< " changed=" << changed
+				<< " translucent=" << (obj->get_info().has_translucency() ? 1 : 0)
+				<< " light=" << obj->get_info().get_object_light(obj->get_framenum())
+				<< " samples=";
+			for (size_t i = 0; i < samples.size(); ++i) {
+				if (i) out << ";";
+				out << samples[i];
+			}
+			out << "\n";
+		}
+	}
+
 	void Trace_painted_object(Game_object* obj) {
 		if (!ordering_trace_capture
 			|| !ordering_trace_stream.good()
@@ -1583,11 +1636,25 @@ void Game_render::paint_object(Game_object* obj) {
 				bbox_x, bbox_y, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox_palindex, 2);
 	}
 	Lamp_paint_snapshot lamp_snapshot = Capture_lamp_paint(obj);
+	Lamp_paint_snapshot post_lamp_before;
+	if (last_lamp_postpaint.valid && (!obj || obj->get_shapenum() != 526)) {
+		post_lamp_before = last_lamp_postpaint;
+		auto* buf = static_cast<Image_buffer8*>(Game_window::get_instance()->get_win()->get_ibuf());
+		for (int y = 0; y < post_lamp_before.height; ++y) {
+			for (int x = 0; x < post_lamp_before.width; ++x) {
+				post_lamp_before.pixels[y * post_lamp_before.width + x] =
+						buf->get_pixel8(post_lamp_before.left + x, post_lamp_before.top + y);
+			}
+		}
+	}
 	Trace_painted_object(obj);
 	obj->paint();    // Finally, paint this one.
 	Write_lamp_paint_diff(lamp_snapshot);
 	if (lamp_snapshot.valid) {
 		last_lamp_postpaint = Capture_lamp_paint(obj);
+		std::ofstream clear("exult-lamppost-postobjects.log", std::ios::out | std::ios::trunc);
+	} else if (post_lamp_before.valid) {
+		Trace_post_lamp_object_contribution(obj, post_lamp_before);
 	}
 	// paint bbox front
 	if (bbox_palindex != -1) {
