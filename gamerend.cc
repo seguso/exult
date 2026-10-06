@@ -293,6 +293,110 @@ namespace {
 		ordering_trace_capture = false;
 	}
 
+	struct Lamp_paint_snapshot {
+		bool valid = false;
+		int left = 0;
+		int top = 0;
+		int width = 0;
+		int height = 0;
+		int frame_left = 0;
+		int frame_top = 0;
+		int frame_right = 0;
+		int frame_bottom = 0;
+		std::vector<unsigned char> pixels;
+	};
+
+	Lamp_paint_snapshot Capture_lamp_paint(Game_object* obj) {
+		Lamp_paint_snapshot snap;
+		if (!obj || obj->get_shapenum() != 526) {
+			return snap;
+		}
+
+		Game_window* gwin = Game_window::get_instance();
+		int anchor_x = 0;
+		int anchor_y = 0;
+		gwin->get_shape_location(obj, anchor_x, anchor_y);
+		Shape_frame* frame = obj->get_shape();
+		if (!frame) {
+			return snap;
+		}
+
+		constexpr int radius = 64;
+		snap.left = anchor_x - radius;
+		snap.top = anchor_y - radius;
+		snap.width = radius * 2 + 1;
+		snap.height = radius * 2 + 1;
+		snap.frame_left = anchor_x - frame->get_xleft();
+		snap.frame_top = anchor_y - frame->get_yabove();
+		snap.frame_right = snap.frame_left + frame->get_width() - 1;
+		snap.frame_bottom = snap.frame_top + frame->get_height() - 1;
+		snap.pixels.resize(snap.width * snap.height);
+
+		auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+		for (int y = 0; y < snap.height; ++y) {
+			for (int x = 0; x < snap.width; ++x) {
+				snap.pixels[y * snap.width + x] =
+						buf->get_pixel8(snap.left + x, snap.top + y);
+			}
+		}
+		snap.valid = true;
+		return snap;
+	}
+
+	void Write_lamp_paint_diff(const Lamp_paint_snapshot& snap) {
+		if (!snap.valid) {
+			return;
+		}
+
+		Game_window* gwin = Game_window::get_instance();
+		auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+		int changed_inside = 0;
+		int changed_outside = 0;
+		std::vector<std::string> samples;
+
+		for (int y = 0; y < snap.height; ++y) {
+			for (int x = 0; x < snap.width; ++x) {
+				const int world_x = snap.left + x;
+				const int world_y = snap.top + y;
+				const unsigned char before = snap.pixels[y * snap.width + x];
+				const unsigned char after = buf->get_pixel8(world_x, world_y);
+				if (before == after) {
+					continue;
+				}
+
+				const bool inside =
+						world_x >= snap.frame_left &&
+						world_x <= snap.frame_right &&
+						world_y >= snap.frame_top &&
+						world_y <= snap.frame_bottom;
+				if (inside) {
+					changed_inside++;
+				} else {
+					changed_outside++;
+					if (samples.size() < 64) {
+						samples.push_back(
+								std::to_string(x) + "," + std::to_string(y) + ":" +
+								std::to_string(static_cast<int>(before)) + "->" +
+								std::to_string(static_cast<int>(after)));
+					}
+				}
+			}
+		}
+
+		std::ofstream out("exult-lamppost-paint.log", std::ios::out | std::ios::trunc);
+		if (out.good()) {
+			out << "patch=" << snap.width << "x" << snap.height
+				<< " changedInsideFrame=" << changed_inside
+				<< " changedOutsideFrame=" << changed_outside << "\n";
+			out << "outsideSamples=";
+			for (size_t i = 0; i < samples.size(); ++i) {
+				if (i) out << ";";
+				out << samples[i];
+			}
+			out << "\n";
+		}
+	}
+
 	void Trace_painted_object(Game_object* obj) {
 		if (!ordering_trace_capture
 			|| !ordering_trace_stream.good()
@@ -1433,8 +1537,10 @@ void Game_render::paint_object(Game_object* obj) {
 		obj->get_info().paint_bbox(
 				bbox_x, bbox_y, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox_palindex, 2);
 	}
+	Lamp_paint_snapshot lamp_snapshot = Capture_lamp_paint(obj);
 	Trace_painted_object(obj);
 	obj->paint();    // Finally, paint this one.
+	Write_lamp_paint_diff(lamp_snapshot);
 	// paint bbox front
 	if (bbox_palindex != -1) {
 		obj->get_info().paint_bbox(
