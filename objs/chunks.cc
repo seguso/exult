@@ -46,7 +46,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "ordinfo.h"
 #include "shapeinf.h"
 
-#include <fstream>
 
 using std::rand;
 using std::vector;
@@ -1078,10 +1077,6 @@ bool Map_chunk::is_blocked(
 		int         max_rise     // Max. rise, or -1 to use old beha-
 								 //   viour (max_drop if FLY, else 1).
 ) {
-	const int requested_x = tile.tx;
-	const int requested_y = tile.ty;
-	const int requested_lift = tile.tz;
-
 	// Get chunk tile is in.
 	Game_map*  gmap  = gwin->get_map();
 	Map_chunk* chunk = gmap->get_chunk_safely(tile.tx / c_tiles_per_chunk, tile.ty / c_tiles_per_chunk);
@@ -1090,24 +1085,9 @@ bool Map_chunk::is_blocked(
 	}
 	chunk->setup_cache();    // Be sure cache is present.
 	int new_lift;            // Check it within chunk.
-	const bool blocked = chunk->is_blocked(
-			height, tile.tz, tile.tx % c_tiles_per_chunk, tile.ty % c_tiles_per_chunk, new_lift, move_flags, max_drop, max_rise);
-
-	if (requested_x >= 1075 && requested_x <= 1095
-			&& requested_y >= 2165 && requested_y <= 2188) {
-		std::ofstream out("exult-movement-trace.log", std::ios::out | std::ios::app);
-		if (out.good()) {
-			out << "to=(" << requested_x << "," << requested_y << ")"
-				<< " requestedLift=" << requested_lift
-				<< " blocked=" << (blocked ? 1 : 0)
-				<< " resolvedLift=" << new_lift
-				<< " height=" << height
-				<< " moveFlags=" << move_flags
-				<< "\n";
-		}
-	}
-
-	if (blocked) {
+	if (chunk->is_blocked(
+				height, tile.tz, tile.tx % c_tiles_per_chunk, tile.ty % c_tiles_per_chunk, new_lift, move_flags, max_drop,
+				max_rise)) {
 		return true;
 	}
 	tile.tz = new_lift;
