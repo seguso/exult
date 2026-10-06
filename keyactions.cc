@@ -41,6 +41,7 @@
 #include "exult.h"
 #include "exult_constants.h"
 #include "game.h"
+#include "gameclk.h"
 #include "gamemap.h"
 #include "gamerend.h"
 #include "gamewin.h"
@@ -870,6 +871,19 @@ void ActionNextMapTeleport(const int* params) {
 void ActionTime(const int* params) {
 	ignore_unused_variable_warning(params);
 	cheat.fake_time_period();
+}
+
+void ActionDebugToggleDayNight(const int* params) {
+	ignore_unused_variable_warning(params);
+	auto* gwin = Game_window::get_instance();
+	auto* clock = gwin->get_clock();
+	const int hour = clock->get_hour();
+	const bool is_night = hour < 5 || hour >= 21;
+	clock->set_hour(is_night ? 12 : 23);
+	clock->set_minute(0);
+	clock->reset_palette();
+	gwin->paint();
+	std::cout << "Debug F6 time: " << (is_night ? "day 12:00" : "night 23:00") << std::endl;
 }
 
 //  { ActionWizard, 1, "Toggle archwizard mode", cheat_keys, NONE },
