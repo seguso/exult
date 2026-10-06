@@ -34,6 +34,7 @@
 #include "Text_gump.h"
 #include "actions.h"
 #include "actors.h"
+#include "aniinf.h"
 #include "animate.h"
 #include "barge.h"
 #include "chunks.h"
@@ -789,6 +790,26 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	item->set_shape(shape);
 	chunk->add(item);
 	gwin->add_dirty(item);
+	if (item->get_shapenum() == 889 || item->get_shapenum() == 526) {
+		const Shape_info& info = item->get_info();
+		const int nframes = item->get_num_frames();
+		const Animation_info* ani = info.is_animated()
+				? const_cast<Shape_info&>(info).get_animation_info_safe(item->get_shapenum(), nframes)
+				: nullptr;
+		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
+		if (trace.good()) {
+			trace << "AFTER_SHAPE now=" << item->get_shapenum() << "/" << item->get_framenum()
+				  << " frames=" << nframes
+				  << " animated=" << (info.is_animated() ? 1 : 0)
+				  << " light=" << info.get_object_light(item->get_framenum());
+			if (ani) {
+				trace << " aniType=" << static_cast<int>(ani->get_type())
+					  << " aniCount=" << ani->get_frame_count()
+					  << " aniDelay=" << ani->get_frame_delay();
+			}
+			trace << "\n";
+		}
+	}
 	//	rect = gwin->get_shape_rect(item).add(rect);
 	//	rect.enlarge(8);
 	//	rect = gwin->clip_to_win(rect);
