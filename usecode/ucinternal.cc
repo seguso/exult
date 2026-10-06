@@ -842,6 +842,15 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 				for (const auto& [pix, count] : counts) {
 					trace << pix << ":" << count << ",";
 				}
+				trace << "\nFRAME_COLORS\n";
+				for (const auto& [pix, count] : counts) {
+					trace << "  idx=" << pix
+						  << " rgb6=("
+						  << static_cast<int>(gwin->get_pal()->get_red(pix)) << ","
+						  << static_cast<int>(gwin->get_pal()->get_green(pix)) << ","
+						  << static_cast<int>(gwin->get_pal()->get_blue(pix)) << ")"
+						  << " count=" << count << "\n";
+				}
 			}
 			if (ani) {
 				trace << " aniType=" << static_cast<int>(ani->get_type())
