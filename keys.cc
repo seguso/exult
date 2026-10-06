@@ -157,6 +157,7 @@ const struct Action {
 		{"TARGET_MODE_TELEPORT", ActionTeleportTargetMode,           nullptr, 0x838,   Action::cheat_keys,         NONE, false,  true,  true, false},
 		{   "NEXT_MAP_TELEPORT",    ActionNextMapTeleport,           nullptr, 0x839,   Action::cheat_keys,         NONE, false,  true,  true, false},
 		{    "NEXT_TIME_PERIOD",               ActionTime,           nullptr, 0x83A,   Action::cheat_keys,         NONE, false,  true,  true, false},
+		{ "DEBUG_TOGGLE_DAY_NIGHT", ActionDebugToggleDayNight,           nullptr, 0x85b,  Action::normal_keys,         NONE,  true,  true,  true, false},
 		{  "TOGGLE_WIZARD_MODE",             ActionWizard,           nullptr, 0x83B,   Action::cheat_keys,         NONE, false,  true,  true, false},
 		{          "PARTY_HEAL",               ActionHeal,           nullptr, 0x83C,   Action::cheat_keys,         NONE, false,  true,  true, false},
 		{"PARTY_INCREASE_LEVEL",            ActionLevelup,           nullptr, 0x83D,   Action::cheat_keys,         NONE, false,  true,  true, false},
@@ -268,6 +269,18 @@ static ParseActionMap actions;
 
 KeyBinder::KeyBinder() {
 	FillParseMaps();
+
+	// Development-only parity helper with Ult: keep F6 available without
+	// enabling cheats or editing a keymap file.
+	auto action = actions.find("DEBUG_TOGGLE_DAY_NIGHT");
+	if (action != actions.end()) {
+		AddKeyBinding(
+				SDLK_F6,
+				SDL_KMOD_NONE,
+				action->second,
+				0,
+				nullptr);
+	}
 }
 
 void KeyBinder::AddKeyBinding(SDL_Keycode key, SDL_Keymod mod, const Action* action, int nparams, const int* params) {
