@@ -43,6 +43,8 @@ Boston, MA  02111-1307, USA.
 
 #include "common_types.h"
 #include "gamma.h"
+
+#include <fstream>
 #include "iwin8.h"
 
 #include <algorithm>
@@ -151,6 +153,20 @@ void Image_window8::rotate_colors(
 	}
 
 	if (upd) {    // Take effect now?
+		{
+			std::ofstream trace("exult-display-palette.log", std::ios::out | std::ios::trunc);
+			if (trace.good()) {
+				trace << "ticks=" << SDL_GetTicks() << "\n";
+				for (int index = 248; index <= 251; ++index) {
+					trace << "idx=" << index
+						<< " rgb8=("
+						<< static_cast<int>(colors[index * 3]) << ","
+						<< static_cast<int>(colors[index * 3 + 1]) << ","
+						<< static_cast<int>(colors[index * 3 + 2]) << ")\n";
+				}
+			}
+		}
+
 		SDL_Color colors2[256];
 		for (int i = 0; i < 256; i++) {
 			colors2[i].r = colors[i * 3];
