@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <set>
 #include <vector>
 
 /*
@@ -666,6 +667,66 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
 	}
 	effects->paint();
+
+	// Diagnostic parity check for Ult: dump the indexed colours that are
+	// present around blood/footprint shape 912 before the 45-degree resample.
+	// This deliberately observes the same 8-bit rotate_scene that paint_rotated()
+	// feeds into Scale2x.
+	if (main_actor) {
+		std::ofstream out("exult-shape912-color.log", std::ios::out | std::ios::trunc);
+		if (out.good()) {
+			out << "EXULT shape 912 pre-rotate palette=" << pal->get_palette_index() << "\n";
+			const int center_cx = main_actor->get_cx();
+			const int center_cy = main_actor->get_cy();
+			for (int dy = -1; dy <= 1; ++dy) {
+				for (int dx = -1; dx <= 1; ++dx) {
+					const int cx = (center_cx + dx + c_num_chunks) % c_num_chunks;
+					const int cy = (center_cy + dy + c_num_chunks) % c_num_chunks;
+					Map_chunk* chunk = map->get_chunk(cx, cy);
+					if (!chunk) {
+						continue;
+					}
+					Nonflat_object_iterator next(chunk);
+					Game_object* obj = nullptr;
+					while ((obj = next.get_next()) != nullptr) {
+						if (obj->get_shapenum() != 912) {
+							continue;
+						}
+						const Tile_coord t = obj->get_tile();
+						TileRect r = get_shape_rect(obj);
+						std::set<unsigned char> indices;
+						const int left = std::max(r.x, scene_x);
+						const int top = std::max(r.y, scene_y);
+						const int right = std::min(r.x + r.w, scene_x + scene_size);
+						const int bottom = std::min(r.y + r.h, scene_y + scene_size);
+						for (int py = top; py < bottom; ++py) {
+							for (int px = left; px < right; ++px) {
+								indices.insert(rotate_scene->get_pixel8(px, py));
+							}
+						}
+						out << "shape=912 frame=" << obj->get_framenum()
+							<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+							<< " sceneIndices=";
+						bool first = true;
+						for (unsigned char idx : indices) {
+							if (!first) {
+								out << ",";
+							}
+							first = false;
+							out << static_cast<int>(idx);
+						}
+						out << "\n";
+						for (unsigned char idx : indices) {
+							out << "  idx=" << static_cast<int>(idx)
+								<< " rgb6=(" << static_cast<int>(pal->get_red(idx))
+								<< "," << static_cast<int>(pal->get_green(idx))
+								<< "," << static_cast<int>(pal->get_blue(idx)) << ")\n";
+						}
+					}
+				}
+			}
+		}
+	}
 	// A world object being dragged should go through the same rotated-world
 	// raster pipeline as when it is at rest. Painting it here preserves the
 	// exact Scale2x + rotate quality instead of promoting it to an unrotated UI
