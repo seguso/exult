@@ -305,6 +305,7 @@ namespace {
 		int frame_bottom = 0;
 		std::vector<unsigned char> pixels;
 	};
+	static Lamp_paint_snapshot last_lamp_postpaint;
 
 	Lamp_paint_snapshot Capture_lamp_paint(Game_object* obj) {
 		Lamp_paint_snapshot snap;
@@ -389,6 +390,49 @@ namespace {
 				<< " changedInsideFrame=" << changed_inside
 				<< " changedOutsideFrame=" << changed_outside << "\n";
 			out << "outsideSamples=";
+			for (size_t i = 0; i < samples.size(); ++i) {
+				if (i) out << ";";
+				out << samples[i];
+			}
+			out << "\n";
+		}
+	}
+
+	void Write_lamp_final_scene_diff() {
+		if (!last_lamp_postpaint.valid) {
+			return;
+		}
+
+		Game_window* gwin = Game_window::get_instance();
+		auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+		int changed = 0;
+		std::vector<std::string> samples;
+
+		for (int y = 0; y < last_lamp_postpaint.height; ++y) {
+			for (int x = 0; x < last_lamp_postpaint.width; ++x) {
+				const unsigned char before =
+						last_lamp_postpaint.pixels[y * last_lamp_postpaint.width + x];
+				const unsigned char after =
+						buf->get_pixel8(
+								last_lamp_postpaint.left + x,
+								last_lamp_postpaint.top + y);
+				if (before == after) {
+					continue;
+				}
+				changed++;
+				if (samples.size() < 64) {
+					samples.push_back(
+							std::to_string(x) + "," + std::to_string(y) + ":" +
+							std::to_string(static_cast<int>(before)) + "->" +
+							std::to_string(static_cast<int>(after)));
+				}
+			}
+		}
+
+		std::ofstream out("exult-lamppost-final.log", std::ios::out | std::ios::trunc);
+		if (out.good()) {
+			out << "changedAfterLampPaint=" << changed << "\n";
+			out << "samples=";
 			for (size_t i = 0; i < samples.size(); ++i) {
 				if (i) out << ";";
 				out << samples[i];
@@ -718,6 +762,7 @@ int Game_render::paint_map(
 	Write_lamppost_ground_diff(
 			gwin,
 			lamppost_ground);
+	Write_lamp_final_scene_diff();
 	End_ordering_trace();
 
 	/// Dungeon Blackness (but disable in map editor mode)
@@ -1541,6 +1586,9 @@ void Game_render::paint_object(Game_object* obj) {
 	Trace_painted_object(obj);
 	obj->paint();    // Finally, paint this one.
 	Write_lamp_paint_diff(lamp_snapshot);
+	if (lamp_snapshot.valid) {
+		last_lamp_postpaint = Capture_lamp_paint(obj);
+	}
 	// paint bbox front
 	if (bbox_palindex != -1) {
 		obj->get_info().paint_bbox(
