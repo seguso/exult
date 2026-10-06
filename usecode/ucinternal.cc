@@ -1360,6 +1360,13 @@ Game_object_shared Usecode_internal::create_object(
 		int  shapenum,
 		bool equip    // Equip monsters.
 ) {
+	if (shapenum == 440) {
+		std::ofstream out("exult-illumination-440.log", std::ios::out | std::ios::app);
+		if (out.good()) {
+			out << "CREATE shape=440 equip=" << (equip ? 1 : 0) << "\n";
+		}
+	}
+
 	Game_object_shared obj;    // Create to be written to Ireg.
 	const Shape_info&  info = ShapeID::get_info(shapenum);
 	modified_map            = true;
