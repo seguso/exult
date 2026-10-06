@@ -34,7 +34,6 @@
 #include "Text_gump.h"
 #include "actions.h"
 #include "actors.h"
-#include "aniinf.h"
 #include "animate.h"
 #include "barge.h"
 #include "chunks.h"
@@ -48,7 +47,6 @@
 #include "game.h"
 #include "gamemap.h"
 #include "gamewin.h"
-#include "ibuf8.h"
 #include "ios_state.hpp"
 #include "items.h"
 #include "keyring.h"
@@ -754,15 +752,6 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	if (!item) {
 		return;
 	}
-	if (item->get_shapenum() == 889 || item->get_shapenum() == 526 || shape == 889 || shape == 526) {
-		const Tile_coord t = item->get_tile();
-		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
-		if (trace.good()) {
-			trace << "SET_SHAPE before=" << item->get_shapenum() << "/" << item->get_framenum()
-				  << " requestedShape=" << shape
-				  << " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")\n";
-		}
-	}
 	// See if light turned on/off.
 	const bool light_changed = item->get_info().is_light_source() != ShapeID::get_info(shape).is_light_source();
 	auto*      owner         = item->get_owner();
@@ -791,95 +780,6 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	item->set_shape(shape);
 	chunk->add(item);
 	gwin->add_dirty(item);
-	if (item->get_shapenum() == 889 || item->get_shapenum() == 526) {
-		const Shape_info& info = item->get_info();
-		const int nframes = item->get_num_frames();
-		const Animation_info* ani = info.is_animated()
-				? const_cast<Shape_info&>(info).get_animation_info_safe(item->get_shapenum(), nframes)
-				: nullptr;
-		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
-		if (trace.good()) {
-			Shape_frame* sf = item->get_shape();
-			trace << "AFTER_SHAPE now=" << item->get_shapenum() << "/" << item->get_framenum()
-				  << " frames=" << nframes
-				  << " animated=" << (info.is_animated() ? 1 : 0)
-				  << " translucent=" << (info.has_translucency() ? 1 : 0)
-				  << " light=" << info.get_object_light(item->get_framenum());
-			if (sf) {
-				trace << " frameSize=" << sf->get_width() << "x" << sf->get_height()
-					  << " extents=(" << sf->get_xleft() << "," << sf->get_xright()
-					  << "," << sf->get_yabove() << "," << sf->get_ybelow() << ")";
-
-				Image_buffer8 scratch(sf->get_width(), sf->get_height());
-				scratch.fill8(255);
-				if (sf->is_rle()) {
-					sf->paint_rle(&scratch, sf->get_xleft(), sf->get_yabove());
-				} else {
-					sf->paint(&scratch, sf->get_xleft(), sf->get_yabove());
-				}
-
-				std::map<int, int> counts;
-				trace << "\nFRAME_PIXELS rows=";
-				for (int y = 0; y < sf->get_height(); ++y) {
-					int first_x = -1;
-					int last_x = -1;
-					for (int x = 0; x < sf->get_width(); ++x) {
-						const int pix = scratch.get_pixel8(x, y);
-						if (pix == 255) {
-							continue;
-						}
-						counts[pix]++;
-						if (first_x < 0) {
-							first_x = x;
-						}
-						last_x = x;
-					}
-					if (first_x >= 0) {
-						trace << y << ":" << first_x << "-" << last_x << ";";
-					}
-				}
-				trace << "\nFRAME_INDICES ";
-				for (const auto& [pix, count] : counts) {
-					trace << pix << ":" << count << ",";
-				}
-				trace << "\nFRAME_COLORS\n";
-				for (const auto& [pix, count] : counts) {
-					trace << "  idx=" << pix
-						  << " rgb6=("
-						  << static_cast<int>(gwin->get_pal()->get_red(pix)) << ","
-						  << static_cast<int>(gwin->get_pal()->get_green(pix)) << ","
-						  << static_cast<int>(gwin->get_pal()->get_blue(pix)) << ")"
-						  << " count=" << count << "\n";
-				}
-			}
-			if (ani) {
-				trace << " aniType=" << static_cast<int>(ani->get_type())
-					  << " aniCount=" << ani->get_frame_count()
-					  << " aniDelay=" << ani->get_frame_delay();
-			}
-			trace << "\n";
-			Game_object_vector nearby;
-			Game_object::find_nearby(
-					nearby,
-					item->get_tile(),
-					c_any_shapenum,
-					3,
-					0);
-			trace << "NEARBY_OBJECTS count=" << nearby.size() << "\n";
-			for (auto* near_obj : nearby) {
-				if (!near_obj) {
-					continue;
-				}
-				const Tile_coord nt = near_obj->get_tile();
-				trace << "  shape=" << near_obj->get_shapenum()
-					  << " frame=" << near_obj->get_framenum()
-					  << " tile=(" << nt.tx << "," << nt.ty << "," << nt.tz << ")"
-					  << " translucent=" << (near_obj->get_info().has_translucency() ? 1 : 0)
-					  << " light=" << near_obj->get_info().get_object_light(near_obj->get_framenum())
-					  << "\n";
-			}
-		}
-	}
 	//	rect = gwin->get_shape_rect(item).add(rect);
 	//	rect.enlarge(8);
 	//	rect = gwin->clip_to_win(rect);
@@ -902,17 +802,6 @@ void Usecode_internal::set_item_frame(
 ) {
 	if (!item) {
 		return;
-	}
-	if (item->get_shapenum() == 889 || item->get_shapenum() == 526) {
-		const Tile_coord t = item->get_tile();
-		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
-		if (trace.good()) {
-			trace << "SET_FRAME before=" << item->get_shapenum() << "/" << item->get_framenum()
-				  << " requestedFrame=" << frame
-				  << " checkEmpty=" << check_empty
-				  << " setRotated=" << set_rotated
-				  << " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")\n";
-		}
 	}
 	// Added 9/16/2001:
 	if (!set_rotated) {    // Leave bit alone?
