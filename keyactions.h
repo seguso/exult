@@ -95,6 +95,7 @@ void ActionTeleport(const int* params);
 void ActionTeleportTargetMode(const int* params);
 void ActionNextMapTeleport(const int* params);
 void ActionTime(const int* params);
+void ActionDebugToggleDayNight(const int* params);
 void ActionWizard(const int* params);
 void ActionHeal(const int* params);
 void ActionCheatScreen(const int* params);
