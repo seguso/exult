@@ -310,6 +310,124 @@ namespace {
 	}
 }
 
+struct Lamppost_ground_capture {
+	bool valid = false;
+	int left = 0;
+	int top = 0;
+	int width = 0;
+	int height = 0;
+	int frame_left = 0;
+	int frame_top = 0;
+	int frame_right = 0;
+	int frame_bottom = 0;
+	std::vector<unsigned char> pixels;
+};
+
+static Lamppost_ground_capture Capture_lamppost_ground(Game_window* gwin) {
+	Lamppost_ground_capture capture;
+	Actor* actor = gwin->get_main_actor();
+	if (!actor) {
+		return capture;
+	}
+
+	Game_object_vector lamps;
+	Game_object::find_nearby(lamps, actor->get_tile(), 526, 20, 0);
+	Game_object* lamp = nullptr;
+	for (auto* obj : lamps) {
+		if (obj && obj->get_shapenum() == 526) {
+			lamp = obj;
+			break;
+		}
+	}
+	if (!lamp) {
+		return capture;
+	}
+
+	int anchor_x = 0;
+	int anchor_y = 0;
+	gwin->get_shape_location(lamp, anchor_x, anchor_y);
+	Shape_frame* frame = lamp->get_shape();
+	if (!frame) {
+		return capture;
+	}
+
+	constexpr int radius = 64;
+	capture.left = anchor_x - radius;
+	capture.top = anchor_y - radius;
+	capture.width = radius * 2 + 1;
+	capture.height = radius * 2 + 1;
+	capture.frame_left = anchor_x - frame->get_xleft();
+	capture.frame_top = anchor_y - frame->get_yabove();
+	capture.frame_right = capture.frame_left + frame->get_width() - 1;
+	capture.frame_bottom = capture.frame_top + frame->get_height() - 1;
+	capture.pixels.resize(capture.width * capture.height);
+
+	auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+	for (int y = 0; y < capture.height; ++y) {
+		for (int x = 0; x < capture.width; ++x) {
+			capture.pixels[y * capture.width + x] =
+					buf->get_pixel8(capture.left + x, capture.top + y);
+		}
+	}
+	capture.valid = true;
+	return capture;
+}
+
+static void Write_lamppost_ground_diff(Game_window* gwin, const Lamppost_ground_capture& capture) {
+	if (!capture.valid) {
+		return;
+	}
+
+	auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+	int changed_inside_frame = 0;
+	int changed_outside_frame = 0;
+	std::vector<std::string> samples;
+
+	for (int y = 0; y < capture.height; ++y) {
+		for (int x = 0; x < capture.width; ++x) {
+			const int world_x = capture.left + x;
+			const int world_y = capture.top + y;
+			const unsigned char before = capture.pixels[y * capture.width + x];
+			const unsigned char after = buf->get_pixel8(world_x, world_y);
+			if (before == after) {
+				continue;
+			}
+
+			const bool inside =
+					world_x >= capture.frame_left &&
+					world_x <= capture.frame_right &&
+					world_y >= capture.frame_top &&
+					world_y <= capture.frame_bottom;
+			if (inside) {
+				changed_inside_frame++;
+			} else {
+				changed_outside_frame++;
+				if (samples.size() < 64) {
+					samples.push_back(
+							std::to_string(x) + "," + std::to_string(y) + ":" +
+							std::to_string(static_cast<int>(before)) + "->" +
+							std::to_string(static_cast<int>(after)));
+				}
+			}
+		}
+	}
+
+	std::ofstream out("exult-lamppost-ground.log", std::ios::out | std::ios::trunc);
+	if (out.good()) {
+		out << "patch=" << capture.width << "x" << capture.height
+			<< " changedInsideFrame=" << changed_inside_frame
+			<< " changedOutsideFrame=" << changed_outside_frame << "\n";
+		out << "outsideSamples=";
+		for (size_t i = 0; i < samples.size(); ++i) {
+			if (i) {
+				out << ";";
+			}
+			out << samples[i];
+		}
+		out << "\n";
+	}
+}
+
 /*
  *  Show the outline around a chunk.
  */
@@ -466,6 +584,9 @@ int Game_render::paint_map(
 			paint_chunk_flat_rles(cx, cy, xoff, yoff);
 		}
 	}
+	Lamppost_ground_capture lamppost_ground =
+			Capture_lamppost_ground(gwin);
+
 	// Draw the chunk grid in Map editor cheat mode.
 	if (cheat.in_map_editor()) {
 		for (cy = start_chunky; cy != stop_chunky; cy = INCR_CHUNK(cy)) {
@@ -490,6 +611,9 @@ int Game_render::paint_map(
 			light_sources += paint_chunk_objects(dx, dy);
 		}
 	}
+	Write_lamppost_ground_diff(
+			gwin,
+			lamppost_ground);
 	End_ordering_trace();
 
 	/// Dungeon Blackness (but disable in map editor mode)
