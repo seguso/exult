@@ -36,6 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "gamemap.h"
 #include "gamewin.h"
 #include "ucsched.h"
+#include "shapes/shapeinf/aniinf.h"
 
 #include <fstream>
 
@@ -89,8 +90,9 @@ void Ireg_game_object::paint() {
 					<< " hatchable=" << (info.get_shape_class() == Shape_info::hatchable ? 1 : 0);
 				if (info.is_animated()) {
 					const ShapeID sid(440, frame);
+					Shape_info& mutable_info = ShapeID::get_info(440);
 					const Animation_info* ai =
-							info.get_animation_info_safe(440, sid.get_num_frames());
+							mutable_info.get_animation_info_safe(440, sid.get_num_frames());
 					if (ai) {
 						out << " animType=" << static_cast<int>(ai->get_type())
 							<< " frameDelay=" << ai->get_frame_delay()
