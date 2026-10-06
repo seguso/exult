@@ -142,6 +142,17 @@ void Ireg_game_object::paint() {
  */
 
 void Ireg_game_object::move(int newtx, int newty, int newlift, int newmap) {
+	if (get_shapenum() == 440) {
+		const Tile_coord oldt = get_tile();
+		std::ofstream out("exult-illumination-440.log", std::ios::out | std::ios::app);
+		if (out.good()) {
+			out << "MOVE shape=440"
+				<< " from=(" << oldt.tx << "," << oldt.ty << "," << oldt.tz << ")"
+				<< " to=(" << newtx << "," << newty << "," << newlift << ")"
+				<< " map=" << newmap << "\n";
+		}
+	}
+
 	if (owner) {    // Watch for this.
 		owner->remove(this);
 		set_invalid();    // So we can safely move it back.
