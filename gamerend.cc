@@ -198,7 +198,7 @@ namespace {
 					continue;
 				}
 
-				Nonflat_object_iterator next(chunk);
+				Object_iterator next(chunk->get_objects());
 				Game_object* obj = nullptr;
 				while ((obj = next.get_next()) != nullptr) {
 					if (Ordering_trace_near_actor(obj)) {
