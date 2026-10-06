@@ -798,10 +798,17 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 				: nullptr;
 		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
 		if (trace.good()) {
+			Shape_frame* sf = item->get_shape();
 			trace << "AFTER_SHAPE now=" << item->get_shapenum() << "/" << item->get_framenum()
 				  << " frames=" << nframes
 				  << " animated=" << (info.is_animated() ? 1 : 0)
+				  << " translucent=" << (info.has_translucency() ? 1 : 0)
 				  << " light=" << info.get_object_light(item->get_framenum());
+			if (sf) {
+				trace << " frameSize=" << sf->get_width() << "x" << sf->get_height()
+					  << " extents=(" << sf->get_xleft() << "," << sf->get_xright()
+					  << "," << sf->get_yabove() << "," << sf->get_ybelow() << ")";
+			}
 			if (ani) {
 				trace << " aniType=" << static_cast<int>(ani->get_type())
 					  << " aniCount=" << ani->get_frame_count()
