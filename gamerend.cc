@@ -629,6 +629,51 @@ static void Write_lamppost_ground_diff(Game_window* gwin, const Lamppost_ground_
 	}
 }
 
+static void Write_lamppost_effects_diff(
+		Game_window* gwin,
+		const Lamppost_ground_capture& capture) {
+	if (!capture.valid) {
+		return;
+	}
+
+	auto* buf = static_cast<Image_buffer8*>(gwin->get_win()->get_ibuf());
+	int changed = 0;
+	std::vector<std::string> samples;
+
+	for (int y = 0; y < capture.height; ++y) {
+		for (int x = 0; x < capture.width; ++x) {
+			const unsigned char before =
+					capture.pixels[y * capture.width + x];
+			const unsigned char after =
+					buf->get_pixel8(
+							capture.left + x,
+							capture.top + y);
+			if (before == after) {
+				continue;
+			}
+
+			changed++;
+			if (samples.size() < 64) {
+				samples.push_back(
+						std::to_string(x) + "," + std::to_string(y) + ":" +
+						std::to_string(static_cast<int>(before)) + "->" +
+						std::to_string(static_cast<int>(after)));
+			}
+		}
+	}
+
+	std::ofstream out("exult-lamppost-effects.log", std::ios::out | std::ios::trunc);
+	if (out.good()) {
+		out << "changedByEffects=" << changed << "\n";
+		out << "samples=";
+		for (size_t i = 0; i < samples.size(); ++i) {
+			if (i) out << ";";
+			out << samples[i];
+		}
+		out << "\n";
+	}
+}
+
 /*
  *  Show the outline around a chunk.
  */
@@ -992,7 +1037,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	if (main_actor) {
 		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
 	}
+
+	Lamppost_ground_capture lamppost_before_effects =
+			Capture_lamppost_ground(this);
 	effects->paint();
+	Write_lamppost_effects_diff(
+			this,
+			lamppost_before_effects);
 
 	// Diagnostic parity check for Ult: dump the indexed colours that are
 	// present around blood/footprint shape 912 before the 45-degree resample.
