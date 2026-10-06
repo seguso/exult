@@ -390,6 +390,21 @@ KeyMap::const_iterator KeyBinder::TranslateEvent(const SDL_Event& ev) const {
 }
 
 bool KeyBinder::HandleEvent(const SDL_Event& ev) const {
+	// Development-only parity helper with Ult. Do this before normal keymap
+	// lookup because user/config keymaps are loaded after construction and can
+	// overwrite the constructor-time F6 binding.
+	if (ev.type == SDL_EVENT_KEY_DOWN
+			&& ev.key.key == SDLK_F6
+			&& (ev.key.mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) == 0) {
+		ActionDebugToggleDayNight(nullptr);
+		return true;
+	}
+	if (ev.type == SDL_EVENT_KEY_UP
+			&& ev.key.key == SDLK_F6
+			&& (ev.key.mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) == 0) {
+		return true;
+	}
+
 	auto sdlkey_index = TranslateEvent(ev);
 	if (sdlkey_index != bindings.end()) {
 		return DoAction(sdlkey_index->second, ev.type == SDL_EVENT_KEY_DOWN);
