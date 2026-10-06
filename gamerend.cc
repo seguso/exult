@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <vector>
 
@@ -119,8 +120,8 @@ namespace {
 		const Tile_coord t = obj->get_tile();
 		const Shape_info& info = obj->get_info();
 		const int frame = obj->get_framenum();
-		const TileRect area = gwin->get_shape_rect(obj);
-		Ordering_info ord(gwin, obj, const_cast<TileRect&>(area));
+		TileRect area = gwin->get_shape_rect(obj);
+		Ordering_info ord(gwin, obj, area);
 
 		out << label
 			<< " ptr=" << obj
