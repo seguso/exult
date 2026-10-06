@@ -84,7 +84,20 @@ void Ireg_game_object::paint() {
 					<< " translucent=" << (info.has_translucency() ? 1 : 0)
 					<< " light=" << info.get_object_light(frame)
 					<< " frames=" << get_num_frames()
-					<< " owner=" << (get_owner() ? 1 : 0);
+					<< " owner=" << (get_owner() ? 1 : 0)
+					<< " shapeClass=" << static_cast<int>(info.get_shape_class())
+					<< " hatchable=" << (info.get_shape_class() == Shape_info::hatchable ? 1 : 0);
+				if (info.is_animated()) {
+					const ShapeID sid(440, frame);
+					const Animation_info* ai =
+							info.get_animation_info_safe(440, sid.get_num_frames());
+					if (ai) {
+						out << " animType=" << static_cast<int>(ai->get_type())
+							<< " frameDelay=" << ai->get_frame_delay()
+							<< " freezeFirstChance=" << ai->get_freeze_first_chance()
+							<< " recycle=" << ai->get_recycle();
+					}
+				}
 
 				Game_object_vector lamps;
 				Game_object::find_nearby(lamps, t, 526, 12, 0);
