@@ -752,6 +752,15 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	if (!item) {
 		return;
 	}
+	if (item->get_shapenum() == 889 || item->get_shapenum() == 526 || shape == 889 || shape == 526) {
+		const Tile_coord t = item->get_tile();
+		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
+		if (trace.good()) {
+			trace << "SET_SHAPE before=" << item->get_shapenum() << "/" << item->get_framenum()
+				  << " requestedShape=" << shape
+				  << " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")\n";
+		}
+	}
 	// See if light turned on/off.
 	const bool light_changed = item->get_info().is_light_source() != ShapeID::get_info(shape).is_light_source();
 	auto*      owner         = item->get_owner();
@@ -802,6 +811,17 @@ void Usecode_internal::set_item_frame(
 ) {
 	if (!item) {
 		return;
+	}
+	if (item->get_shapenum() == 889 || item->get_shapenum() == 526) {
+		const Tile_coord t = item->get_tile();
+		std::ofstream trace("exult-lamppost-usecode.log", std::ios::out | std::ios::app);
+		if (trace.good()) {
+			trace << "SET_FRAME before=" << item->get_shapenum() << "/" << item->get_framenum()
+				  << " requestedFrame=" << frame
+				  << " checkEmpty=" << check_empty
+				  << " setRotated=" << set_rotated
+				  << " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")\n";
+		}
 	}
 	// Added 9/16/2001:
 	if (!set_rotated) {    // Leave bit alone?
