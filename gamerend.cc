@@ -43,6 +43,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <fstream>
 
 /*
  *  Paint just the map with given top-left-corner tile.
@@ -1020,6 +1021,53 @@ void Game_render::paint_object(Game_object* obj) {
 	if (bbox_palindex != -1) {
 		obj->get_info().paint_bbox(
 				bbox_x, bbox_y, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox_palindex, 2);
+	}
+	if (obj->get_shapenum() == 440) {
+		static int last_frame = -1;
+		static int last_tx = -1;
+		static int last_ty = -1;
+		static int last_tz = -1;
+		const Tile_coord t = obj->get_tile();
+		const int frame = obj->get_framenum();
+		if (frame != last_frame || t.tx != last_tx || t.ty != last_ty || t.tz != last_tz) {
+			last_frame = frame;
+			last_tx = t.tx;
+			last_ty = t.ty;
+			last_tz = t.tz;
+			const Shape_info& info = obj->get_info();
+			std::ofstream out("exult-illumination-440.log", std::ios::out | std::ios::app);
+			if (out.good()) {
+				out << "shape=440"
+					<< " frame=" << frame
+					<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+					<< " animated=" << (info.is_animated() ? 1 : 0)
+					<< " translucent=" << (info.has_translucency() ? 1 : 0)
+					<< " light=" << info.get_object_light(frame)
+					<< " frames=" << obj->get_num_frames()
+					<< " owner=" << (obj->get_owner() ? 1 : 0)
+					<< " deps=" << obj->get_dependencies().size();
+
+				Game_object_vector lamps;
+				Game_object::find_nearby(lamps, t, 526, 12, 0);
+				out << " nearby526=" << lamps.size();
+				for (auto* lamp : lamps) {
+					if (!lamp) continue;
+					const Tile_coord lt = lamp->get_tile();
+					out << " [" << lamp->get_framenum()
+						<< "@(" << lt.tx << "," << lt.ty << "," << lt.tz << ")]";
+				}
+				lamps.clear();
+				Game_object::find_nearby(lamps, t, 889, 12, 0);
+				out << " nearby889=" << lamps.size();
+				for (auto* lamp : lamps) {
+					if (!lamp) continue;
+					const Tile_coord lt = lamp->get_tile();
+					out << " [" << lamp->get_framenum()
+						<< "@(" << lt.tx << "," << lt.ty << "," << lt.tz << ")]";
+				}
+				out << "\n";
+			}
+		}
 	}
 	obj->paint();    // Finally, paint this one.
 	// paint bbox front
