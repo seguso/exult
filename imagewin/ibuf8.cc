@@ -32,6 +32,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 
 using std::cerr;
 using std::endl;
@@ -464,6 +465,12 @@ void Image_buffer8::fill_translucent8(
 		int srcw, int srch, int destx, int desty,
 		const Xform_palette& xform    // Transform table.
 ) {
+	{
+		std::ofstream out("exult-fill-translucent.log", std::ios::out | std::ios::app);
+		if (out.good()) {
+			out << "rect=(" << destx << "," << desty << "," << srcw << "," << srch << ")\n";
+		}
+	}
 	int srcx = 0;
 	int srcy = 0;
 	// Constrain to window's space.
