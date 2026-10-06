@@ -27,6 +27,7 @@
 
 #include <memory>
 #include <optional>
+#include <fstream>
 #include <vector>
 
 class Shape_frame;
@@ -357,7 +358,23 @@ public:
 		if (palette_transform != 0) {
 			transtable = Get_palette_transform_table(table);
 		}
-		sman->paint_shape(xoff, yoff, cache.shape, force_trans ? *force_trans : cache.has_trans, transtable);
+		const bool effective_trans = force_trans ? *force_trans : cache.has_trans;
+		if (effective_trans) {
+			std::ofstream out("exult-translucent-shapes.log", std::ios::out | std::ios::app);
+			if (out.good()) {
+				out << "shape=" << shapenum
+					<< " frame=" << framenum
+					<< " file=" << static_cast<int>(shapefile)
+					<< " x=" << xoff
+					<< " y=" << yoff;
+				if (cache.shape) {
+					out << " size=" << cache.shape->get_width()
+						<< "x" << cache.shape->get_height();
+				}
+				out << "\n";
+			}
+		}
+		sman->paint_shape(xoff, yoff, cache.shape, effective_trans, transtable);
 	}
 
 	void paint_invisible(int xoff, int yoff) const {
