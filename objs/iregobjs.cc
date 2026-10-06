@@ -37,6 +37,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "gamewin.h"
 #include "ucsched.h"
 
+#include <fstream>
+
 using std::ostream;
 
 /*
@@ -58,6 +60,60 @@ void Ireg_game_object::paint() {
 	int x;
 	int y;
 	gwin->get_shape_location(this, x, y);
+
+	if (get_shapenum() == 440) {
+		static int last_frame = -1;
+		static int last_tx = -1;
+		static int last_ty = -1;
+		static int last_tz = -1;
+		const Tile_coord t = get_tile();
+		const int frame = get_framenum();
+		if (frame != last_frame || t.tx != last_tx || t.ty != last_ty || t.tz != last_tz) {
+			last_frame = frame;
+			last_tx = t.tx;
+			last_ty = t.ty;
+			last_tz = t.tz;
+			const Shape_info& info = get_info();
+			std::ofstream out("exult-illumination-440.log", std::ios::out | std::ios::app);
+			if (out.good()) {
+				out << "shape=440"
+					<< " frame=" << frame
+					<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+					<< " screen=(" << x << "," << y << ")"
+					<< " animated=" << (info.is_animated() ? 1 : 0)
+					<< " translucent=" << (info.has_translucency() ? 1 : 0)
+					<< " light=" << info.get_object_light(frame)
+					<< " frames=" << get_num_frames()
+					<< " owner=" << (get_owner() ? 1 : 0);
+
+				Game_object_vector lamps;
+				Game_object::find_nearby(lamps, t, 526, 12, 0);
+				out << " nearby526=" << lamps.size();
+				for (auto* lamp : lamps) {
+					if (!lamp) {
+						continue;
+					}
+					const Tile_coord lt = lamp->get_tile();
+					out << " [" << lamp->get_framenum()
+						<< "@(" << lt.tx << "," << lt.ty << "," << lt.tz << ")]";
+				}
+
+				lamps.clear();
+				Game_object::find_nearby(lamps, t, 889, 12, 0);
+				out << " nearby889=" << lamps.size();
+				for (auto* lamp : lamps) {
+					if (!lamp) {
+						continue;
+					}
+					const Tile_coord lt = lamp->get_tile();
+					out << " [" << lamp->get_framenum()
+						<< "@(" << lt.tx << "," << lt.ty << "," << lt.tz << ")]";
+				}
+				out << "\n";
+			}
+		}
+	}
+
 	if (flags & (1L << Obj_flags::invisible)) {
 		paint_invisible(x, y);
 	} else {
