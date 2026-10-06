@@ -300,7 +300,8 @@ static int Get_light_strength(const Game_object* obj, const Game_object* av, int
 	const int dx = std::abs(Tile_coord::delta(t1.tx, t2.tx));
 	const int dy = std::abs(Tile_coord::delta(t1.ty, t2.ty));
 	// This seems to match the originals as far as distance effects go.
-	const int dist_decay_factor = std::max(0, 75 - 2 * dx - 3 * dy);
+	const int raw_decay = 75 - 2 * dx - 3 * dy;
+	const int dist_decay_factor = raw_decay > 0 ? raw_decay : 0;
 	// Finally, return how bright this light is.
 	return dist_decay_factor * brightness;
 }
