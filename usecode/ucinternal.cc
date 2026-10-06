@@ -48,6 +48,7 @@
 #include "game.h"
 #include "gamemap.h"
 #include "gamewin.h"
+#include "ibuf8.h"
 #include "ios_state.hpp"
 #include "items.h"
 #include "keyring.h"
@@ -808,6 +809,39 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 				trace << " frameSize=" << sf->get_width() << "x" << sf->get_height()
 					  << " extents=(" << sf->get_xleft() << "," << sf->get_xright()
 					  << "," << sf->get_yabove() << "," << sf->get_ybelow() << ")";
+
+				Image_buffer8 scratch(sf->get_width(), sf->get_height());
+				scratch.fill8(255);
+				if (sf->is_rle()) {
+					sf->paint_rle(&scratch, sf->get_xleft(), sf->get_yabove());
+				} else {
+					sf->paint(&scratch, sf->get_xleft(), sf->get_yabove());
+				}
+
+				std::map<int, int> counts;
+				trace << "\nFRAME_PIXELS rows=";
+				for (int y = 0; y < sf->get_height(); ++y) {
+					int first_x = -1;
+					int last_x = -1;
+					for (int x = 0; x < sf->get_width(); ++x) {
+						const int pix = scratch.get_pixel8(x, y);
+						if (pix == 255) {
+							continue;
+						}
+						counts[pix]++;
+						if (first_x < 0) {
+							first_x = x;
+						}
+						last_x = x;
+					}
+					if (first_x >= 0) {
+						trace << y << ":" << first_x << "-" << last_x << ";";
+					}
+				}
+				trace << "\nFRAME_INDICES ";
+				for (const auto& [pix, count] : counts) {
+					trace << pix << ":" << count << ",";
+				}
 			}
 			if (ani) {
 				trace << " aniType=" << static_cast<int>(ani->get_type())
@@ -815,6 +849,26 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 					  << " aniDelay=" << ani->get_frame_delay();
 			}
 			trace << "\n";
+			Game_object_vector nearby;
+			Game_object::find_nearby(
+					nearby,
+					item->get_tile(),
+					c_any_shapenum,
+					3,
+					0);
+			trace << "NEARBY_OBJECTS count=" << nearby.size() << "\n";
+			for (auto* near_obj : nearby) {
+				if (!near_obj) {
+					continue;
+				}
+				const Tile_coord nt = near_obj->get_tile();
+				trace << "  shape=" << near_obj->get_shapenum()
+					  << " frame=" << near_obj->get_framenum()
+					  << " tile=(" << nt.tx << "," << nt.ty << "," << nt.tz << ")"
+					  << " translucent=" << (near_obj->get_info().has_translucency() ? 1 : 0)
+					  << " light=" << near_obj->get_info().get_object_light(near_obj->get_framenum())
+					  << "\n";
+			}
 		}
 	}
 	//	rect = gwin->get_shape_rect(item).add(rect);
