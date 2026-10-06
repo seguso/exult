@@ -38,11 +38,14 @@
 #include "gamewin.h"
 #include "ignore_unused_variable_warning.h"
 #include "objiter.h"
+#include "ordinfo.h"
 #include "perf.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <fstream>
+#include <vector>
 
 /*
  *  Paint just the map with given top-left-corner tile.
@@ -83,6 +86,226 @@ inline int Figure_screen_offset(
 	}
 	t %= c_num_tiles;
 	return t * c_tilesize;
+}
+
+namespace {
+	std::ofstream ordering_trace_stream;
+	bool ordering_trace_capture = false;
+	int ordering_trace_actor_x = -1;
+	int ordering_trace_actor_y = -1;
+	int ordering_trace_actor_z = -1;
+	int ordering_trace_last_x = -100000;
+	int ordering_trace_last_y = -100000;
+	int ordering_trace_last_z = -100000;
+
+	bool Ordering_trace_near_actor(const Game_object* obj) {
+		if (!obj) {
+			return false;
+		}
+		const Tile_coord t = obj->get_tile();
+		return std::abs(t.tx - ordering_trace_actor_x) <= 8
+			&& std::abs(t.ty - ordering_trace_actor_y) <= 8;
+	}
+
+	void Write_ordering_info(
+			std::ostream& out,
+			Game_window* gwin,
+			const char* label,
+			Game_object* obj) {
+		if (!obj) {
+			return;
+		}
+
+		const Tile_coord t = obj->get_tile();
+		const Shape_info& info = obj->get_info();
+		const int frame = obj->get_framenum();
+		const TileRect area = gwin->get_shape_rect(obj);
+		Ordering_info ord(gwin, obj, const_cast<TileRect&>(area));
+
+		out << label
+			<< " ptr=" << obj
+			<< " shape=" << obj->get_shapenum()
+			<< " frame=" << frame
+			<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+			<< " dims=("
+			<< info.get_3d_xtiles(frame) << ","
+			<< info.get_3d_ytiles(frame) << ","
+			<< info.get_3d_height() << ")"
+			<< " rangeX=[" << ord.xleft << "," << ord.xright << "]"
+			<< " rangeY=[" << ord.yfar << "," << ord.ynear << "]"
+			<< " rangeZ=[" << ord.zbot << "," << ord.ztop << "]"
+			<< " occludes=" << (info.occludes() ? 1 : 0)
+			<< " area=(" << area.x << "," << area.y << "," << area.w << "," << area.h << ")"
+			<< "\n";
+	}
+
+	void Begin_ordering_trace(Game_window* gwin) {
+		Actor* actor = gwin->get_main_actor();
+		if (!actor) {
+			ordering_trace_capture = false;
+			return;
+		}
+
+		const Tile_coord at = actor->get_tile();
+		if (at.tx == ordering_trace_last_x
+			&& at.ty == ordering_trace_last_y
+			&& at.tz == ordering_trace_last_z) {
+			ordering_trace_capture = false;
+			return;
+		}
+
+		ordering_trace_last_x = at.tx;
+		ordering_trace_last_y = at.ty;
+		ordering_trace_last_z = at.tz;
+		ordering_trace_actor_x = at.tx;
+		ordering_trace_actor_y = at.ty;
+		ordering_trace_actor_z = at.tz;
+
+		if (ordering_trace_stream.is_open()) {
+			ordering_trace_stream.close();
+		}
+		ordering_trace_stream.open(
+				"exult-ordering-trace.log",
+				std::ios::out | std::ios::trunc);
+		if (!ordering_trace_stream.good()) {
+			ordering_trace_capture = false;
+			return;
+		}
+
+		ordering_trace_stream
+			<< "EXULT ORDERING TRACE avatarTile=("
+			<< at.tx << "," << at.ty << "," << at.tz << ")\n";
+		Write_ordering_info(
+				ordering_trace_stream,
+				gwin,
+				"ACTOR",
+				actor);
+
+		std::vector<Game_object*> nearby;
+		Game_map* map = gwin->get_map();
+
+		const int center_cx = actor->get_cx();
+		const int center_cy = actor->get_cy();
+
+		for (int dy = -1; dy <= 1; ++dy) {
+			for (int dx = -1; dx <= 1; ++dx) {
+				const int cx = (center_cx + dx + c_num_chunks) % c_num_chunks;
+				const int cy = (center_cy + dy + c_num_chunks) % c_num_chunks;
+				Map_chunk* chunk = map->get_chunk(cx, cy);
+				if (!chunk) {
+					continue;
+				}
+
+				Nonflat_object_iterator next(chunk);
+				Game_object* obj = nullptr;
+				while ((obj = next.get_next()) != nullptr) {
+					if (Ordering_trace_near_actor(obj)) {
+						nearby.push_back(obj);
+					}
+				}
+			}
+		}
+
+		ordering_trace_stream
+			<< "OBJECTS nearby=" << nearby.size() << "\n";
+
+		for (size_t i = 0; i < nearby.size(); ++i) {
+			Game_object* obj = nearby[i];
+			ordering_trace_stream << "OBJ[" << i << "] ";
+			Write_ordering_info(
+					ordering_trace_stream,
+					gwin,
+					"",
+					obj);
+
+			ordering_trace_stream << "  deps=";
+			bool first = true;
+			for (auto* dep : obj->get_dependencies()) {
+				if (!dep || !Ordering_trace_near_actor(dep)) {
+					continue;
+				}
+				const Tile_coord dt = dep->get_tile();
+				if (!first) {
+					ordering_trace_stream << ";";
+				}
+				first = false;
+				ordering_trace_stream
+					<< dep->get_shapenum() << "/" << dep->get_framenum()
+					<< "@(" << dt.tx << "," << dt.ty << "," << dt.tz << ")";
+			}
+			ordering_trace_stream << "\n";
+
+			Ordering_info actor_ord(gwin, actor);
+			ordering_trace_stream
+				<< "  actorRelation="
+				<< Game_object::compare(actor_ord, obj)
+				<< "\n";
+		}
+
+		ordering_trace_stream
+			<< "PAIRWISE (only intersecting paint areas):\n";
+
+		for (size_t i = 0; i < nearby.size(); ++i) {
+			Game_object* left = nearby[i];
+			const TileRect left_area = gwin->get_shape_rect(left);
+
+			for (size_t j = i + 1; j < nearby.size(); ++j) {
+				Game_object* right = nearby[j];
+				const TileRect right_area = gwin->get_shape_rect(right);
+				if (!left_area.intersects(right_area)) {
+					continue;
+				}
+
+				Ordering_info left_ord(gwin, left);
+				Ordering_info right_ord(gwin, right);
+				const Tile_coord lt = left->get_tile();
+				const Tile_coord rt = right->get_tile();
+
+				ordering_trace_stream
+					<< "  " << i << ":" << left->get_shapenum() << "/" << left->get_framenum()
+					<< "@(" << lt.tx << "," << lt.ty << "," << lt.tz << ")"
+					<< " vs "
+					<< j << ":" << right->get_shapenum() << "/" << right->get_framenum()
+					<< "@(" << rt.tx << "," << rt.ty << "," << rt.tz << ")"
+					<< " cmp=" << Game_object::compare(left_ord, right)
+					<< " reverse=" << Game_object::compare(right_ord, left)
+					<< " leftDependsRight=" << (left->get_dependencies().count(right) ? 1 : 0)
+					<< " rightDependsLeft=" << (right->get_dependencies().count(left) ? 1 : 0)
+					<< "\n";
+			}
+		}
+
+		ordering_trace_stream << "PAINT ORDER (nearby only):\n";
+		ordering_trace_stream.flush();
+		ordering_trace_capture = true;
+
+		std::cout << "Ordering trace: exult-ordering-trace.log" << std::endl;
+	}
+
+	void End_ordering_trace() {
+		if (!ordering_trace_capture) {
+			return;
+		}
+		ordering_trace_stream << "END PAINT ORDER\n";
+		ordering_trace_stream.flush();
+		ordering_trace_capture = false;
+	}
+
+	void Trace_painted_object(Game_object* obj) {
+		if (!ordering_trace_capture
+			|| !ordering_trace_stream.good()
+			|| !Ordering_trace_near_actor(obj)) {
+			return;
+		}
+
+		const Tile_coord t = obj->get_tile();
+		ordering_trace_stream
+			<< "  PAINT shape=" << obj->get_shapenum()
+			<< " frame=" << obj->get_framenum()
+			<< " tile=(" << t.tx << "," << t.ty << "," << t.tz << ")"
+			<< " ptr=" << obj
+			<< "\n";
+	}
 }
 
 /*
@@ -198,6 +421,7 @@ int Game_render::paint_map(
 	Shape_manager* sman = gwin->shape_man;
 	render_seq++;    // Increment sequence #.
 	gwin->painted = true;
+	Begin_ordering_trace(gwin);
 
 	const int scrolltx      = gwin->scrolltx;
 	const int scrollty      = gwin->scrollty;
@@ -264,6 +488,8 @@ int Game_render::paint_map(
 			light_sources += paint_chunk_objects(dx, dy);
 		}
 	}
+	End_ordering_trace();
+
 	/// Dungeon Blackness (but disable in map editor mode)
 	if (static_cast<int>(gwin->in_dungeon) >= gwin->skip_above_actor && !cheat.in_map_editor()) {
 		paint_blackness(start_chunkx, start_chunky, stop_chunkx, stop_chunky, gwin->ice_dungeon ? 73 : 0);
@@ -1021,6 +1247,7 @@ void Game_render::paint_object(Game_object* obj) {
 		obj->get_info().paint_bbox(
 				bbox_x, bbox_y, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox_palindex, 2);
 	}
+	Trace_painted_object(obj);
 	obj->paint();    // Finally, paint this one.
 	// paint bbox front
 	if (bbox_palindex != -1) {
