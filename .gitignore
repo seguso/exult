@@ -283,6 +283,12 @@ Makecache
 .cache
 msvc/.vs
 
+# Keep VS Code launch configuration under version control
+!.vscode/
+!.vscode/exult-launch.cfg
+!.vscode/launch.json
+!.vscode/tasks.json
+
 # Win32 build
 data/u7bgintrinsics.data
 data/u7sibetaintrinsics.data
