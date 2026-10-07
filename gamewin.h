@@ -145,8 +145,9 @@ class Game_window {
 	// one-tile correction step. -1 means no mouse-facing override.
 	int mouse_walk_visual_dir = -1;
 	World_view_transform world_view;
-	std::unique_ptr<Image_buffer8> rotate_scene;
+	std::unique_ptr<Image_buffer8> rotate_scene;    // Retained for A/B fallback while testing the SDL path.
 	std::unique_ptr<Image_buffer8> rotate_scene_2x;
+	int rotated_world_layer = -1;                  // Expanded world, scaled then rotated by SDL.
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
