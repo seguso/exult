@@ -554,24 +554,31 @@ Game_window::~Game_window() {
 
 void Game_window::resize_rotate_scene() {
 	world_view.configure(win->get_game_width(), win->get_game_height());
+
+	if (rotated_world_layer >= 0) {
+		win->destroy_layer(rotated_world_layer);
+		rotated_world_layer = -1;
+	}
+	rotate_scene.reset();
+	rotate_scene_2x.reset();
+
+	win->set_rotate_view(rotate_world);
 	if (!rotate_world) {
-		// Keep the default path allocation-free: the enlarged scene buffers only
-		// exist while the optional rotated-world view is enabled.
-		rotate_scene.reset();
-		rotate_scene_2x.reset();
 		return;
 	}
 
+	// Keep our existing expanded-world geometry, but move the raster rotation
+	// to SDL after the selected Exult scaler has produced RGB pixels. This is
+	// the key idea from DominusExult's partial_45_rotate experiment, without
+	// falling back to a viewport-sized source that leaves rotated corners empty.
 	const int scene_size = world_view.get_scene_size();
-	auto buffer = win->create_buffer(scene_size, scene_size);
-	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
-	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
-
-	// Pixel-art-aware rotation uses a persistent 2x intermediate. Keep this
-	// buffer in ordinary 0-based coordinates; paint_rotated() maps logical
-	// scene coordinates into it after running the Scale2x reconstruction.
-	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
-	rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
+	rotated_world_layer = win->create_layer(
+			"Rotated world", scene_size, scene_size, 255, 0, -(1 << 20));
+	if (rotated_world_layer >= 0) {
+		win->layer_set_opaque(rotated_world_layer, true);
+		win->layer_set_game_scaler(rotated_world_layer, true);
+		win->layer_set_visible(rotated_world_layer, true);
+	}
 }
 
 void Game_window::set_rotate_world_enabled(bool enabled) {
