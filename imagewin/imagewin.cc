@@ -2233,7 +2233,10 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool fo
 			SDL_ClearError();
 		}
 		SDL_RenderClear(screen_renderer);
-		if (!rotate_view) {
+		// Full-screen scene playback/menu layers may temporarily own the display;
+		// do not suppress their normal backing image merely because gameplay
+		// rotation is configured.
+		if (!rotate_view || scene_mode) {
 			if (!SDL_RenderTexture(screen_renderer, screen_texture_a, fullRect, nullptr)) {
 				const char* err = SDL_GetError();
 				std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture_a, srcRect, nullptr) failed: "
