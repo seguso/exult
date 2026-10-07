@@ -2127,7 +2127,7 @@ void Image_window::composite_layers() {
 			continue;
 		}
 		const uint32 bit = 1u << static_cast<int>(kind);
-		if ((ui_layer_kind_mask & bit) == 0) {
+		if (!lp->game_scaler && (ui_layer_kind_mask & bit) == 0) {
 			continue;
 		}
 		ordered.push_back(lp.get());
@@ -2149,7 +2149,13 @@ void Image_window::composite_layers() {
 		const int layer_fill_scaler = layer.game_scaler ? fill_scaler : eff_ui_fill_scaler(cfg);
 		const bool smooth = (layer_scaler == bilinear) || (layer_scaler == SDLScaler)
 							|| (layer_fill_scaler == bilinear) || (layer_fill_scaler == SDLScaler);
-		const SDL_ScaleMode smode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+		// SDL's texture rotation is the second reconstruction stage in the
+		// Dominus path. Always use linear sampling for the rotated world after
+		// the selected Exult scaler (HQx/Scale2x/etc.) has produced its RGB
+		// source. Other layers retain their existing scaler-dependent mode.
+		const SDL_ScaleMode smode = (layer.game_scaler && layer.angle != 0.0)
+										 ? SDL_SCALEMODE_LINEAR
+										 : (smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
 		// If a software (member) scaler is active, layers are pre-scaled by it
 		// to this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
 		const int render_scale = layer_render_scale(layer);
