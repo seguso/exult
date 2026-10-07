@@ -194,6 +194,9 @@ public:
 		int         render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
 										 // the game's scaler at this factor.
 		unsigned char alpha = 255;       // Whole-layer opacity (255 = opaque).
+		double        angle = 0.0;          // Optional SDL composite rotation.
+		SDL_FPoint    angle_center{0.0f, 0.0f};
+		bool          game_scaler = false;  // Use the world's scaler rather than UI scaler config.
 		// Optional 256-entry ARGB override, one per palette index. A non-zero
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
@@ -730,6 +733,12 @@ public:
 	// Whole-layer opacity (255 = opaque). Lets an opaque-painted layer be
 	// composited semi-transparently (e.g. the translucent shortcut bar).
 	void layer_set_alpha(int handle, unsigned char a);
+	// Rotate a layer at final SDL composition time. Center is relative to the
+	// destination rectangle, in destination pixels.
+	void layer_set_angle(int handle, double angle, float center_x, float center_y);
+	// Make a layer use the main world's scaler/filtering instead of UI scaler
+	// configuration. Used by the experimental expanded rotated-world layer.
+	void layer_set_game_scaler(int handle, bool enabled);
 
 	// -------- Layer scaling config --------
 	// Configure how layers (conversation, mouse cursor) are scaled and
