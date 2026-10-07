@@ -244,7 +244,7 @@ uint32 Image_window8::layer_argb_pixel(const Layer& layer, unsigned char p) cons
 	}
 	// Use the layer's fixed-palette override if one is set, else the live one.
 	const std::vector<unsigned char>& ov  = get_ui_cfg(layer.ui_kind).ui_palette_colors;
-	const unsigned char*              pal = ov.empty() ? colors : ov.data();
+	const unsigned char*              pal = (layer.game_scaler || ov.empty()) ? colors : ov.data();
 	return (static_cast<uint32>(0xff) << 24) | (static_cast<uint32>(pal[3 * p]) << 16) | (static_cast<uint32>(pal[3 * p + 1]) << 8)
 		   | static_cast<uint32>(pal[3 * p + 2]);
 }
@@ -365,7 +365,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 
 	// Fixed-palette override for this layer, if any (else the live palette).
 	const std::vector<unsigned char>& pal_ov      = get_ui_cfg(layer.ui_kind).ui_palette_colors;
-	const unsigned char*              palette_rgb = pal_ov.empty() ? colors : pal_ov.data();
+	const unsigned char*              palette_rgb = (layer.game_scaler || pal_ov.empty()) ? colors : pal_ov.data();
 
 	SDL_Palette* sdl_pal = SDL_GetSurfacePalette(lsurf);
 	if (!sdl_pal) {
