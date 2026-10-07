@@ -394,6 +394,7 @@ protected:
 			screen_texture;    // Output of scalers gets drawn here. This may contain partial frames if there is no inter_surface
 	struct SDL_Texture* screen_texture_a;    // What gets drawn to the screen by SDL. The is the accumulation of all updates to
 											 // screen_texture and contains the current full frame being displayed
+	bool rotate_view = false;               // Experimental GPU rotation of the final world texture.
 
 	// Update screen_texture_a with the dirtyRect changes made to screen_texture and render fullRect of screen_texture_a
 	void UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool for_screenshot);
@@ -682,6 +683,14 @@ public:
 
 	void show() {    // Repaint entire window.
 		show(get_start_x(), get_start_y(), get_full_width(), get_full_height());
+	}
+
+	void set_rotate_view(bool on) {
+		rotate_view = on;
+	}
+
+	bool get_rotate_view() const {
+		return rotate_view;
 	}
 
 	// Repaint rectangle.
