@@ -2227,38 +2227,13 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool fo
 			SDL_ClearError();
 		}
 		SDL_RenderClear(screen_renderer);
-		if (rotate_view && !for_screenshot) {
-			// DominusExult-style experiment: rotate the already-scaled RGB
-			// world texture at final SDL composition time. Overlay layers are
-			// composited below after this block and therefore remain upright.
-			int                             logical_w = 0;
-			int                             logical_h = 0;
-			SDL_RendererLogicalPresentation mode;
-			if (SDL_GetRenderLogicalPresentation(screen_renderer, &logical_w, &logical_h, &mode)
-				&& logical_w > 0 && logical_h > 0) {
-				int center_x = logical_w / 2;
-				int center_y = logical_h / 2;
-				game_to_screen(get_game_width() / 2, get_game_height() / 2, false, center_x, center_y);
-				const SDL_FRect dst{
-						0.0f, 0.0f, static_cast<float>(logical_w), static_cast<float>(logical_h)};
-				const SDL_FPoint center{
-						static_cast<float>(center_x), static_cast<float>(center_y)};
-				if (!SDL_RenderTextureRotated(
-							screen_renderer, screen_texture_a, fullRect, &dst, 45.0, &center, SDL_FLIP_NONE)) {
-					const char* err = SDL_GetError();
-					std::cerr << "SDL_RenderTextureRotated(screen_texture_a) failed: " << (err ? err : "") << std::endl;
-					SDL_ClearError();
-				}
-			} else if (!SDL_RenderTexture(screen_renderer, screen_texture_a, fullRect, nullptr)) {
+		if (!rotate_view) {
+			if (!SDL_RenderTexture(screen_renderer, screen_texture_a, fullRect, nullptr)) {
 				const char* err = SDL_GetError();
-				std::cerr << "SDL_RenderTexture(screen_texture_a) fallback failed: " << (err ? err : "") << std::endl;
+				std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture_a, srcRect, nullptr) failed: "
+						  << (err ? err : "") << std::endl;
 				SDL_ClearError();
 			}
-		} else if (!SDL_RenderTexture(screen_renderer, screen_texture_a, fullRect, nullptr)) {
-			const char* err = SDL_GetError();
-			std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture_a, srcRect, nullptr) failed: " << (err ? err : "")
-					  << std::endl;
-			SDL_ClearError();
 		}
 		if (!for_screenshot) {
 			last_fullrect = *fullRect;
