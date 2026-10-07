@@ -1670,6 +1670,28 @@ void Image_window::layer_set_alpha(int handle, unsigned char a) {
 	layers[handle]->alpha = a;
 }
 
+void Image_window::layer_set_angle(int handle, double angle, float center_x, float center_y) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->angle        = angle;
+	layers[handle]->angle_center = SDL_FPoint{center_x, center_y};
+}
+
+void Image_window::layer_set_game_scaler(int handle, bool enabled) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	if (layers[handle]->game_scaler != enabled) {
+		layers[handle]->game_scaler = enabled;
+		if (layers[handle]->texture != nullptr) {
+			SDL_DestroyTexture(layers[handle]->texture);
+			layers[handle]->texture = nullptr;
+		}
+		layers[handle]->dirty = true;
+	}
+}
+
 void Image_window::layer_set_dest(int handle, int x, int y, int w, int h, bool add) {
 	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
 		return;
@@ -1712,7 +1734,7 @@ void Image_window::mark_all_layers_dirty() {
 
 int Image_window::layer_render_scale(const Layer& layer) const {
 	const UiLayerConfig& cfg     = get_ui_cfg(layer.ui_kind);
-	const int            uscaler = eff_ui_scaler(cfg);
+	const int            uscaler = layer.game_scaler ? scaler : eff_ui_scaler(cfg);
 	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
 		return 1;
 	}
@@ -1740,7 +1762,7 @@ bool Image_window::scale_layer_color(const Layer& layer, SDL_Surface* src8, int 
 		return false;
 	}
 	const UiLayerConfig& cfg     = get_ui_cfg(layer.ui_kind);
-	const int            uscaler = eff_ui_scaler(cfg);
+	const int            uscaler = layer.game_scaler ? scaler : eff_ui_scaler(cfg);
 	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
 		return false;
 	}
@@ -2121,9 +2143,12 @@ void Image_window::composite_layers() {
 		auto   perftimer = PerformanceTimer::GetScopedPerfTimer("Composite_Layer:", layer.get_name(), true);
 
 		const UiLayerConfig& cfg = get_ui_cfg(layer.ui_kind);
-		// Match filtering to this layer's scaler/fill scaler.
-		const bool smooth = (eff_ui_scaler(cfg) == bilinear) || (eff_ui_scaler(cfg) == SDLScaler)
-							|| (eff_ui_fill_scaler(cfg) == bilinear) || (eff_ui_fill_scaler(cfg) == SDLScaler);
+		// Match filtering to this layer's scaler/fill scaler. The rotated-world
+		// layer deliberately follows the main world scaler instead of UI config.
+		const int layer_scaler = layer.game_scaler ? scaler : eff_ui_scaler(cfg);
+		const int layer_fill_scaler = layer.game_scaler ? fill_scaler : eff_ui_fill_scaler(cfg);
+		const bool smooth = (layer_scaler == bilinear) || (layer_scaler == SDLScaler)
+							|| (layer_fill_scaler == bilinear) || (layer_fill_scaler == SDLScaler);
 		const SDL_ScaleMode smode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
 		// If a software (member) scaler is active, layers are pre-scaled by it
 		// to this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
@@ -2161,7 +2186,13 @@ void Image_window::composite_layers() {
 			}
 			// Only draw if dest rect is valid
 			if (dst.w > 0 && dst.h > 0) {
-				SDL_RenderTexture(screen_renderer, layer.texture, &src, &dst);
+				if (layer.angle != 0.0) {
+					SDL_RenderTextureRotated(
+							screen_renderer, layer.texture, &src, &dst,
+							layer.angle, &layer.angle_center, SDL_FLIP_NONE);
+				} else {
+					SDL_RenderTexture(screen_renderer, layer.texture, &src, &dst);
+				}
 			}
 		}
 	}
