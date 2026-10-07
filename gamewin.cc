@@ -580,6 +580,7 @@ void Game_window::resize_rotate_scene() {
 		win->layer_set_visible(rotated_world_layer, true);
 		cout << "Rotate backend: sdl-scaled-expanded-layer, scaler="
 			 << Image_window::get_name_for_scaler(win->get_scaler())
+			 << ", fill_scaler=" << Image_window::get_name_for_scaler(win->get_fill_scaler())
 			 << ", scene=" << scene_size << "x" << scene_size << std::endl;
 	}
 }
