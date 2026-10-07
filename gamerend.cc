@@ -413,43 +413,80 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	ignore_unused_variable_warning(y);
 	ignore_unused_variable_warning(w);
 	ignore_unused_variable_warning(h);
-	if (!rotate_scene) {
+
+	if (rotated_world_layer < 0) {
 		resize_rotate_scene();
 	}
+	if (rotated_world_layer < 0) {
+		return;
+	}
 
-	// Quantize camera translation only in the rotated view.  The renderer
-	// itself still scrolls by exact source pixels; this phase term makes the
-	// resampling lattice world-anchored, so a stationary object's contour does
-	// not change merely because smooth scrolling advanced by one pixel.
-	world_view.set_camera_pixel_origin(
-			static_cast<double>(scrolltx * c_tilesize + get_scrolltx_lo()),
-			static_cast<double>(scrollty * c_tilesize + get_scrollty_lo()));
+	// SDL performs the final +45 degree rotation, so the geometry transform
+	// used for input must be the pure rotation as well. The old software
+	// sampler needed a world-anchored subpixel phase; the scaled RGB texture
+	// does not.
+	world_view.set_camera_pixel_origin(0.0, 0.0);
 
 	const int display_width  = world_view.get_display_width();
 	const int display_height = world_view.get_display_height();
-	const int scene_size = world_view.get_scene_size();
-	const int scene_x    = -world_view.get_scene_offset_x();
-	const int scene_y    = -world_view.get_scene_offset_y();
-	rotate_scene->clear_clip();
-	rotate_scene->fill8(pal->get_border_index());
-	Image_buffer8* previous = push_render_target(rotate_scene.get());
-	rotate_scene->set_clip(scene_x, scene_y, scene_size, scene_size);
+	const int scene_size     = world_view.get_scene_size();
+	const int scene_x        = world_view.get_scene_x();
+	const int scene_y        = world_view.get_scene_y();
+
+	auto* world_buf = static_cast<Image_buffer8*>(win->get_layer_ibuf(rotated_world_layer));
+	if (!world_buf) {
+		return;
+	}
+
+	// The layer has a guard band but still represents the same expanded logical
+	// scene as the previous rotate_scene buffer. Offset its logical origin so
+	// Exult's canonical paint_map path can render negative scene coordinates
+	// without any per-object rotation or changed draw ordering.
+	world_buf->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
+	world_buf->clear_clip();
+	world_buf->fill8(pal->get_border_index());
+	world_buf->set_clip(scene_x, scene_y, scene_size, scene_size);
+
+	Image_buffer8* previous = push_render_target(world_buf);
 	int light_sources = 0;
 	if (main_actor) {
 		light_sources = render->paint_map(scene_x, scene_y, scene_size, scene_size);
 	}
 	effects->paint();
-	// A world object being dragged should go through the same rotated-world
-	// raster pipeline as when it is at rest. Painting it here preserves the
-	// exact Scale2x + rotate quality instead of promoting it to an unrotated UI
-	// overlay.
 	if (dragging && dragging->is_world_object_drag() && !dragging->is_over_gump()) {
 		dragging->paint_world_object();
 	}
-	rotate_scene->clear_clip();
+	world_buf->clear_clip();
 	pop_render_target(previous);
+	win->layer_set_dirty(rotated_world_layer);
 
-	// The world is repainted in full for this first implementation.
+	// Map the expanded logical scene through Exult's normal world scaler/fill
+	// placement, then rotate that already-scaled RGB layer in SDL. This keeps
+	// HQx/Scale2x/etc. ahead of the rotation exactly as in DominusExult's
+	// experiment, while our larger source prevents missing rotated corners.
+	int dst_x0 = scene_x;
+	int dst_y0 = scene_y;
+	int dst_x1 = scene_x + scene_size;
+	int dst_y1 = scene_y + scene_size;
+	win->game_to_screen(scene_x, scene_y, false, dst_x0, dst_y0);
+	win->game_to_screen(scene_x + scene_size, scene_y + scene_size, false, dst_x1, dst_y1);
+
+	const int dst_w = dst_x1 - dst_x0;
+	const int dst_h = dst_y1 - dst_y0;
+	win->layer_set_dest(rotated_world_layer, dst_x0, dst_y0, dst_w, dst_h);
+
+	int center_x = display_width / 2;
+	int center_y = display_height / 2;
+	win->game_to_screen(display_width / 2, display_height / 2, false, center_x, center_y);
+	win->layer_set_angle(
+			rotated_world_layer, 45.0,
+			static_cast<float>(center_x - dst_x0),
+			static_cast<float>(center_y - dst_y0));
+	win->layer_set_visible(rotated_world_layer, true);
+
+	// The main framebuffer is now only a staging area for non-layer legacy UI.
+	// Clear its world contents: UpdateRect suppresses this main texture while
+	// rotate_view is active, and composites the expanded world layer first.
 	int gx = 0;
 	int gy = 0;
 	int gw = display_width;
@@ -458,114 +495,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
 
-	// Reconstruct the 8-bit scene at 2x with the Scale2x/EPX neighbourhood
-	// rule before rotating it.  This is deliberately pixel-art-aware: diagonal
-	// runs that are only corner-connected at 1x get extra coverage at 2x, while
-	// interior colours (for example the lighter stripe inside a lamp post) stay
-	// distinct instead of being swallowed by a generic dark-edge bias.
-	rotate_scene_2x->clear_clip();
-	rotate_scene_2x->fill8(pal->get_border_index());
-	const auto scene_pixel = [&](int x, int y) {
-		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
-		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
-		return rotate_scene->get_pixel8(x, y);
-	};
-	for (int sy = 0; sy < scene_size; ++sy) {
-		const int y = scene_y + sy;
-		for (int sx = 0; sx < scene_size; ++sx) {
-			const int x = scene_x + sx;
-			const unsigned char e = scene_pixel(x, y);
-			const unsigned char b = scene_pixel(x, y - 1);
-			const unsigned char d = scene_pixel(x - 1, y);
-			const unsigned char f = scene_pixel(x + 1, y);
-			const unsigned char h = scene_pixel(x, y + 1);
-
-			unsigned char e0 = e;
-			unsigned char e1 = e;
-			unsigned char e2 = e;
-			unsigned char e3 = e;
-			if (b != h && d != f) {
-				if (d == b) e0 = d;
-				if (b == f) e1 = f;
-				if (d == h) e2 = d;
-				if (h == f) e3 = f;
-			}
-
-			const int hx = sx * 2;
-			const int hy = sy * 2;
-			rotate_scene_2x->put_pixel8(e0, hx, hy);
-			rotate_scene_2x->put_pixel8(e1, hx + 1, hy);
-			rotate_scene_2x->put_pixel8(e2, hx, hy + 1);
-			rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
-		}
-	}
-
-	// Rotate from the reconstructed 2x scene and area-sample each destination
-	// pixel at four quarter-pixel positions.  Unlike the previous dark-edge
-	// resolver this treats light and dark detail symmetrically.
-	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
-	rotate_blend_cache.fill(255);
-	const auto quantize_rgb = [&](int r, int g, int b) {
-		r = std::clamp(r, 0, 63);
-		g = std::clamp(g, 0, 63);
-		b = std::clamp(b, 0, 63);
-		const unsigned int key = static_cast<unsigned int>(r)
-				| (static_cast<unsigned int>(g) << 6)
-				| (static_cast<unsigned int>(b) << 12);
-		unsigned char& cached = rotate_blend_cache[key];
-		if (cached == 255) {
-			cached = static_cast<unsigned char>(pal->find_color(r, g, b));
-		}
-		return cached;
-	};
-	const auto sample_scene_2x = [&](const World_view_point& source) {
-		const double fx = (source.x - static_cast<double>(scene_x)) * 2.0 + 0.5;
-		const double fy = (source.y - static_cast<double>(scene_y)) * 2.0 + 0.5;
-		const int sx = static_cast<int>(std::floor(fx));
-		const int sy = static_cast<int>(std::floor(fy));
-		const int hi_size = scene_size * 2;
-		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
-			return static_cast<unsigned char>(pal->get_border_index());
-		}
-		return rotate_scene_2x->get_pixel8(sx, sy);
-	};
-	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
-		if (a == b && a == c && a == d) {
-			return a;
-		}
-		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c) + pal->get_red(d) + 2) / 4;
-		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c) + pal->get_green(d) + 2) / 4;
-		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c) + pal->get_blue(d) + 2) / 4;
-		return quantize_rgb(r, g, blue);
-	};
-
-	const double source_dx = world_view.display_to_scene_x_step();
-	const double source_dy = world_view.display_to_scene_y_step();
-	for (int dy = 0; dy < display_height; ++dy) {
-		const double y0 = static_cast<double>(dy) + 0.25;
-		const double y1 = static_cast<double>(dy) + 0.75;
-		World_view_point source00 = world_view.display_to_scene({0.25, y0});
-		World_view_point source10 = world_view.display_to_scene({0.75, y0});
-		World_view_point source01 = world_view.display_to_scene({0.25, y1});
-		World_view_point source11 = world_view.display_to_scene({0.75, y1});
-		for (int dx = 0; dx < display_width; ++dx) {
-			win->put_pixel8(
-					blend4(
-							sample_scene_2x(source00), sample_scene_2x(source10),
-							sample_scene_2x(source01), sample_scene_2x(source11)),
-					dx, dy);
-			source00.x += source_dx;
-			source00.y += source_dy;
-			source10.x += source_dx;
-			source10.y += source_dy;
-			source01.x += source_dx;
-			source01.y += source_dy;
-			source11.x += source_dx;
-			source11.y += source_dy;
-		}
-	}
-
-	win->set_clip(0, 0, display_width, display_height);
 	gump_man->paint(false);
 	if (dragging) {
 		if (dragging->is_world_object_drag()) {
