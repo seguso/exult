@@ -403,9 +403,12 @@ Game_window::Game_window(
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
+	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
 	world_view.set_enabled(rotate_world);
 	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
+	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -559,6 +562,7 @@ void Game_window::resize_rotate_scene() {
 		// exist while the optional rotated-world view is enabled.
 		rotate_scene.reset();
 		rotate_scene_2x.reset();
+		rotate_scene_3x.reset();
 		return;
 	}
 
@@ -572,6 +576,9 @@ void Game_window::resize_rotate_scene() {
 	// scene coordinates into it after running the Scale2x reconstruction.
 	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
 	rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
+
+	auto buffer_3x = win->create_buffer(scene_size * 3, scene_size * 3);
+	rotate_scene_3x.reset(static_cast<Image_buffer8*>(buffer_3x.release()));
 }
 
 void Game_window::set_rotate_world_enabled(bool enabled) {
@@ -581,6 +588,19 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 	config->set("config/gameplay/rotate_world", enabled ? "yes" : "no", true);
 	set_all_dirty();
 	paint();
+}
+
+void Game_window::set_rotate_sampling_mode(int mode) {
+	mode = std::clamp(mode, 0, 2);
+	if (rotate_sampling_mode == mode) {
+		return;
+	}
+	rotate_sampling_mode = mode;
+	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, true);
+	if (rotate_world) {
+		set_all_dirty();
+		paint();
+	}
 }
 
 void Game_window::set_modern_movement_tau_ms(int ms) {
