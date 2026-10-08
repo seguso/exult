@@ -147,6 +147,7 @@ class Game_window {
 	// 4 = HQ3x RGB + 4 samples
 	// 5 = Nearest3x + forward square splat
 	// 6 = Original 1x forward point map + edge-directed hole fill
+	// 7 = Forward topology-preserving diagonal links (debug red holes)
 	int rotate_sampling_mode = 0;
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
