@@ -557,7 +557,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 		return cached;
 	};
-	const auto sample_scaled = [&](const World_view_point& source, int factor, const Image_buffer8* scaled) {
+	const auto sample_scaled = [&](const World_view_point& source, int factor, Image_buffer8* scaled) {
 		const double fx = (source.x - static_cast<double>(scene_x)) * factor + 0.5;
 		const double fy = (source.y - static_cast<double>(scene_y)) * factor + 0.5;
 		const int sx = static_cast<int>(std::floor(fx));
@@ -603,7 +603,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dy = world_view.display_to_scene_y_step();
 	if (rotate_sampling_mode < 2) {
 		const int factor = rotate_sampling_mode == 0 ? 2 : 3;
-		const Image_buffer8* scaled = rotate_sampling_mode == 0 ? rotate_scene_2x.get() : rotate_scene_3x.get();
+		Image_buffer8* scaled = rotate_sampling_mode == 0 ? rotate_scene_2x.get() : rotate_scene_3x.get();
 		for (int dy = 0; dy < display_height; ++dy) {
 			const double y0 = static_cast<double>(dy) + 0.25;
 			const double y1 = static_cast<double>(dy) + 0.75;
