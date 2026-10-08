@@ -604,9 +604,14 @@ void Usecode_internal::show_book() {
 void Usecode_internal::say_string() {
 	//  user_choice = 0;        // Clear user's response.
 	if (!String) {
+		if (book) {
+			std::cerr << "[BOOK31D Exult] say_string: no pending String, book is active" << std::endl;
+		}
 		return;
 	}
 	if (book) {    // Displaying a book?
+		std::cerr << "[BOOK31D Exult] say_string: forwarding pending text to book, length="
+		          << std::strlen(String) << std::endl;
 		show_book();
 		return;
 	}
