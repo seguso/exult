@@ -772,34 +772,129 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					++adjacent_holes;
 				}
 
+				struct Direction_candidate {
+					int dx;
+					int dy;
+					int score;
+					unsigned char color;
+					bool valid;
+					bool tied;
+				};
+				std::array<Direction_candidate, 4> candidates = {{
+						{1, 0, 0, 0, false, false},
+						{0, 1, 0, 0, false, false},
+						{1, 1, 0, 0, false, false},
+						{1, -1, 0, 0, false, false}}};
+
 				int best = 1 << 30;
-				unsigned char best_color = static_cast<unsigned char>(pal->get_border_index());
-				bool have = false;
-				const auto consider = [&](int ax, int ay, int bx, int by) {
+				int valid_count = 0;
+				for (auto& candidate : candidates) {
+					const int ax = x0 - candidate.dx;
+					const int ay = y0 - candidate.dy;
+					const int bx = x0 + candidate.dx;
+					const int by = y0 + candidate.dy;
 					if (ax < 0 || ax >= display_width || bx < 0 || bx >= display_width
 							|| ay < 0 || ay >= display_height || by < 0 || by >= display_height) {
-						return;
+						continue;
 					}
 					const size_t pa = at(ax, ay);
 					const size_t pb = at(bx, by);
 					if (!real[pa] || !real[pb]) {
-						return;
+						continue;
 					}
-					const int d = color_distance(mapped[pa], mapped[pb]);
-					if (!have || d < best) {
-						have = true;
-						best = d;
-						best_color = average_pair(mapped[pa], mapped[pb]);
+					candidate.valid = true;
+					candidate.score = color_distance(mapped[pa], mapped[pb]);
+					candidate.color = average_pair(mapped[pa], mapped[pb]);
+					best = std::min(best, candidate.score);
+					++valid_count;
+				}
+
+				if (valid_count > 0) {
+					int tied_count = 0;
+					for (auto& candidate : candidates) {
+						candidate.tied = candidate.valid && candidate.score == best;
+						if (candidate.tied) {
+							++tied_count;
+						}
 					}
-				};
-				consider(x0 - 1, y0, x0 + 1, y0);
-				consider(x0, y0 - 1, x0, y0 + 1);
-				consider(x0 - 1, y0 - 1, x0 + 1, y0 + 1);
-				consider(x0 + 1, y0 - 1, x0 - 1, y0 + 1);
-				if (have) {
-					filled[pos] = best_color;
-					known[pos] = 1;
-					++filled_pass1;
+
+					// If several directions are equally continuous at radius 1,
+					// keep expanding symmetrically (2, 3, 4, ...) until the tie
+					// breaks. A direction whose farther pair is unavailable drops
+					// out of that tie as soon as another tied direction can still
+					// provide real source samples.
+					for (int radius = 2; tied_count > 1; ++radius) {
+						int extended_best = 1 << 30;
+						int extended_count = 0;
+						for (auto& candidate : candidates) {
+							if (!candidate.tied) {
+								continue;
+							}
+							const int ax = x0 - candidate.dx * radius;
+							const int ay = y0 - candidate.dy * radius;
+							const int bx = x0 + candidate.dx * radius;
+							const int by = y0 + candidate.dy * radius;
+							if (ax < 0 || ax >= display_width || bx < 0 || bx >= display_width
+									|| ay < 0 || ay >= display_height || by < 0 || by >= display_height) {
+								continue;
+							}
+							const size_t pa = at(ax, ay);
+							const size_t pb = at(bx, by);
+							if (!real[pa] || !real[pb]) {
+								continue;
+							}
+							candidate.score = color_distance(mapped[pa], mapped[pb]);
+							extended_best = std::min(extended_best, candidate.score);
+							++extended_count;
+						}
+						if (extended_count == 0) {
+							break;
+						}
+
+						int next_tied_count = 0;
+						for (auto& candidate : candidates) {
+							if (!candidate.tied) {
+								continue;
+							}
+							const int ax = x0 - candidate.dx * radius;
+							const int ay = y0 - candidate.dy * radius;
+							const int bx = x0 + candidate.dx * radius;
+							const int by = y0 + candidate.dy * radius;
+							const bool in_bounds =
+									ax >= 0 && ax < display_width && bx >= 0 && bx < display_width
+									&& ay >= 0 && ay < display_height && by >= 0 && by < display_height;
+							const bool has_pair = in_bounds && real[at(ax, ay)] && real[at(bx, by)];
+							candidate.tied = has_pair && candidate.score == extended_best;
+							if (candidate.tied) {
+								++next_tied_count;
+							}
+						}
+						if (next_tied_count == 0) {
+							break;
+						}
+						tied_count = next_tied_count;
+					}
+
+					const Direction_candidate* chosen = nullptr;
+					for (const auto& candidate : candidates) {
+						if (candidate.tied) {
+							chosen = &candidate;
+							break;
+						}
+					}
+					if (!chosen) {
+						for (const auto& candidate : candidates) {
+							if (candidate.valid && candidate.score == best) {
+								chosen = &candidate;
+								break;
+							}
+						}
+					}
+					if (chosen) {
+						filled[pos] = chosen->color;
+						known[pos] = 1;
+						++filled_pass1;
+					}
 				}
 			}
 		}
