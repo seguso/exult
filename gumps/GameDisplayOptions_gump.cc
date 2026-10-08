@@ -368,12 +368,9 @@ void GameDisplayOptions_gump::build_buttons() {
 #ifdef USE_HQ3X_SCALER
 	rotate_quality_text.emplace_back("HQ3x / 9 samples");
 	rotate_quality_text.emplace_back("HQ3x / 4 samples");
-	rotate_quality_text.emplace_back("Nearest3x / forward square splat");
-	rotate_quality_text.emplace_back("Forward 1x / edge fill");
-	rotate_quality_text.emplace_back("Forward topology / red holes");
-	rotate_quality_text.emplace_back("Forward weighted triplets / red holes");
-	rotate_quality_text.emplace_back("Forward weighted pairs / red holes");
-	rotate_quality_text.emplace_back("Forward weighted quadruplets / red holes");
+	rotate_quality_text.emplace_back("Forward weighted triplets");
+	rotate_quality_text.emplace_back("Forward weighted pairs");
+	rotate_quality_text.emplace_back("Forward weighted quadruplets");
 #endif
 	buttons[id_rotate_sampling_mode] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
