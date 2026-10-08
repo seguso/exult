@@ -628,7 +628,7 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 			"HQ3x RGB + 9 samples",
 			"HQ3x RGB + 4 samples",
 			"Nearest3x + forward square splat",
-			"Nearest3x + forward edge fill"};
+			"Forward 1x + edge-directed hole fill"};
 	cout << "Rotate quality: " << names[rotate_sampling_mode] << std::endl;
 	if (rotate_world) {
 		resize_rotate_scene();
