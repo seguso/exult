@@ -489,9 +489,10 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// Reconstruct the scene with a pixel-art-aware scaler before rotation.
 	// Mode 0 deliberately keeps the clean2 Scale2x + 4-sample path bit-for-bit
 	// equivalent. Modes 1/2 use the standard Scale3x neighbourhood rules and
-	// differ only in the final sampling density. Mode 3 runs Exult's HQ3x
-	// algorithm into an RGB buffer, then performs the same 9-sample rotation
-	// before a single final quantization back to the live U7 palette.
+	// differ only in the final sampling density. Modes 3/4 run Exult's HQ3x
+	// algorithm into an RGB buffer. Mode 5 is deliberately different: it
+	// generates a plain Nearest3x lattice and forward-maps each subpixel centre,
+	// splatting an axis-aligned square in destination space.
 	const auto scene_pixel = [&](int x, int y) {
 		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
 		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
@@ -572,7 +573,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 	}
 #ifdef USE_HQ3X_SCALER
-	else {
+	else if (rotate_sampling_mode == 3 || rotate_sampling_mode == 4) {
 		// HQ3x produces RGB directly. Feed it a compact copy of the expanded
 		// paletted scene so no palette quantization happens between HQ3x and
 		// the rotated 9-sample integration.
@@ -696,7 +697,106 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
-	if (rotate_sampling_mode < 2) {
+
+	if (rotate_sampling_mode == 5) {
+		// Forward square splatting experiment.
+		//
+		// Start from a plain 3x nearest-neighbour lattice (no Scale3x/HQ rules).
+		// Only the subpixel CENTRES are rotated. Each transformed centre deposits
+		// an axis-aligned square in destination space, so the reconstructed
+		// footprint stays square rather than becoming a rotated diamond.
+		//
+		// For a 1/3-pixel source lattice rotated by 45 degrees, sqrt(2)/3 is the
+		// minimum axis-aligned square side that covers the rotated lattice
+		// continuously. Accumulation is normalized, so overlap does not brighten
+		// the image; it only supplies the coverage needed to avoid holes.
+		constexpr double splat_half = 0.23570226039551584; // sqrt(2) / 6
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		std::vector<float> accum_r(dest_count, 0.0f);
+		std::vector<float> accum_g(dest_count, 0.0f);
+		std::vector<float> accum_b(dest_count, 0.0f);
+		std::vector<float> accum_w(dest_count, 0.0f);
+
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const unsigned char color = scene_pixel(src_x, src_y);
+				const float cr = static_cast<float>(pal->get_red(color));
+				const float cg = static_cast<float>(pal->get_green(color));
+				const float cb = static_cast<float>(pal->get_blue(color));
+
+				for (int oy = 0; oy < 3; ++oy) {
+					const double source_y = static_cast<double>(src_y)
+							+ (static_cast<double>(oy) + 0.5) / 3.0;
+					for (int ox = 0; ox < 3; ++ox) {
+						const double source_x = static_cast<double>(src_x)
+								+ (static_cast<double>(ox) + 0.5) / 3.0;
+						const World_view_point dest = world_view.scene_to_display({source_x, source_y});
+
+						const double left   = dest.x - splat_half;
+						const double right  = dest.x + splat_half;
+						const double top    = dest.y - splat_half;
+						const double bottom = dest.y + splat_half;
+
+						const int x0 = std::max(0, static_cast<int>(std::floor(left)));
+						const int x1 = std::min(display_width - 1, static_cast<int>(std::floor(right)));
+						const int y0 = std::max(0, static_cast<int>(std::floor(top)));
+						const int y1 = std::min(display_height - 1, static_cast<int>(std::floor(bottom)));
+
+						for (int dy = y0; dy <= y1; ++dy) {
+							const double wy = std::max(
+									0.0, std::min(bottom, static_cast<double>(dy + 1))
+											 - std::max(top, static_cast<double>(dy)));
+							if (wy <= 0.0) {
+								continue;
+							}
+							for (int dx = x0; dx <= x1; ++dx) {
+								const double wx = std::max(
+										0.0, std::min(right, static_cast<double>(dx + 1))
+												 - std::max(left, static_cast<double>(dx)));
+								const float weight = static_cast<float>(wx * wy);
+								if (weight <= 0.0f) {
+									continue;
+								}
+								const size_t pos = static_cast<size_t>(dy) * display_width + dx;
+								accum_r[pos] += cr * weight;
+								accum_g[pos] += cg * weight;
+								accum_b[pos] += cb * weight;
+								accum_w[pos] += weight;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const size_t pos = static_cast<size_t>(dy) * display_width + dx;
+				if (accum_w[pos] > 0.0f) {
+					const float inv = 1.0f / accum_w[pos];
+					win->put_pixel8(
+							quantize_rgb(
+									static_cast<int>(std::lround(accum_r[pos] * inv)),
+									static_cast<int>(std::lround(accum_g[pos] * inv)),
+									static_cast<int>(std::lround(accum_b[pos] * inv))),
+							dx, dy);
+				} else {
+					// The expanded scene plus the coverage-sized splat should cover
+					// every interior destination pixel. Keep a deterministic safety
+					// fallback for boundary/numerical edge cases.
+					const World_view_point source = world_view.display_to_scene(
+							{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
+					win->put_pixel8(
+							scene_pixel(
+									static_cast<int>(std::floor(source.x)),
+									static_cast<int>(std::floor(source.y))),
+							dx, dy);
+				}
+			}
+		}
+	} else if (rotate_sampling_mode < 2) {
 		const int factor = rotate_sampling_mode == 0 ? 2 : 3;
 		Image_buffer8* scaled = rotate_sampling_mode == 0 ? rotate_scene_2x.get() : rotate_scene_3x.get();
 		for (int dy = 0; dy < display_height; ++dy) {
