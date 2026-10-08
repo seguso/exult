@@ -404,7 +404,7 @@ Game_window::Game_window(
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
-	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 3);
 	world_view.set_enabled(rotate_world);
 	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
@@ -563,6 +563,7 @@ void Game_window::resize_rotate_scene() {
 		rotate_scene.reset();
 		rotate_scene_2x.reset();
 		rotate_scene_3x.reset();
+		rotate_scene_hq3x.clear();
 		return;
 	}
 
@@ -573,14 +574,21 @@ void Game_window::resize_rotate_scene() {
 
 	// Allocate only the intermediate required by the selected A/B mode so the
 	// clean2 baseline keeps its original memory/per-frame characteristics.
+	rotate_scene_hq3x.clear();
 	if (rotate_sampling_mode == 0) {
 		auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
 		rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
 		rotate_scene_3x.reset();
-	} else {
+	} else if (rotate_sampling_mode <= 2) {
 		auto buffer_3x = win->create_buffer(scene_size * 3, scene_size * 3);
 		rotate_scene_3x.reset(static_cast<Image_buffer8*>(buffer_3x.release()));
 		rotate_scene_2x.reset();
+	} else {
+		rotate_scene_2x.reset();
+		rotate_scene_3x.reset();
+		rotate_scene_hq3x.resize(
+				static_cast<size_t>(scene_size) *
+				static_cast<size_t>(scene_size) * 9u);
 	}
 }
 
@@ -594,7 +602,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 }
 
 void Game_window::set_rotate_sampling_mode(int mode) {
-	mode = std::clamp(mode, 0, 2);
+	mode = std::clamp(mode, 0, 3);
 	if (rotate_sampling_mode == mode) {
 		return;
 	}
@@ -603,7 +611,8 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 	static constexpr const char* names[] = {
 			"Scale2x + 4 samples",
 			"Scale3x + 4 samples",
-			"Scale3x + 9 samples"};
+			"Scale3x + 9 samples",
+			"HQ3x RGB + 9 samples"};
 	cout << "Rotate quality: " << names[rotate_sampling_mode] << std::endl;
 	if (rotate_world) {
 		resize_rotate_scene();
