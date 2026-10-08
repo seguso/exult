@@ -150,6 +150,7 @@ class Game_window {
 	// 7 = Forward topology-preserving diagonal links (debug red holes)
 	// 8 = Forward weighted diagonal triplets with continuous colour (debug red holes)
 	// 9 = Forward weighted diagonal pairs with continuous colour (debug red holes)
+	// 10 = Forward weighted diagonal quadruplets with continuous colour (debug red holes)
 	int rotate_sampling_mode = 0;
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
