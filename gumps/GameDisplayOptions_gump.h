@@ -39,6 +39,7 @@ private:
 	int                      modern_smooth;
 	int                      modern_tau;
 	int                      rotate_world;
+	int                      rotate_sampling_mode;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -64,6 +65,7 @@ private:
 		id_modern_smooth,
 		id_modern_tau,
 		id_rotate_world,
+		id_rotate_sampling_mode,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -144,6 +146,10 @@ public:
 
 	void toggle_rotate_world(int state) {
 		rotate_world = state;
+	}
+
+	void toggle_rotate_sampling_mode(int state) {
+		rotate_sampling_mode = state;
 	}
 
 	void toggle_menu_intro(int state) {
