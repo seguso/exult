@@ -802,13 +802,16 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		// overriding coherent triplets.
 		constexpr float node_weight = 0.10f;
 		int node_contributions = 0;
+		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
+			const World_view_point row_dest = world_view.scene_to_display(
+					{static_cast<double>(scene_x) + 0.5, static_cast<double>(src_y) + 0.5});
 			for (int sx = 0; sx < scene_size; ++sx) {
 				const int src_x = scene_x + sx;
 				const unsigned char color = scene_pixel(src_x, src_y);
-				const World_view_point dest = world_view.scene_to_display(
-						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
+				const World_view_point dest{row_dest.x + offset, row_dest.y + offset};
 				const int dx = static_cast<int>(std::floor(dest.x));
 				const int dy = static_cast<int>(std::floor(dest.y));
 				if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
@@ -830,12 +833,16 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		int segment_cells = 0;
 		double confidence_sum = 0.0;
 
+		constexpr double triplet_extent = 2.8284271247461900976;
+		constexpr double inv_triplet_extent = 1.0 / triplet_extent;
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
+			const World_view_point row_p0 = world_view.scene_to_display(
+					{static_cast<double>(scene_x) + 0.5, static_cast<double>(src_y) + 0.5});
 			for (int sx = 0; sx < scene_size; ++sx) {
 				const int src_x = scene_x + sx;
-				const World_view_point p0 = world_view.scene_to_display(
-						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
+				const World_view_point p0{row_p0.x + offset, row_p0.y + offset};
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
 					const int x1 = src_x + delta.first;
 					const int y1 = src_y + delta.second;
@@ -867,23 +874,11 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						++low_cohesion;
 					}
 
-					// Over a two-pixel diagonal at exactly 45 degrees the transformed
-					// displacement is constant: '\\' => (0, 2*sqrt(2)),
-					// '/' => (2*sqrt(2), 0). Reuse p0 instead of transforming p2.
-					constexpr double two_sqrt_2 = 2.8284271247461900976;
-					const double vx = delta.second > 0 ? 0.0 : two_sqrt_2;
-					const double vy = delta.second > 0 ? two_sqrt_2 : 0.0;
-					const World_view_point p2{p0.x + vx, p0.y + vy};
-					if (std::abs(vx) <= std::abs(vy)) {
+					if (delta.second > 0) {
 						// Source '\\' run: vertical destination segment.
-						const double x = (p0.x + p2.x) * 0.5;
-						const double lo = std::min(p0.y, p2.y);
-						const double hi = std::max(p0.y, p2.y);
-						const double length = hi - lo;
-						if (length <= 0.0) {
-							continue;
-						}
-						const int dx = static_cast<int>(std::floor(x));
+						const double lo = p0.y;
+						const double hi = lo + triplet_extent;
+						const int dx = static_cast<int>(std::floor(p0.x));
 						const int first = static_cast<int>(std::floor(lo));
 						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
 						for (int dy = first; dy <= last; ++dy) {
@@ -893,11 +888,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							if (coverage <= 0.0) {
 								continue;
 							}
-							double t0 = (cell_lo - p0.y) / vy;
-							double t1 = (cell_hi - p0.y) / vy;
-							if (t0 > t1) {
-								std::swap(t0, t1);
-							}
+							const double t0 = (cell_lo - lo) * inv_triplet_extent;
+							const double t1 = (cell_hi - lo) * inv_triplet_extent;
 							float r, g, blue;
 							average_colour_over(a, b, cc, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
@@ -905,14 +897,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						}
 					} else {
 						// Source '/' run: horizontal destination segment.
-						const double y = (p0.y + p2.y) * 0.5;
-						const double lo = std::min(p0.x, p2.x);
-						const double hi = std::max(p0.x, p2.x);
-						const double length = hi - lo;
-						if (length <= 0.0) {
-							continue;
-						}
-						const int dy = static_cast<int>(std::floor(y));
+						const double lo = p0.x;
+						const double hi = lo + triplet_extent;
+						const int dy = static_cast<int>(std::floor(p0.y));
 						const int first = static_cast<int>(std::floor(lo));
 						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
 						for (int dx = first; dx <= last; ++dx) {
@@ -922,11 +909,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							if (coverage <= 0.0) {
 								continue;
 							}
-							double t0 = (cell_lo - p0.x) / vx;
-							double t1 = (cell_hi - p0.x) / vx;
-							if (t0 > t1) {
-								std::swap(t0, t1);
-							}
+							const double t0 = (cell_lo - lo) * inv_triplet_extent;
+							const double t1 = (cell_hi - lo) * inv_triplet_extent;
 							float r, g, blue;
 							average_colour_over(a, b, cc, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
