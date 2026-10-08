@@ -1015,26 +1015,28 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
+		// Diagnostic mode: do not display any reconstructed hole colour.
+		// Show every unmapped destination pixel as the closest available
+		// palette colour to pure red so we can visually separate true forward
+		// holes from discontinuities caused by conflicting forward collisions.
+		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
 		int fallback_holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const size_t pos = at(dx, dy);
-				if (!known[pos]) {
+				if (!real[pos]) {
 					++fallback_holes;
-					const World_view_point source = world_view.display_to_scene(
-							{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
-					filled[pos] = scene_pixel(
-							static_cast<int>(std::floor(source.x)),
-							static_cast<int>(std::floor(source.y)));
+					win->put_pixel8(debug_hole_red, dx, dy);
+				} else {
+					win->put_pixel8(mapped[pos], dx, dy);
 				}
-				win->put_pixel8(filled[pos], dx, dy);
 			}
 		}
 
 		printed_edge_fill_examples = true;
 		static bool printed_edge_fill_stats = false;
 		if (!printed_edge_fill_stats) {
-			std::cout << "Forward edge fill ALGO=EXPANDING-TIE-V2"
+			std::cout << "Forward edge fill ALGO=EXPANDING-TIE-V2 DEBUG_RED_HOLES=1"
 				 << ", samples=" << forward_samples
 				 << ", collisions=" << forward_collisions
 				 << ", conflicting_collisions=" << forward_conflicting_collisions
