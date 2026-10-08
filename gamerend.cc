@@ -632,6 +632,20 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 		return rotate_scene_hq3x[static_cast<size_t>(sy) * hi_size + sx];
 	};
+	const auto blend4_rgb = [&](uint32 a, uint32 b, uint32 c0, uint32 d) {
+		const int r = static_cast<int>(((a >> 16) & 0xffu) + ((b >> 16) & 0xffu)
+				+ ((c0 >> 16) & 0xffu) + ((d >> 16) & 0xffu));
+		const int g = static_cast<int>(((a >> 8) & 0xffu) + ((b >> 8) & 0xffu)
+				+ ((c0 >> 8) & 0xffu) + ((d >> 8) & 0xffu));
+		const int blue = static_cast<int>((a & 0xffu) + (b & 0xffu)
+				+ (c0 & 0xffu) + (d & 0xffu));
+		// Average in HQ3x RGB space, then convert once to the live 6-bit palette.
+		return quantize_rgb(
+				(r + 8) / 16,
+				(g + 8) / 16,
+				(blue + 8) / 16);
+	};
+
 	const auto blend9_rgb = [&](const std::array<uint32, 9>& samples) {
 		int r = 0;
 		int g = 0;
@@ -708,6 +722,34 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				source11.y += source_dy;
 			}
 		}
+	} else if (rotate_sampling_mode == 4) {
+#ifdef USE_HQ3X_SCALER
+		// Same HQ3x RGB prefilter as mode 3, but use the clean2 quarter-pixel
+		// four-sample footprint. This isolates sampling density from prefilter.
+		for (int dy = 0; dy < display_height; ++dy) {
+			const double y0 = static_cast<double>(dy) + 0.25;
+			const double y1 = static_cast<double>(dy) + 0.75;
+			World_view_point source00 = world_view.display_to_scene({0.25, y0});
+			World_view_point source10 = world_view.display_to_scene({0.75, y0});
+			World_view_point source01 = world_view.display_to_scene({0.25, y1});
+			World_view_point source11 = world_view.display_to_scene({0.75, y1});
+			for (int dx = 0; dx < display_width; ++dx) {
+				win->put_pixel8(
+						blend4_rgb(
+								sample_hq3x(source00), sample_hq3x(source10),
+								sample_hq3x(source01), sample_hq3x(source11)),
+						dx, dy);
+				source00.x += source_dx;
+				source00.y += source_dy;
+				source10.x += source_dx;
+				source10.y += source_dy;
+				source01.x += source_dx;
+				source01.y += source_dy;
+				source11.x += source_dx;
+				source11.y += source_dy;
+			}
+		}
+#endif
 	} else {
 		constexpr std::array<double, 3> offsets = {1.0 / 6.0, 0.5, 5.0 / 6.0};
 		for (int dy = 0; dy < display_height; ++dy) {
