@@ -246,6 +246,10 @@ public:
 		return "Rotate world 45 deg:";
 	}
 
+	static const char* Rotatequality_() {
+		return "Rotate quality:";
+	}
+
 	static const char* Readableconversationfont_() {
 		return "Readable conversation font:";
 	}
@@ -358,6 +362,13 @@ void GameDisplayOptions_gump::build_buttons() {
 	buttons[id_rotate_world] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_rotate_world, yesNo, rotate_world,
 			get_button_pos_for_label(Strings::Rotateworld45deg_()), yForRow(++y_index), small_size);
+
+	std::vector<std::string> rotate_quality_text = {
+			"2x / 4 samples", "3x / 4 samples", "3x / 9 samples"};
+	buttons[id_rotate_sampling_mode] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
+			std::move(rotate_quality_text), rotate_sampling_mode,
+			get_button_pos_for_label(Strings::Rotatequality_()), yForRow(++y_index), large_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -479,7 +490,8 @@ void GameDisplayOptions_gump::load_settings() {
 	text_bg          = gwin->get_text_bg() + 1;
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
 	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
-	rotate_world     = gwin->is_rotate_world_enabled() ? 1 : 0;
+	rotate_world         = gwin->is_rotate_world_enabled() ? 1 : 0;
+	rotate_sampling_mode = gwin->get_rotate_sampling_mode();
 	const int tau_ms = gwin->get_modern_movement_tau_ms();
 	modern_tau = 0;
 	for (size_t i = 1; i < std::size(modern_tau_values); ++i) {
@@ -523,7 +535,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(18)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(19)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -531,13 +543,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(17), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(18), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(17), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(18), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(17), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(18), 50);
 
 	load_settings();
 	build_buttons();
@@ -578,6 +590,7 @@ void GameDisplayOptions_gump::save_settings() {
 	config->set("config/gameplay/smooth_scrolling", smooth_scrolling * 25, false);
 	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
 	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
+	gwin->set_rotate_sampling_mode(rotate_sampling_mode);
 	gwin->set_rotate_world_enabled(rotate_world != 0);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
 	config->set("config/gameplay/extended_intro", extended_intro ? "yes" : "no", false);
@@ -632,6 +645,7 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Modernsmoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Rotateworld45deg_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Rotatequality_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);
