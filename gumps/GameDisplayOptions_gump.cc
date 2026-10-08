@@ -365,6 +365,9 @@ void GameDisplayOptions_gump::build_buttons() {
 
 	std::vector<std::string> rotate_quality_text = {
 			"2x / 4 samples", "3x / 4 samples", "3x / 9 samples"};
+#ifdef USE_HQ3X_SCALER
+	rotate_quality_text.emplace_back("HQ3x / 9 samples");
+#endif
 	buttons[id_rotate_sampling_mode] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
 			std::move(rotate_quality_text), rotate_sampling_mode,
