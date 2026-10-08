@@ -698,7 +698,166 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
 
-	if (rotate_sampling_mode == 6) {
+	if (rotate_sampling_mode == 7) {
+		// Topology-preserving forward experiment.
+		// Map original source pixel centres, but also preserve exact-colour
+		// diagonal adjacencies as structural links. After a 45-degree rotation,
+		// source '\\' links become vertical and source '/' links become horizontal.
+		// Structural links receive more support than isolated nodes so collision
+		// resolution favours continuous lines. Any remaining destination holes are
+		// deliberately shown in red for diagnosis.
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		std::vector<unsigned char> mapped(dest_count, static_cast<unsigned char>(pal->get_border_index()));
+		std::vector<unsigned short> support(dest_count, 0);
+		std::vector<float> best_dist(dest_count, 1.0e30f);
+		std::vector<unsigned char> occupied(dest_count, 0);
+
+		int node_samples = 0;
+		int node_collisions = 0;
+		int node_conflicts = 0;
+		int diagonal_links = 0;
+		int link_pixels = 0;
+		int link_conflicts = 0;
+		int structural_overwrites = 0;
+
+		const auto at = [&](int x, int y) {
+			return static_cast<size_t>(y) * display_width + x;
+		};
+		const auto deposit = [&](int dx, int dy, unsigned char color, unsigned short weight, float d2) {
+			if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+				return;
+			}
+			const size_t pos = at(dx, dy);
+			if (!occupied[pos]) {
+				occupied[pos] = 1;
+				mapped[pos] = color;
+				support[pos] = weight;
+				best_dist[pos] = d2;
+				return;
+			}
+			if (mapped[pos] == color) {
+				support[pos] = static_cast<unsigned short>(
+						std::min<int>(65535, static_cast<int>(support[pos]) + weight));
+				best_dist[pos] = std::min(best_dist[pos], d2);
+				return;
+			}
+			++link_conflicts;
+			if (weight > support[pos] || (weight == support[pos] && d2 < best_dist[pos])) {
+				if (weight > support[pos]) {
+					++structural_overwrites;
+				}
+				mapped[pos] = color;
+				support[pos] = weight;
+				best_dist[pos] = d2;
+			}
+		};
+
+		// First map the source nodes. Nodes have support 1.
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const unsigned char color = scene_pixel(src_x, src_y);
+				const World_view_point dest = world_view.scene_to_display(
+						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+				const int dx = static_cast<int>(std::floor(dest.x));
+				const int dy = static_cast<int>(std::floor(dest.y));
+				if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+					continue;
+				}
+				const size_t pos = at(dx, dy);
+				++node_samples;
+				if (occupied[pos]) {
+					++node_collisions;
+					if (mapped[pos] != color) {
+						++node_conflicts;
+					}
+				}
+				const double ddx = dest.x - (static_cast<double>(dx) + 0.5);
+				const double ddy = dest.y - (static_cast<double>(dy) + 0.5);
+				const float d2 = static_cast<float>(ddx * ddx + ddy * ddy);
+				deposit(dx, dy, color, 1, d2);
+			}
+		}
+
+		// Then preserve exact-colour diagonal adjacencies. Each structural link
+		// contributes support 2 to every destination cell intersected by the
+		// transformed segment. Consecutive links naturally accumulate more support.
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const unsigned char color = scene_pixel(src_x, src_y);
+				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
+					const int nx = src_x + delta.first;
+					const int ny = src_y + delta.second;
+					if (nx < scene_x || nx >= scene_x + scene_size
+							|| ny < scene_y || ny >= scene_y + scene_size) {
+						continue;
+					}
+					if (scene_pixel(nx, ny) != color) {
+						continue;
+					}
+					++diagonal_links;
+					const World_view_point a = world_view.scene_to_display(
+							{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+					const World_view_point b = world_view.scene_to_display(
+							{static_cast<double>(nx) + 0.5, static_cast<double>(ny) + 0.5});
+					const double mx = (a.x + b.x) * 0.5;
+					const double my = (a.y + b.y) * 0.5;
+					if (std::abs(a.x - b.x) <= std::abs(a.y - b.y)) {
+						const int dx = static_cast<int>(std::floor(mx));
+						const int y0 = static_cast<int>(std::floor(std::min(a.y, b.y)));
+						const int y1 = static_cast<int>(std::floor(std::max(a.y, b.y)));
+						for (int dy = y0; dy <= y1; ++dy) {
+							const double ddx = mx - (static_cast<double>(dx) + 0.5);
+							const double ddy = my - (static_cast<double>(dy) + 0.5);
+							deposit(dx, dy, color, 2, static_cast<float>(ddx * ddx + ddy * ddy));
+							++link_pixels;
+						}
+					} else {
+						const int dy = static_cast<int>(std::floor(my));
+						const int x0 = static_cast<int>(std::floor(std::min(a.x, b.x)));
+						const int x1 = static_cast<int>(std::floor(std::max(a.x, b.x)));
+						for (int dx = x0; dx <= x1; ++dx) {
+							const double ddx = mx - (static_cast<double>(dx) + 0.5);
+							const double ddy = my - (static_cast<double>(dy) + 0.5);
+							deposit(dx, dy, color, 2, static_cast<float>(ddx * ddx + ddy * ddy));
+							++link_pixels;
+						}
+					}
+				}
+			}
+		}
+
+		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		int holes = 0;
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const size_t pos = at(dx, dy);
+				if (!occupied[pos]) {
+					++holes;
+					win->put_pixel8(debug_hole_red, dx, dy);
+				} else {
+					win->put_pixel8(mapped[pos], dx, dy);
+				}
+			}
+		}
+
+		static bool printed_topology_stats = false;
+		if (!printed_topology_stats) {
+			std::cout << "Forward topology ALGO=DIAGONAL-LINKS-V1"
+					 << ", nodes=" << node_samples
+					 << ", node_collisions=" << node_collisions
+					 << ", node_conflicts=" << node_conflicts
+					 << ", diagonal_links=" << diagonal_links
+					 << ", link_pixels=" << link_pixels
+					 << ", link_conflicts=" << link_conflicts
+					 << ", structural_overwrites=" << structural_overwrites
+					 << ", holes=" << holes << std::endl;
+			printed_topology_stats = true;
+		}
+	} else if (rotate_sampling_mode == 6) {
 		// Pure forward point mapping from the original 1x pixel lattice. Unlike
 		// the previous Nearest3x experiment, this deliberately leaves the holes
 		// created by rotating/rasterizing a unit-density grid. Successfully mapped
