@@ -699,11 +699,12 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dy = world_view.display_to_scene_y_step();
 
 	if (rotate_sampling_mode == 6) {
-		// Pure forward point mapping from a logical Nearest3x lattice. Unlike
-		// square splatting, successfully mapped destination pixels are never
-		// blurred or expanded. Only holes left by the rotated lattice are filled,
-		// choosing the opposite-neighbour direction with the smallest RGB
-		// discontinuity (horizontal, vertical, or either diagonal).
+		// Pure forward point mapping from the original 1x pixel lattice. Unlike
+		// the previous Nearest3x experiment, this deliberately leaves the holes
+		// created by rotating/rasterizing a unit-density grid. Successfully mapped
+		// destination pixels are never blurred or expanded; only those holes are
+		// reconstructed, choosing the opposite-neighbour direction with the
+		// smallest RGB discontinuity (horizontal, vertical, or either diagonal).
 		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
 		std::vector<unsigned char> mapped(dest_count, static_cast<unsigned char>(pal->get_border_index()));
 		std::vector<unsigned char> real(dest_count, 0);
@@ -714,28 +715,23 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			for (int sx = 0; sx < scene_size; ++sx) {
 				const int src_x = scene_x + sx;
 				const unsigned char color = scene_pixel(src_x, src_y);
-				for (int oy = 0; oy < 3; ++oy) {
-					const double source_y = static_cast<double>(src_y)
-							+ (static_cast<double>(oy) + 0.5) / 3.0;
-					for (int ox = 0; ox < 3; ++ox) {
-						const double source_x = static_cast<double>(src_x)
-								+ (static_cast<double>(ox) + 0.5) / 3.0;
-						const World_view_point dest = world_view.scene_to_display({source_x, source_y});
-						const int dx = static_cast<int>(std::floor(dest.x));
-						const int dy = static_cast<int>(std::floor(dest.y));
-						if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
-							continue;
-						}
-						const double ddx = dest.x - (static_cast<double>(dx) + 0.5);
-						const double ddy = dest.y - (static_cast<double>(dy) + 0.5);
-						const float d2 = static_cast<float>(ddx * ddx + ddy * ddy);
-						const size_t pos = static_cast<size_t>(dy) * display_width + dx;
-						if (!real[pos] || d2 < best_dist[pos]) {
-							real[pos] = 1;
-							best_dist[pos] = d2;
-							mapped[pos] = color;
-						}
-					}
+				const World_view_point dest = world_view.scene_to_display(
+						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+				const int dx = static_cast<int>(std::floor(dest.x));
+				const int dy = static_cast<int>(std::floor(dest.y));
+				if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+					continue;
+				}
+				const double ddx = dest.x - (static_cast<double>(dx) + 0.5);
+				const double ddy = dest.y - (static_cast<double>(dy) + 0.5);
+				const float d2 = static_cast<float>(ddx * ddx + ddy * ddy);
+				const size_t pos = static_cast<size_t>(dy) * display_width + dx;
+				// A 1x forward lattice can collide after rasterization. Preserve the
+				// source sample whose transformed centre is closest to this pixel centre.
+				if (!real[pos] || d2 < best_dist[pos]) {
+					real[pos] = 1;
+					best_dist[pos] = d2;
+					mapped[pos] = color;
 				}
 			}
 		}
