@@ -810,6 +810,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 		constexpr double triplet_extent = 2.8284271247461900976;
 		constexpr double inv_triplet_extent = 1.0 / triplet_extent;
+		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
 			const World_view_point row_p0 = world_view.scene_to_display(

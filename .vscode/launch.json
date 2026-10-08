@@ -17,6 +17,21 @@
             "externalConsole": false
         },
         {
+            "name": "Launch Exult (Forge of Virtue)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build Exult (Release x64)",
+            "program": "${workspaceFolder}/Exult.exe",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.vscode/exult-launch.cfg",
+                "--fov"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false
+        },
+        {
             "name": "Launch Exult (Serpent Isle)",
             "type": "cppvsdbg",
             "request": "launch",
