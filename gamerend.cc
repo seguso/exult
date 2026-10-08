@@ -798,33 +798,10 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		};
 
-		// Low-weight node evidence. It anchors isolated source pixels without
-		// overriding coherent triplets.
+		// Low-weight node evidence is emitted from the same source scan as the
+		// triplets below, avoiding a second full traversal of the expanded scene.
 		constexpr float node_weight = 0.10f;
 		int node_contributions = 0;
-		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
-		for (int sy = 0; sy < scene_size; ++sy) {
-			const int src_y = scene_y + sy;
-			const World_view_point row_dest = world_view.scene_to_display(
-					{static_cast<double>(scene_x) + 0.5, static_cast<double>(src_y) + 0.5});
-			for (int sx = 0; sx < scene_size; ++sx) {
-				const int src_x = scene_x + sx;
-				const unsigned char color = scene_pixel(src_x, src_y);
-				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
-				const World_view_point dest{row_dest.x + offset, row_dest.y + offset};
-				const int dx = static_cast<int>(std::floor(dest.x));
-				const int dy = static_cast<int>(std::floor(dest.y));
-				if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
-					continue;
-				}
-				add_rgb(dx, dy,
-						static_cast<float>(pal_r[color]),
-						static_cast<float>(pal_g[color]),
-						static_cast<float>(pal_b[color]),
-						node_weight);
-				++node_contributions;
-			}
-		}
 
 		int triplets = 0;
 		int high_cohesion = 0;
@@ -843,6 +820,19 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				const int src_x = scene_x + sx;
 				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
 				const World_view_point p0{row_p0.x + offset, row_p0.y + offset};
+
+				const unsigned char node_color = scene_pixel(src_x, src_y);
+				const int node_dx = static_cast<int>(std::floor(p0.x));
+				const int node_dy = static_cast<int>(std::floor(p0.y));
+				if (node_dx >= 0 && node_dx < display_width && node_dy >= 0 && node_dy < display_height) {
+					add_rgb(node_dx, node_dy,
+							static_cast<float>(pal_r[node_color]),
+							static_cast<float>(pal_g[node_color]),
+							static_cast<float>(pal_b[node_color]),
+							node_weight);
+					++node_contributions;
+				}
+
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
 					const int x1 = src_x + delta.first;
 					const int y1 = src_y + delta.second;
