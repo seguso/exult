@@ -565,6 +565,7 @@ Tile_coord Usecode_internal::get_position(Usecode_value& itemval) {
 
 void Usecode_internal::show_pending_text() {
 	if (book) {    // Book mode?
+		std::cerr << "[BOOK31D Exult] show_pending_text: advancing accumulated book pages" << std::endl;
 		int x;
 		int y;
 		while (book->show_next_page() && Get_click(x, y, Mouse::hand, nullptr, false, book, true))
@@ -585,6 +586,12 @@ void Usecode_internal::show_book() {
 	char*       str = String;
 	std::string translated(str);
 	translate_usecode_text(translated);
+	std::string excerpt = translated.substr(0, 300);
+	for (char& ch : excerpt) {
+		if (ch == '\n' || ch == '\r' || ch == '\t') ch = ' ';
+	}
+	std::cerr << "[BOOK31D Exult] show_book chunk length=" << translated.size()
+	          << " excerpt=\"" << excerpt << "\"" << std::endl;
 	book->add_text(translated.c_str());
 	delete[] String;
 	String = nullptr;
@@ -1657,6 +1664,10 @@ void Usecode_internal::set_book(
 		} else if (!book && b) {
 			touchui->hideGameControls();
 		}
+	}
+	if (b || book) {
+		std::cerr << "[BOOK31D Exult] set_book old=" << (book != nullptr)
+		          << " new=" << (b != nullptr) << std::endl;
 	}
 	delete book;
 	book = b;
