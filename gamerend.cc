@@ -458,51 +458,90 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
 
-	// Reconstruct the 8-bit scene at 2x with the Scale2x/EPX neighbourhood
-	// rule before rotating it.  This is deliberately pixel-art-aware: diagonal
-	// runs that are only corner-connected at 1x get extra coverage at 2x, while
-	// interior colours (for example the lighter stripe inside a lamp post) stay
-	// distinct instead of being swallowed by a generic dark-edge bias.
-	rotate_scene_2x->clear_clip();
-	rotate_scene_2x->fill8(pal->get_border_index());
+	// Reconstruct the scene with a pixel-art-aware scaler before rotation.
+	// Mode 0 deliberately keeps the clean2 Scale2x + 4-sample path bit-for-bit
+	// equivalent. Modes 1/2 use the standard Scale3x neighbourhood rules and
+	// differ only in the final sampling density.
 	const auto scene_pixel = [&](int x, int y) {
 		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
 		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
 		return rotate_scene->get_pixel8(x, y);
 	};
-	for (int sy = 0; sy < scene_size; ++sy) {
-		const int y = scene_y + sy;
-		for (int sx = 0; sx < scene_size; ++sx) {
-			const int x = scene_x + sx;
-			const unsigned char e = scene_pixel(x, y);
-			const unsigned char b = scene_pixel(x, y - 1);
-			const unsigned char d = scene_pixel(x - 1, y);
-			const unsigned char f = scene_pixel(x + 1, y);
-			const unsigned char h = scene_pixel(x, y + 1);
 
-			unsigned char e0 = e;
-			unsigned char e1 = e;
-			unsigned char e2 = e;
-			unsigned char e3 = e;
-			if (b != h && d != f) {
-				if (d == b) e0 = d;
-				if (b == f) e1 = f;
-				if (d == h) e2 = d;
-				if (h == f) e3 = f;
+	if (rotate_sampling_mode == 0) {
+		rotate_scene_2x->clear_clip();
+		rotate_scene_2x->fill8(pal->get_border_index());
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int x = scene_x + sx;
+				const unsigned char e = scene_pixel(x, y);
+				const unsigned char b = scene_pixel(x, y - 1);
+				const unsigned char d = scene_pixel(x - 1, y);
+				const unsigned char f = scene_pixel(x + 1, y);
+				const unsigned char h = scene_pixel(x, y + 1);
+
+				unsigned char e0 = e;
+				unsigned char e1 = e;
+				unsigned char e2 = e;
+				unsigned char e3 = e;
+				if (b != h && d != f) {
+					if (d == b) e0 = d;
+					if (b == f) e1 = f;
+					if (d == h) e2 = d;
+					if (h == f) e3 = f;
+				}
+
+				const int hx = sx * 2;
+				const int hy = sy * 2;
+				rotate_scene_2x->put_pixel8(e0, hx, hy);
+				rotate_scene_2x->put_pixel8(e1, hx + 1, hy);
+				rotate_scene_2x->put_pixel8(e2, hx, hy + 1);
+				rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
 			}
+		}
+	} else {
+		rotate_scene_3x->clear_clip();
+		rotate_scene_3x->fill8(pal->get_border_index());
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int x = scene_x + sx;
+				const unsigned char a = scene_pixel(x - 1, y - 1);
+				const unsigned char b = scene_pixel(x, y - 1);
+				const unsigned char cc = scene_pixel(x + 1, y - 1);
+				const unsigned char d = scene_pixel(x - 1, y);
+				const unsigned char epx = scene_pixel(x, y);
+				const unsigned char fpx = scene_pixel(x + 1, y);
+				const unsigned char g = scene_pixel(x - 1, y + 1);
+				const unsigned char h = scene_pixel(x, y + 1);
+				const unsigned char i = scene_pixel(x + 1, y + 1);
 
-			const int hx = sx * 2;
-			const int hy = sy * 2;
-			rotate_scene_2x->put_pixel8(e0, hx, hy);
-			rotate_scene_2x->put_pixel8(e1, hx + 1, hy);
-			rotate_scene_2x->put_pixel8(e2, hx, hy + 1);
-			rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
+				std::array<unsigned char, 9> out;
+				out.fill(epx);
+				if (b != h && d != fpx) {
+					out[0] = d == b ? d : epx;
+					out[1] = (d == b && epx != cc) || (b == fpx && epx != a) ? b : epx;
+					out[2] = b == fpx ? fpx : epx;
+					out[3] = (d == b && epx != g) || (d == h && epx != a) ? d : epx;
+					out[4] = epx;
+					out[5] = (b == fpx && epx != i) || (h == fpx && epx != cc) ? fpx : epx;
+					out[6] = d == h ? d : epx;
+					out[7] = (d == h && epx != i) || (h == fpx && epx != g) ? h : epx;
+					out[8] = h == fpx ? fpx : epx;
+				}
+
+				const int hx = sx * 3;
+				const int hy = sy * 3;
+				for (int oy = 0; oy < 3; ++oy) {
+					for (int ox = 0; ox < 3; ++ox) {
+						rotate_scene_3x->put_pixel8(out[oy * 3 + ox], hx + ox, hy + oy);
+					}
+				}
+			}
 		}
 	}
 
-	// Rotate from the reconstructed 2x scene and area-sample each destination
-	// pixel at four quarter-pixel positions.  Unlike the previous dark-edge
-	// resolver this treats light and dark detail symmetrically.
 	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
 	rotate_blend_cache.fill(255);
 	const auto quantize_rgb = [&](int r, int g, int b) {
@@ -518,50 +557,95 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 		return cached;
 	};
-	const auto sample_scene_2x = [&](const World_view_point& source) {
-		const double fx = (source.x - static_cast<double>(scene_x)) * 2.0 + 0.5;
-		const double fy = (source.y - static_cast<double>(scene_y)) * 2.0 + 0.5;
+	const auto sample_scaled = [&](const World_view_point& source, int factor, const Image_buffer8* scaled) {
+		const double fx = (source.x - static_cast<double>(scene_x)) * factor + 0.5;
+		const double fy = (source.y - static_cast<double>(scene_y)) * factor + 0.5;
 		const int sx = static_cast<int>(std::floor(fx));
 		const int sy = static_cast<int>(std::floor(fy));
-		const int hi_size = scene_size * 2;
+		const int hi_size = scene_size * factor;
 		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
 			return static_cast<unsigned char>(pal->get_border_index());
 		}
-		return rotate_scene_2x->get_pixel8(sx, sy);
+		return scaled->get_pixel8(sx, sy);
 	};
-	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
-		if (a == b && a == c && a == d) {
+	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c0, unsigned char d) {
+		if (a == b && a == c0 && a == d) {
 			return a;
 		}
-		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c) + pal->get_red(d) + 2) / 4;
-		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c) + pal->get_green(d) + 2) / 4;
-		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c) + pal->get_blue(d) + 2) / 4;
+		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c0) + pal->get_red(d) + 2) / 4;
+		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c0) + pal->get_green(d) + 2) / 4;
+		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c0) + pal->get_blue(d) + 2) / 4;
 		return quantize_rgb(r, g, blue);
+	};
+	const auto blend9 = [&](const std::array<unsigned char, 9>& samples) {
+		bool all_same = true;
+		for (size_t n = 1; n < samples.size(); ++n) {
+			if (samples[n] != samples[0]) {
+				all_same = false;
+				break;
+			}
+		}
+		if (all_same) {
+			return samples[0];
+		}
+		int r = 0;
+		int g = 0;
+		int b = 0;
+		for (const unsigned char sample : samples) {
+			r += pal->get_red(sample);
+			g += pal->get_green(sample);
+			b += pal->get_blue(sample);
+		}
+		return quantize_rgb((r + 4) / 9, (g + 4) / 9, (b + 4) / 9);
 	};
 
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
-	for (int dy = 0; dy < display_height; ++dy) {
-		const double y0 = static_cast<double>(dy) + 0.25;
-		const double y1 = static_cast<double>(dy) + 0.75;
-		World_view_point source00 = world_view.display_to_scene({0.25, y0});
-		World_view_point source10 = world_view.display_to_scene({0.75, y0});
-		World_view_point source01 = world_view.display_to_scene({0.25, y1});
-		World_view_point source11 = world_view.display_to_scene({0.75, y1});
-		for (int dx = 0; dx < display_width; ++dx) {
-			win->put_pixel8(
-					blend4(
-							sample_scene_2x(source00), sample_scene_2x(source10),
-							sample_scene_2x(source01), sample_scene_2x(source11)),
-					dx, dy);
-			source00.x += source_dx;
-			source00.y += source_dy;
-			source10.x += source_dx;
-			source10.y += source_dy;
-			source01.x += source_dx;
-			source01.y += source_dy;
-			source11.x += source_dx;
-			source11.y += source_dy;
+	if (rotate_sampling_mode < 2) {
+		const int factor = rotate_sampling_mode == 0 ? 2 : 3;
+		const Image_buffer8* scaled = rotate_sampling_mode == 0 ? rotate_scene_2x.get() : rotate_scene_3x.get();
+		for (int dy = 0; dy < display_height; ++dy) {
+			const double y0 = static_cast<double>(dy) + 0.25;
+			const double y1 = static_cast<double>(dy) + 0.75;
+			World_view_point source00 = world_view.display_to_scene({0.25, y0});
+			World_view_point source10 = world_view.display_to_scene({0.75, y0});
+			World_view_point source01 = world_view.display_to_scene({0.25, y1});
+			World_view_point source11 = world_view.display_to_scene({0.75, y1});
+			for (int dx = 0; dx < display_width; ++dx) {
+				win->put_pixel8(
+						blend4(
+								sample_scaled(source00, factor, scaled), sample_scaled(source10, factor, scaled),
+								sample_scaled(source01, factor, scaled), sample_scaled(source11, factor, scaled)),
+						dx, dy);
+				source00.x += source_dx;
+				source00.y += source_dy;
+				source10.x += source_dx;
+				source10.y += source_dy;
+				source01.x += source_dx;
+				source01.y += source_dy;
+				source11.x += source_dx;
+				source11.y += source_dy;
+			}
+		}
+	} else {
+		constexpr std::array<double, 3> offsets = {1.0 / 6.0, 0.5, 5.0 / 6.0};
+		for (int dy = 0; dy < display_height; ++dy) {
+			std::array<World_view_point, 9> sources;
+			for (int oy = 0; oy < 3; ++oy) {
+				for (int ox = 0; ox < 3; ++ox) {
+					sources[oy * 3 + ox] = world_view.display_to_scene(
+							{offsets[ox], static_cast<double>(dy) + offsets[oy]});
+				}
+			}
+			for (int dx = 0; dx < display_width; ++dx) {
+				std::array<unsigned char, 9> samples;
+				for (size_t n = 0; n < samples.size(); ++n) {
+					samples[n] = sample_scaled(sources[n], 3, rotate_scene_3x.get());
+					sources[n].x += source_dx;
+					sources[n].y += source_dy;
+				}
+				win->put_pixel8(blend9(samples), dx, dy);
+			}
 		}
 	}
 
