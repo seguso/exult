@@ -915,14 +915,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Quad_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(
@@ -1122,14 +1122,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Pair_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(
@@ -1366,7 +1366,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
@@ -1374,7 +1374,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				const Triplet_accum& src = accum[pos];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(
