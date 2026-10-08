@@ -1692,6 +1692,13 @@ void Image_window::layer_set_game_scaler(int handle, bool enabled) {
 	}
 }
 
+void Image_window::layer_set_rotate_linear(int handle, bool enabled) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->rotate_linear = enabled;
+}
+
 void Image_window::layer_set_dest(int handle, int x, int y, int w, int h, bool add) {
 	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
 		return;
@@ -2154,7 +2161,7 @@ void Image_window::composite_layers() {
 		// the selected Exult scaler (HQx/Scale2x/etc.) has produced its RGB
 		// source. Other layers retain their existing scaler-dependent mode.
 		const SDL_ScaleMode smode = (layer.game_scaler && layer.angle != 0.0)
-										 ? SDL_SCALEMODE_LINEAR
+										 ? (layer.rotate_linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST)
 										 : (smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
 		// If a software (member) scaler is active, layers are pre-scaled by it
 		// to this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
