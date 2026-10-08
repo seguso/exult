@@ -798,6 +798,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					if (scene_pixel(nx, ny) != color) {
 						continue;
 					}
+					// Do not turn flat fills into high-priority topology. A same-colour
+					// diagonal pair is structural only when at least one of the two cells
+					// touching the diagonal on its sides differs from the run colour.
+					const unsigned char side_a = scene_pixel(src_x + delta.first, src_y);
+					const unsigned char side_b = scene_pixel(src_x, src_y + delta.second);
+					if (side_a == color && side_b == color) {
+						continue;
+					}
 					++diagonal_links;
 					const World_view_point a = world_view.scene_to_display(
 							{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
