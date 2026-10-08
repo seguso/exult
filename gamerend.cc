@@ -776,15 +776,16 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					int dx;
 					int dy;
 					int score;
+					int initial_score;
 					unsigned char color;
 					bool valid;
 					bool tied;
 				};
 				std::array<Direction_candidate, 4> candidates = {{
-						{1, 0, 0, 0, false, false},
-						{0, 1, 0, 0, false, false},
-						{1, 1, 0, 0, false, false},
-						{1, -1, 0, 0, false, false}}};
+						{1, 0, 0, 0, 0, false, false},
+						{0, 1, 0, 0, 0, false, false},
+						{1, 1, 0, 0, 0, false, false},
+						{1, -1, 0, 0, 0, false, false}}};
 
 				int best = 1 << 30;
 				int valid_count = 0;
@@ -804,6 +805,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					}
 					candidate.valid = true;
 					candidate.score = color_distance(mapped[pa], mapped[pb]);
+					candidate.initial_score = candidate.score;
 					candidate.color = average_pair(mapped[pa], mapped[pb]);
 					best = std::min(best, candidate.score);
 					++valid_count;
@@ -884,7 +886,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					}
 					if (!chosen) {
 						for (const auto& candidate : candidates) {
-							if (candidate.valid && candidate.score == best) {
+							if (candidate.valid && candidate.initial_score == best) {
 								chosen = &candidate;
 								break;
 							}
