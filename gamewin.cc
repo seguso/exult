@@ -405,7 +405,7 @@ Game_window::Game_window(
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
 #ifdef USE_HQ3X_SCALER
-	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 4);
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 5);
 #else
 	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
 #endif
@@ -587,12 +587,17 @@ void Game_window::resize_rotate_scene() {
 		auto buffer_3x = win->create_buffer(scene_size * 3, scene_size * 3);
 		rotate_scene_3x.reset(static_cast<Image_buffer8*>(buffer_3x.release()));
 		rotate_scene_2x.reset();
-	} else {
+	} else if (rotate_sampling_mode <= 4) {
 		rotate_scene_2x.reset();
 		rotate_scene_3x.reset();
 		rotate_scene_hq3x.resize(
 				static_cast<size_t>(scene_size) *
 				static_cast<size_t>(scene_size) * 9u);
+	} else {
+		// Forward square-splat works directly from the original scene and
+		// generates the logical Nearest3x subpixels on the fly.
+		rotate_scene_2x.reset();
+		rotate_scene_3x.reset();
 	}
 }
 
@@ -607,7 +612,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 
 void Game_window::set_rotate_sampling_mode(int mode) {
 #ifdef USE_HQ3X_SCALER
-	mode = std::clamp(mode, 0, 4);
+	mode = std::clamp(mode, 0, 5);
 #else
 	mode = std::clamp(mode, 0, 2);
 #endif
@@ -621,7 +626,8 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 			"Scale3x + 4 samples",
 			"Scale3x + 9 samples",
 			"HQ3x RGB + 9 samples",
-			"HQ3x RGB + 4 samples"};
+			"HQ3x RGB + 4 samples",
+			"Nearest3x + forward square splat"};
 	cout << "Rotate quality: " << names[rotate_sampling_mode] << std::endl;
 	if (rotate_world) {
 		resize_rotate_scene();
