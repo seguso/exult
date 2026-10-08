@@ -47,6 +47,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <utility>
 
@@ -699,7 +700,248 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
 
-	if (rotate_sampling_mode == 7) {
+	if (rotate_sampling_mode == 8) {
+		// Forward weighted-triplet experiment.
+		//
+		// Every three-pixel diagonal run participates, including runs inside flat
+		// colour fields. The three source colours define a continuous piecewise-
+		// linear colour function A->B->C along the transformed segment. Its weight
+		// depends only on how regular that colour progression is: constant colours
+		// and smooth gradients are strong, erratic colour changes are weak.
+		//
+		// Contributions are accumulated and normalized; there is no special-case
+		// distinction between "real lines" and uniform areas. Original source nodes
+		// contribute a small baseline weight so isolated details are not discarded.
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		std::vector<float> accum_r(dest_count, 0.0f);
+		std::vector<float> accum_g(dest_count, 0.0f);
+		std::vector<float> accum_b(dest_count, 0.0f);
+		std::vector<float> accum_w(dest_count, 0.0f);
+
+		const auto at = [&](int x, int y) {
+			return static_cast<size_t>(y) * display_width + x;
+		};
+		const auto add_rgb = [&](int dx, int dy, float r, float g, float b, float weight) {
+			if (weight <= 0.0f || dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+				return;
+			}
+			const size_t pos = at(dx, dy);
+			accum_r[pos] += r * weight;
+			accum_g[pos] += g * weight;
+			accum_b[pos] += b * weight;
+			accum_w[pos] += weight;
+		};
+		const auto colour_at = [&](unsigned char a, unsigned char b, unsigned char cc, double t,
+				float& r, float& g, float& blue) {
+			t = std::clamp(t, 0.0, 1.0);
+			const auto channel = [&](int av, int bv, int cv) {
+				if (t <= 0.5) {
+					const double u = t * 2.0;
+					return static_cast<float>(av + (bv - av) * u);
+				}
+				const double u = (t - 0.5) * 2.0;
+				return static_cast<float>(bv + (cv - bv) * u);
+			};
+			r = channel(pal->get_red(a), pal->get_red(b), pal->get_red(cc));
+			g = channel(pal->get_green(a), pal->get_green(b), pal->get_green(cc));
+			blue = channel(pal->get_blue(a), pal->get_blue(b), pal->get_blue(cc));
+		};
+		const auto average_colour_over = [&](unsigned char a, unsigned char b, unsigned char cc,
+				double t0, double t1, float& r, float& g, float& blue) {
+			// Midpoint is exact on either linear half. If the destination cell spans
+			// B (t=.5), split the integral so all three colours retain their proper
+			// influence rather than pre-averaging A/B/C.
+			const auto sample_mid = [&](double lo, double hi, float& rr, float& gg, float& bb) {
+				colour_at(a, b, cc, (lo + hi) * 0.5, rr, gg, bb);
+			};
+			if (t0 < 0.5 && t1 > 0.5) {
+				float r0, g0, b0, r1, g1, b1;
+				sample_mid(t0, 0.5, r0, g0, b0);
+				sample_mid(0.5, t1, r1, g1, b1);
+				const double w0 = 0.5 - t0;
+				const double w1 = t1 - 0.5;
+				const double inv = 1.0 / (w0 + w1);
+				r = static_cast<float>((r0 * w0 + r1 * w1) * inv);
+				g = static_cast<float>((g0 * w0 + g1 * w1) * inv);
+				blue = static_cast<float>((b0 * w0 + b1 * w1) * inv);
+			} else {
+				sample_mid(t0, t1, r, g, blue);
+			}
+		};
+
+		// Low-weight node evidence. It anchors isolated source pixels without
+		// overriding coherent triplets.
+		constexpr float node_weight = 0.10f;
+		int node_contributions = 0;
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const unsigned char color = scene_pixel(src_x, src_y);
+				const World_view_point dest = world_view.scene_to_display(
+						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+				const int dx = static_cast<int>(std::floor(dest.x));
+				const int dy = static_cast<int>(std::floor(dest.y));
+				if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+					continue;
+				}
+				add_rgb(dx, dy,
+						static_cast<float>(pal->get_red(color)),
+						static_cast<float>(pal->get_green(color)),
+						static_cast<float>(pal->get_blue(color)),
+						node_weight);
+				++node_contributions;
+			}
+		}
+
+		int triplets = 0;
+		int high_cohesion = 0;
+		int medium_cohesion = 0;
+		int low_cohesion = 0;
+		int segment_cells = 0;
+		double confidence_sum = 0.0;
+
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
+					const int x1 = src_x + delta.first;
+					const int y1 = src_y + delta.second;
+					const int x2 = src_x + delta.first * 2;
+					const int y2 = src_y + delta.second * 2;
+					if (x2 < scene_x || x2 >= scene_x + scene_size
+							|| y2 < scene_y || y2 >= scene_y + scene_size) {
+						continue;
+					}
+
+					const unsigned char a = scene_pixel(src_x, src_y);
+					const unsigned char b = scene_pixel(x1, y1);
+					const unsigned char cc = scene_pixel(x2, y2);
+
+					// Second colour derivative: A-2B+C. Zero means either a perfectly
+					// flat run or a perfectly regular gradient, both maximally coherent.
+					const int d2r = pal->get_red(a) - 2 * pal->get_red(b) + pal->get_red(cc);
+					const int d2g = pal->get_green(a) - 2 * pal->get_green(b) + pal->get_green(cc);
+					const int d2b = pal->get_blue(a) - 2 * pal->get_blue(b) + pal->get_blue(cc);
+					const double curvature = std::sqrt(
+							static_cast<double>(d2r * d2r + d2g * d2g + d2b * d2b));
+					const float confidence = static_cast<float>(1.0 / (1.0 + curvature / 6.0));
+					++triplets;
+					confidence_sum += confidence;
+					if (confidence >= 0.80f) {
+						++high_cohesion;
+					} else if (confidence >= 0.40f) {
+						++medium_cohesion;
+					} else {
+						++low_cohesion;
+					}
+
+					const World_view_point p0 = world_view.scene_to_display(
+							{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
+					const World_view_point p2 = world_view.scene_to_display(
+							{static_cast<double>(x2) + 0.5, static_cast<double>(y2) + 0.5});
+
+					const double vx = p2.x - p0.x;
+					const double vy = p2.y - p0.y;
+					if (std::abs(vx) <= std::abs(vy)) {
+						// Source '\\' run: vertical destination segment.
+						const double x = (p0.x + p2.x) * 0.5;
+						const double lo = std::min(p0.y, p2.y);
+						const double hi = std::max(p0.y, p2.y);
+						const double length = hi - lo;
+						if (length <= 0.0) {
+							continue;
+						}
+						const int dx = static_cast<int>(std::floor(x));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dy = first; dy <= last; ++dy) {
+							const double cell_lo = std::max(lo, static_cast<double>(dy));
+							const double cell_hi = std::min(hi, static_cast<double>(dy + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							double t0 = (cell_lo - p0.y) / vy;
+							double t1 = (cell_hi - p0.y) / vy;
+							if (t0 > t1) {
+								std::swap(t0, t1);
+							}
+							float r, g, blue;
+							average_colour_over(a, b, cc, t0, t1, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					} else {
+						// Source '/' run: horizontal destination segment.
+						const double y = (p0.y + p2.y) * 0.5;
+						const double lo = std::min(p0.x, p2.x);
+						const double hi = std::max(p0.x, p2.x);
+						const double length = hi - lo;
+						if (length <= 0.0) {
+							continue;
+						}
+						const int dy = static_cast<int>(std::floor(y));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dx = first; dx <= last; ++dx) {
+							const double cell_lo = std::max(lo, static_cast<double>(dx));
+							const double cell_hi = std::min(hi, static_cast<double>(dx + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							double t0 = (cell_lo - p0.x) / vx;
+							double t1 = (cell_hi - p0.x) / vx;
+							if (t0 > t1) {
+								std::swap(t0, t1);
+							}
+							float r, g, blue;
+							average_colour_over(a, b, cc, t0, t1, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					}
+				}
+			}
+		}
+
+		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		int holes = 0;
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const size_t pos = at(dx, dy);
+				if (accum_w[pos] <= 0.0f) {
+					++holes;
+					win->put_pixel8(debug_hole_red, dx, dy);
+				} else {
+					const float inv = 1.0f / accum_w[pos];
+					win->put_pixel8(
+							quantize_rgb(
+									static_cast<int>(std::lround(accum_r[pos] * inv)),
+									static_cast<int>(std::lround(accum_g[pos] * inv)),
+									static_cast<int>(std::lround(accum_b[pos] * inv))),
+							dx, dy);
+				}
+			}
+		}
+
+		static bool printed_triplet_stats = false;
+		if (!printed_triplet_stats) {
+			std::cout << "Forward triplets ALGO=WEIGHTED-TRIPLETS-V1"
+					 << ", nodes=" << node_contributions
+					 << ", triplets=" << triplets
+					 << ", segment_cells=" << segment_cells
+					 << ", cohesion=[high:" << high_cohesion
+					 << " medium:" << medium_cohesion
+					 << " low:" << low_cohesion << "]"
+					 << ", avg_confidence="
+					 << (triplets > 0 ? confidence_sum / triplets : 0.0)
+					 << ", holes=" << holes << std::endl;
+			printed_triplet_stats = true;
+		}
+	} else if (rotate_sampling_mode == 7) {
 		// Topology-preserving forward experiment.
 		// Map original source pixel centres, but also preserve exact-colour
 		// diagonal adjacencies as structural links. After a 45-degree rotation,
