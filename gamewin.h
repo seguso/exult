@@ -145,6 +145,7 @@ class Game_window {
 	// 2 = Scale3x + 9 samples
 	// 3 = HQ3x RGB + 9 samples
 	// 4 = HQ3x RGB + 4 samples
+	// 5 = Nearest3x + forward square splat
 	int rotate_sampling_mode = 0;
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
