@@ -700,7 +700,257 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
 
-	if (rotate_sampling_mode == 9) {
+	if (rotate_sampling_mode == 10) {
+		// Forward weighted-quadruplet experiment.
+		//
+		// Every four-pixel diagonal window participates and windows overlap by one
+		// source pixel: A-B-C-D, B-C-D-E, ... . A-B-C-D defines a continuous
+		// piecewise-linear colour function along a transformed segment of length
+		// 3*sqrt(2). Confidence is based on the third finite colour difference,
+		// A-3B+3C-D: constant colours, linear gradients, and smoothly curved
+		// quadratic-like gradients can all remain strong; abrupt irregular changes
+		// are down-weighted.
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		struct Quad_accum {
+			float r;
+			float g;
+			float b;
+			float w;
+		};
+		static thread_local std::vector<Quad_accum> accum;
+		accum.resize(dest_count);
+		std::fill(accum.begin(), accum.end(), Quad_accum{0.0f, 0.0f, 0.0f, 0.0f});
+
+		std::array<int, 256> pal_r;
+		std::array<int, 256> pal_g;
+		std::array<int, 256> pal_b;
+		for (int pi = 0; pi < 256; ++pi) {
+			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+		}
+
+		// Per channel A-3B+3C-D is in [-252,252], so squared RGB magnitude is
+		// at most 3*252^2 = 190512.
+		static const std::array<float, 190513> quad_confidence_lut = [] {
+			std::array<float, 190513> lut{};
+			for (size_t i = 0; i < lut.size(); ++i) {
+				const double third_difference = std::sqrt(static_cast<double>(i));
+				lut[i] = static_cast<float>(1.0 / (1.0 + third_difference / 6.0));
+			}
+			return lut;
+		}();
+
+		const auto at = [&](int x, int y) {
+			return static_cast<size_t>(y) * display_width + x;
+		};
+		const auto add_rgb = [&](int dx, int dy, float r, float g, float b, float weight) {
+			if (weight <= 0.0f || dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+				return;
+			}
+			Quad_accum& dst = accum[at(dx, dy)];
+			dst.r += r * weight;
+			dst.g += g * weight;
+			dst.b += b * weight;
+			dst.w += weight;
+		};
+
+		const auto average_colour_over = [&](unsigned char a, unsigned char b,
+				unsigned char cc, unsigned char d, double t0, double t1,
+				float& r, float& g, float& blue) {
+			t0 = std::clamp(t0, 0.0, 1.0);
+			t1 = std::clamp(t1, 0.0, 1.0);
+			if (t1 < t0) {
+				std::swap(t0, t1);
+			}
+			const double total = t1 - t0;
+			if (total <= 0.0) {
+				r = static_cast<float>(pal_r[a]);
+				g = static_cast<float>(pal_g[a]);
+				blue = static_cast<float>(pal_b[a]);
+				return;
+			}
+
+			double ar = 0.0;
+			double ag = 0.0;
+			double ab = 0.0;
+			double cur = t0;
+			while (cur < t1) {
+				double next;
+				int r0, g0, b0, r1, g1, b1;
+				double local_mid;
+				if (cur < (1.0 / 3.0)) {
+					next = std::min(t1, 1.0 / 3.0);
+					r0 = pal_r[a]; g0 = pal_g[a]; b0 = pal_b[a];
+					r1 = pal_r[b]; g1 = pal_g[b]; b1 = pal_b[b];
+					local_mid = ((cur + next) * 0.5) * 3.0;
+				} else if (cur < (2.0 / 3.0)) {
+					next = std::min(t1, 2.0 / 3.0);
+					r0 = pal_r[b]; g0 = pal_g[b]; b0 = pal_b[b];
+					r1 = pal_r[cc]; g1 = pal_g[cc]; b1 = pal_b[cc];
+					local_mid = (((cur + next) * 0.5) - 1.0 / 3.0) * 3.0;
+				} else {
+					next = t1;
+					r0 = pal_r[cc]; g0 = pal_g[cc]; b0 = pal_b[cc];
+					r1 = pal_r[d]; g1 = pal_g[d]; b1 = pal_b[d];
+					local_mid = (((cur + next) * 0.5) - 2.0 / 3.0) * 3.0;
+				}
+				const double span = next - cur;
+				ar += (r0 + (r1 - r0) * local_mid) * span;
+				ag += (g0 + (g1 - g0) * local_mid) * span;
+				ab += (b0 + (b1 - b0) * local_mid) * span;
+				cur = next;
+			}
+			const double inv = 1.0 / total;
+			r = static_cast<float>(ar * inv);
+			g = static_cast<float>(ag * inv);
+			blue = static_cast<float>(ab * inv);
+		};
+
+		constexpr float node_weight = 0.10f;
+		constexpr double quad_extent = 4.2426406871192851464;
+		constexpr double inv_quad_extent = 1.0 / quad_extent;
+		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
+		int node_contributions = 0;
+		int quadruplets = 0;
+		int high_cohesion = 0;
+		int medium_cohesion = 0;
+		int low_cohesion = 0;
+		int segment_cells = 0;
+		double confidence_sum = 0.0;
+
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			const World_view_point row_p0 = world_view.scene_to_display(
+					{static_cast<double>(scene_x) + 0.5, static_cast<double>(src_y) + 0.5});
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
+				const World_view_point p0{row_p0.x + offset, row_p0.y + offset};
+
+				const unsigned char node_color = scene_pixel(src_x, src_y);
+				const int node_dx = static_cast<int>(std::floor(p0.x));
+				const int node_dy = static_cast<int>(std::floor(p0.y));
+				if (node_dx >= 0 && node_dx < display_width && node_dy >= 0 && node_dy < display_height) {
+					add_rgb(node_dx, node_dy,
+							static_cast<float>(pal_r[node_color]),
+							static_cast<float>(pal_g[node_color]),
+							static_cast<float>(pal_b[node_color]),
+							node_weight);
+					++node_contributions;
+				}
+
+				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
+					const int x1 = src_x + delta.first;
+					const int y1 = src_y + delta.second;
+					const int x2 = src_x + delta.first * 2;
+					const int y2 = src_y + delta.second * 2;
+					const int x3 = src_x + delta.first * 3;
+					const int y3 = src_y + delta.second * 3;
+					if (x3 < scene_x || x3 >= scene_x + scene_size
+							|| y3 < scene_y || y3 >= scene_y + scene_size) {
+						continue;
+					}
+
+					const unsigned char a = node_color;
+					const unsigned char b = scene_pixel(x1, y1);
+					const unsigned char cc = scene_pixel(x2, y2);
+					const unsigned char d = scene_pixel(x3, y3);
+					const int d3r = pal_r[a] - 3 * pal_r[b] + 3 * pal_r[cc] - pal_r[d];
+					const int d3g = pal_g[a] - 3 * pal_g[b] + 3 * pal_g[cc] - pal_g[d];
+					const int d3b = pal_b[a] - 3 * pal_b[b] + 3 * pal_b[cc] - pal_b[d];
+					const int third2 = d3r * d3r + d3g * d3g + d3b * d3b;
+					const float confidence = quad_confidence_lut[static_cast<size_t>(third2)];
+					++quadruplets;
+					confidence_sum += confidence;
+					if (confidence >= 0.80f) {
+						++high_cohesion;
+					} else if (confidence >= 0.40f) {
+						++medium_cohesion;
+					} else {
+						++low_cohesion;
+					}
+
+					if (delta.second > 0) {
+						const double lo = p0.y;
+						const double hi = lo + quad_extent;
+						const int dx = static_cast<int>(std::floor(p0.x));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dy = first; dy <= last; ++dy) {
+							const double cell_lo = std::max(lo, static_cast<double>(dy));
+							const double cell_hi = std::min(hi, static_cast<double>(dy + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							const double t0 = (cell_lo - lo) * inv_quad_extent;
+							const double t1 = (cell_hi - lo) * inv_quad_extent;
+							float r, g, blue;
+							average_colour_over(a, b, cc, d, t0, t1, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					} else {
+						const double lo = p0.x;
+						const double hi = lo + quad_extent;
+						const int dy = static_cast<int>(std::floor(p0.y));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dx = first; dx <= last; ++dx) {
+							const double cell_lo = std::max(lo, static_cast<double>(dx));
+							const double cell_hi = std::min(hi, static_cast<double>(dx + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							const double t0 = (cell_lo - lo) * inv_quad_extent;
+							const double t1 = (cell_hi - lo) * inv_quad_extent;
+							float r, g, blue;
+							average_colour_over(a, b, cc, d, t0, t1, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					}
+				}
+			}
+		}
+
+		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		int holes = 0;
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const Quad_accum& src = accum[at(dx, dy)];
+				if (src.w <= 0.0f) {
+					++holes;
+					win->put_pixel8(debug_hole_red, dx, dy);
+				} else {
+					const float inv = 1.0f / src.w;
+					win->put_pixel8(
+							quantize_rgb(
+									static_cast<int>(std::lround(src.r * inv)),
+									static_cast<int>(std::lround(src.g * inv)),
+									static_cast<int>(std::lround(src.b * inv))),
+							dx, dy);
+				}
+			}
+		}
+
+		static bool printed_quad_stats = false;
+		if (!printed_quad_stats) {
+			std::cout << "Forward quadruplets ALGO=WEIGHTED-QUADRUPLETS-V1"
+					 << ", nodes=" << node_contributions
+					 << ", quadruplets=" << quadruplets
+					 << ", segment_cells=" << segment_cells
+					 << ", cohesion=[high:" << high_cohesion
+					 << " medium:" << medium_cohesion
+					 << " low:" << low_cohesion << "]"
+					 << ", avg_confidence="
+					 << (quadruplets > 0 ? confidence_sum / quadruplets : 0.0)
+					 << ", holes=" << holes << std::endl;
+			printed_quad_stats = true;
+		}
+	} else if (rotate_sampling_mode == 9) {
 		// Forward weighted-pair experiment.
 		//
 		// Every adjacent diagonal pair participates, including pairs inside flat
