@@ -713,10 +713,39 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		// distinction between "real lines" and uniform areas. Original source nodes
 		// contribute a small baseline weight so isolated details are not discarded.
 		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
-		std::vector<float> accum_r(dest_count, 0.0f);
-		std::vector<float> accum_g(dest_count, 0.0f);
-		std::vector<float> accum_b(dest_count, 0.0f);
-		std::vector<float> accum_w(dest_count, 0.0f);
+		static thread_local std::vector<float> accum_r;
+		static thread_local std::vector<float> accum_g;
+		static thread_local std::vector<float> accum_b;
+		static thread_local std::vector<float> accum_w;
+		accum_r.resize(dest_count);
+		accum_g.resize(dest_count);
+		accum_b.resize(dest_count);
+		accum_w.resize(dest_count);
+		std::fill(accum_r.begin(), accum_r.end(), 0.0f);
+		std::fill(accum_g.begin(), accum_g.end(), 0.0f);
+		std::fill(accum_b.begin(), accum_b.end(), 0.0f);
+		std::fill(accum_w.begin(), accum_w.end(), 0.0f);
+
+		std::array<int, 256> pal_r;
+		std::array<int, 256> pal_g;
+		std::array<int, 256> pal_b;
+		for (int pi = 0; pi < 256; ++pi) {
+			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+		}
+
+		// A-2B+C is in [-126,126] for 6-bit palette channels. The confidence
+		// function depends only on its squared RGB magnitude, so cache all possible
+		// values once instead of doing two sqrt() operations per source pixel.
+		static const std::array<float, 47629> confidence_lut = [] {
+			std::array<float, 47629> lut{};
+			for (size_t i = 0; i < lut.size(); ++i) {
+				const double curvature = std::sqrt(static_cast<double>(i));
+				lut[i] = static_cast<float>(1.0 / (1.0 + curvature / 6.0));
+			}
+			return lut;
+		}();
 
 		const auto at = [&](int x, int y) {
 			return static_cast<size_t>(y) * display_width + x;
@@ -742,9 +771,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				const double u = (t - 0.5) * 2.0;
 				return static_cast<float>(bv + (cv - bv) * u);
 			};
-			r = channel(pal->get_red(a), pal->get_red(b), pal->get_red(cc));
-			g = channel(pal->get_green(a), pal->get_green(b), pal->get_green(cc));
-			blue = channel(pal->get_blue(a), pal->get_blue(b), pal->get_blue(cc));
+			r = channel(pal_r[a], pal_r[b], pal_r[cc]);
+			g = channel(pal_g[a], pal_g[b], pal_g[cc]);
+			blue = channel(pal_b[a], pal_b[b], pal_b[cc]);
 		};
 		const auto average_colour_over = [&](unsigned char a, unsigned char b, unsigned char cc,
 				double t0, double t1, float& r, float& g, float& blue) {
@@ -786,9 +815,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					continue;
 				}
 				add_rgb(dx, dy,
-						static_cast<float>(pal->get_red(color)),
-						static_cast<float>(pal->get_green(color)),
-						static_cast<float>(pal->get_blue(color)),
+						static_cast<float>(pal_r[color]),
+						static_cast<float>(pal_g[color]),
+						static_cast<float>(pal_b[color]),
 						node_weight);
 				++node_contributions;
 			}
@@ -805,6 +834,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			const int src_y = scene_y + sy;
 			for (int sx = 0; sx < scene_size; ++sx) {
 				const int src_x = scene_x + sx;
+				const World_view_point p0 = world_view.scene_to_display(
+						{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
 					const int x1 = src_x + delta.first;
 					const int y1 = src_y + delta.second;
@@ -821,12 +852,11 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 					// Second colour derivative: A-2B+C. Zero means either a perfectly
 					// flat run or a perfectly regular gradient, both maximally coherent.
-					const int d2r = pal->get_red(a) - 2 * pal->get_red(b) + pal->get_red(cc);
-					const int d2g = pal->get_green(a) - 2 * pal->get_green(b) + pal->get_green(cc);
-					const int d2b = pal->get_blue(a) - 2 * pal->get_blue(b) + pal->get_blue(cc);
-					const double curvature = std::sqrt(
-							static_cast<double>(d2r * d2r + d2g * d2g + d2b * d2b));
-					const float confidence = static_cast<float>(1.0 / (1.0 + curvature / 6.0));
+					const int d2r = pal_r[a] - 2 * pal_r[b] + pal_r[cc];
+					const int d2g = pal_g[a] - 2 * pal_g[b] + pal_g[cc];
+					const int d2b = pal_b[a] - 2 * pal_b[b] + pal_b[cc];
+					const int curvature2 = d2r * d2r + d2g * d2g + d2b * d2b;
+					const float confidence = confidence_lut[static_cast<size_t>(curvature2)];
 					++triplets;
 					confidence_sum += confidence;
 					if (confidence >= 0.80f) {
@@ -837,13 +867,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						++low_cohesion;
 					}
 
-					const World_view_point p0 = world_view.scene_to_display(
-							{static_cast<double>(src_x) + 0.5, static_cast<double>(src_y) + 0.5});
-					const World_view_point p2 = world_view.scene_to_display(
-							{static_cast<double>(x2) + 0.5, static_cast<double>(y2) + 0.5});
-
-					const double vx = p2.x - p0.x;
-					const double vy = p2.y - p0.y;
+					// Over a two-pixel diagonal at exactly 45 degrees the transformed
+					// displacement is constant: '\\' => (0, 2*sqrt(2)),
+					// '/' => (2*sqrt(2), 0). Reuse p0 instead of transforming p2.
+					constexpr double two_sqrt_2 = 2.8284271247461900976;
+					const double vx = delta.second > 0 ? 0.0 : two_sqrt_2;
+					const double vy = delta.second > 0 ? two_sqrt_2 : 0.0;
+					const World_view_point p2{p0.x + vx, p0.y + vy};
 					if (std::abs(vx) <= std::abs(vy)) {
 						// Source '\\' run: vertical destination segment.
 						const double x = (p0.x + p2.x) * 0.5;
