@@ -139,6 +139,7 @@ class Game_window {
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
 	bool rotate_world = false;
+	bool rotate_filter_linear = true;
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
 	// the dominant requested direction instead of visibly snapping toward each
@@ -803,6 +804,10 @@ public:
 	}
 
 	void set_rotate_world_enabled(bool enabled);
+	bool is_rotate_filter_linear() const {
+		return rotate_filter_linear;
+	}
+	void set_rotate_filter_linear(bool linear);
 	void display_to_world(int& x, int& y) const;
 	void world_to_display(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
