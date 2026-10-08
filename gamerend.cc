@@ -778,6 +778,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		int max_tie_radius = 1;
 		std::array<int, 4> direction_wins = {0, 0, 0, 0};
 		int diagnostic_examples = 0;
+		static bool printed_edge_fill_examples = false;
 		for (int y0 = 0; y0 < display_height; ++y0) {
 			for (int x0 = 0; x0 < display_width; ++x0) {
 				const size_t pos = at(x0, y0);
@@ -948,7 +949,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						if (chosen_index >= 0) {
 							++direction_wins[static_cast<size_t>(chosen_index)];
 						}
-						if (initial_tied_count > 1 && diagnostic_examples < 16) {
+						if (initial_tied_count > 1 && !printed_edge_fill_examples && diagnostic_examples < 16) {
 							static constexpr const char* dir_names[] = {"H", "V", "D\\", "D/"};
 							std::cout << "Forward edge tie example " << (diagnostic_examples + 1)
 									  << ": xy=(" << x0 << "," << y0 << ")"
@@ -1030,6 +1031,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
+		printed_edge_fill_examples = true;
 		static bool printed_edge_fill_stats = false;
 		if (!printed_edge_fill_stats) {
 			std::cout << "Forward edge fill ALGO=EXPANDING-TIE-V2"
