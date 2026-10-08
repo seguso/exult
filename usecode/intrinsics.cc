@@ -2007,6 +2007,9 @@ USECODE_INTRINSIC(book_mode) {
 	if (!obj) {
 		return no_ret;
 	}
+	std::cerr << "[BOOK31D Exult] item shape=" << obj->get_shapenum()
+	          << " frame=" << obj->get_framenum()
+	          << " quality=" << obj->get_quality() << std::endl;
 
 	// check for avatar read here
 	const bool do_serp = !gwin->get_main_actor()->get_flag(Obj_flags::read);
