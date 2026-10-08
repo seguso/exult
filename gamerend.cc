@@ -700,7 +700,206 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
 
-	if (rotate_sampling_mode == 8) {
+	if (rotate_sampling_mode == 9) {
+		// Forward weighted-pair experiment.
+		//
+		// Every adjacent diagonal pair participates, including pairs inside flat
+		// colour fields. Pairs overlap by one source pixel along each diagonal run:
+		// A-B, B-C, C-D, ... . The pair defines a continuous linear colour function
+		// A->B over its transformed segment (length sqrt(2)); contribution weight
+		// depends on RGB similarity of the pair. All destination contributions are
+		// accumulated and normalized, with a small baseline node contribution so
+		// isolated source details remain represented.
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		struct Pair_accum {
+			float r;
+			float g;
+			float b;
+			float w;
+		};
+		static thread_local std::vector<Pair_accum> accum;
+		accum.resize(dest_count);
+		std::fill(accum.begin(), accum.end(), Pair_accum{0.0f, 0.0f, 0.0f, 0.0f});
+
+		std::array<int, 256> pal_r;
+		std::array<int, 256> pal_g;
+		std::array<int, 256> pal_b;
+		for (int pi = 0; pi < 256; ++pi) {
+			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+		}
+
+		// RGB pair distance is in [0, sqrt(3*63^2)]. Precompute the exact
+		// confidence function once; the hot loop indexes by squared distance.
+		static const std::array<float, 11908> pair_confidence_lut = [] {
+			std::array<float, 11908> lut{};
+			for (size_t i = 0; i < lut.size(); ++i) {
+				const double distance = std::sqrt(static_cast<double>(i));
+				lut[i] = static_cast<float>(1.0 / (1.0 + distance / 6.0));
+			}
+			return lut;
+		}();
+
+		const auto at = [&](int x, int y) {
+			return static_cast<size_t>(y) * display_width + x;
+		};
+		const auto add_rgb = [&](int dx, int dy, float r, float g, float b, float weight) {
+			if (weight <= 0.0f || dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+				return;
+			}
+			Pair_accum& dst = accum[at(dx, dy)];
+			dst.r += r * weight;
+			dst.g += g * weight;
+			dst.b += b * weight;
+			dst.w += weight;
+		};
+
+		constexpr float node_weight = 0.10f;
+		constexpr double pair_extent = 1.4142135623730950488;
+		constexpr double inv_pair_extent = 1.0 / pair_extent;
+		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
+		int node_contributions = 0;
+		int pairs = 0;
+		int high_cohesion = 0;
+		int medium_cohesion = 0;
+		int low_cohesion = 0;
+		int segment_cells = 0;
+		double confidence_sum = 0.0;
+
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			const World_view_point row_p0 = world_view.scene_to_display(
+					{static_cast<double>(scene_x) + 0.5, static_cast<double>(src_y) + 0.5});
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const double offset = static_cast<double>(sx) * half_sqrt_2_fast;
+				const World_view_point p0{row_p0.x + offset, row_p0.y + offset};
+
+				const unsigned char node_color = scene_pixel(src_x, src_y);
+				const int node_dx = static_cast<int>(std::floor(p0.x));
+				const int node_dy = static_cast<int>(std::floor(p0.y));
+				if (node_dx >= 0 && node_dx < display_width && node_dy >= 0 && node_dy < display_height) {
+					add_rgb(node_dx, node_dy,
+							static_cast<float>(pal_r[node_color]),
+							static_cast<float>(pal_g[node_color]),
+							static_cast<float>(pal_b[node_color]),
+							node_weight);
+					++node_contributions;
+				}
+
+				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
+					const int x1 = src_x + delta.first;
+					const int y1 = src_y + delta.second;
+					if (x1 < scene_x || x1 >= scene_x + scene_size
+							|| y1 < scene_y || y1 >= scene_y + scene_size) {
+						continue;
+					}
+
+					const unsigned char a = node_color;
+					const unsigned char b = scene_pixel(x1, y1);
+					const int dr = pal_r[a] - pal_r[b];
+					const int dg = pal_g[a] - pal_g[b];
+					const int db = pal_b[a] - pal_b[b];
+					const int distance2 = dr * dr + dg * dg + db * db;
+					const float confidence = pair_confidence_lut[static_cast<size_t>(distance2)];
+					++pairs;
+					confidence_sum += confidence;
+					if (confidence >= 0.80f) {
+						++high_cohesion;
+					} else if (confidence >= 0.40f) {
+						++medium_cohesion;
+					} else {
+						++low_cohesion;
+					}
+
+					const auto colour_at = [&](double t, float& r, float& g, float& blue) {
+						t = std::clamp(t, 0.0, 1.0);
+						r = static_cast<float>(pal_r[a] + (pal_r[b] - pal_r[a]) * t);
+						g = static_cast<float>(pal_g[a] + (pal_g[b] - pal_g[a]) * t);
+						blue = static_cast<float>(pal_b[a] + (pal_b[b] - pal_b[a]) * t);
+					};
+
+					if (delta.second > 0) {
+						// Source '\\' pair -> vertical destination segment.
+						const double lo = p0.y;
+						const double hi = lo + pair_extent;
+						const int dx = static_cast<int>(std::floor(p0.x));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dy = first; dy <= last; ++dy) {
+							const double cell_lo = std::max(lo, static_cast<double>(dy));
+							const double cell_hi = std::min(hi, static_cast<double>(dy + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							const double tmid = ((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent;
+							float r, g, blue;
+							colour_at(tmid, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					} else {
+						// Source '/' pair -> horizontal destination segment.
+						const double lo = p0.x;
+						const double hi = lo + pair_extent;
+						const int dy = static_cast<int>(std::floor(p0.y));
+						const int first = static_cast<int>(std::floor(lo));
+						const int last = static_cast<int>(std::floor(std::nextafter(hi, lo)));
+						for (int dx = first; dx <= last; ++dx) {
+							const double cell_lo = std::max(lo, static_cast<double>(dx));
+							const double cell_hi = std::min(hi, static_cast<double>(dx + 1));
+							const double coverage = cell_hi - cell_lo;
+							if (coverage <= 0.0) {
+								continue;
+							}
+							const double tmid = ((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent;
+							float r, g, blue;
+							colour_at(tmid, r, g, blue);
+							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							++segment_cells;
+						}
+					}
+				}
+			}
+		}
+
+		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		int holes = 0;
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const Pair_accum& src = accum[at(dx, dy)];
+				if (src.w <= 0.0f) {
+					++holes;
+					win->put_pixel8(debug_hole_red, dx, dy);
+				} else {
+					const float inv = 1.0f / src.w;
+					win->put_pixel8(
+							quantize_rgb(
+									static_cast<int>(std::lround(src.r * inv)),
+									static_cast<int>(std::lround(src.g * inv)),
+									static_cast<int>(std::lround(src.b * inv))),
+							dx, dy);
+				}
+			}
+		}
+
+		static bool printed_pair_stats = false;
+		if (!printed_pair_stats) {
+			std::cout << "Forward pairs ALGO=WEIGHTED-PAIRS-V1"
+					 << ", nodes=" << node_contributions
+					 << ", pairs=" << pairs
+					 << ", segment_cells=" << segment_cells
+					 << ", cohesion=[high:" << high_cohesion
+					 << " medium:" << medium_cohesion
+					 << " low:" << low_cohesion << "]"
+					 << ", avg_confidence="
+					 << (pairs > 0 ? confidence_sum / pairs : 0.0)
+					 << ", holes=" << holes << std::endl;
+			printed_pair_stats = true;
+		}
+	} else if (rotate_sampling_mode == 8) {
 		// Forward weighted-triplet experiment.
 		//
 		// Every three-pixel diagonal run participates, including runs inside flat
