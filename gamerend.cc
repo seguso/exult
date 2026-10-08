@@ -698,7 +698,187 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	const double source_dx = world_view.display_to_scene_x_step();
 	const double source_dy = world_view.display_to_scene_y_step();
 
-	if (rotate_sampling_mode == 5) {
+	if (rotate_sampling_mode == 6) {
+		// Pure forward point mapping from a logical Nearest3x lattice. Unlike
+		// square splatting, successfully mapped destination pixels are never
+		// blurred or expanded. Only holes left by the rotated lattice are filled,
+		// choosing the opposite-neighbour direction with the smallest RGB
+		// discontinuity (horizontal, vertical, or either diagonal).
+		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
+		std::vector<unsigned char> mapped(dest_count, static_cast<unsigned char>(pal->get_border_index()));
+		std::vector<unsigned char> real(dest_count, 0);
+		std::vector<float> best_dist(dest_count, 1.0e30f);
+
+		for (int sy = 0; sy < scene_size; ++sy) {
+			const int src_y = scene_y + sy;
+			for (int sx = 0; sx < scene_size; ++sx) {
+				const int src_x = scene_x + sx;
+				const unsigned char color = scene_pixel(src_x, src_y);
+				for (int oy = 0; oy < 3; ++oy) {
+					const double source_y = static_cast<double>(src_y)
+							+ (static_cast<double>(oy) + 0.5) / 3.0;
+					for (int ox = 0; ox < 3; ++ox) {
+						const double source_x = static_cast<double>(src_x)
+								+ (static_cast<double>(ox) + 0.5) / 3.0;
+						const World_view_point dest = world_view.scene_to_display({source_x, source_y});
+						const int dx = static_cast<int>(std::floor(dest.x));
+						const int dy = static_cast<int>(std::floor(dest.y));
+						if (dx < 0 || dx >= display_width || dy < 0 || dy >= display_height) {
+							continue;
+						}
+						const double ddx = dest.x - (static_cast<double>(dx) + 0.5);
+						const double ddy = dest.y - (static_cast<double>(dy) + 0.5);
+						const float d2 = static_cast<float>(ddx * ddx + ddy * ddy);
+						const size_t pos = static_cast<size_t>(dy) * display_width + dx;
+						if (!real[pos] || d2 < best_dist[pos]) {
+							real[pos] = 1;
+							best_dist[pos] = d2;
+							mapped[pos] = color;
+						}
+					}
+				}
+			}
+		}
+
+		const auto color_distance = [&](unsigned char a, unsigned char b) {
+			const int dr = pal->get_red(a) - pal->get_red(b);
+			const int dg = pal->get_green(a) - pal->get_green(b);
+			const int db = pal->get_blue(a) - pal->get_blue(b);
+			return dr * dr + dg * dg + db * db;
+		};
+		const auto average_pair = [&](unsigned char a, unsigned char b) {
+			return quantize_rgb(
+					(pal->get_red(a) + pal->get_red(b) + 1) / 2,
+					(pal->get_green(a) + pal->get_green(b) + 1) / 2,
+					(pal->get_blue(a) + pal->get_blue(b) + 1) / 2);
+		};
+		const auto at = [&](int x, int y) {
+			return static_cast<size_t>(y) * display_width + x;
+		};
+
+		std::vector<unsigned char> filled = mapped;
+		std::vector<unsigned char> known = real;
+		std::vector<unsigned char> pass1(dest_count, 0);
+
+		int total_holes = 0;
+		int adjacent_holes = 0;
+		int filled_pass1 = 0;
+		for (int y0 = 0; y0 < display_height; ++y0) {
+			for (int x0 = 0; x0 < display_width; ++x0) {
+				const size_t pos = at(x0, y0);
+				if (real[pos]) {
+					continue;
+				}
+				++total_holes;
+				if ((x0 > 0 && !real[at(x0 - 1, y0)])
+						|| (x0 + 1 < display_width && !real[at(x0 + 1, y0)])
+						|| (y0 > 0 && !real[at(x0, y0 - 1)])
+						|| (y0 + 1 < display_height && !real[at(x0, y0 + 1)])) {
+					++adjacent_holes;
+				}
+
+				int best = 1 << 30;
+				unsigned char best_color = static_cast<unsigned char>(pal->get_border_index());
+				bool have = false;
+				const auto consider = [&](int ax, int ay, int bx, int by) {
+					if (ax < 0 || ax >= display_width || bx < 0 || bx >= display_width
+							|| ay < 0 || ay >= display_height || by < 0 || by >= display_height) {
+						return;
+					}
+					const size_t pa = at(ax, ay);
+					const size_t pb = at(bx, by);
+					if (!real[pa] || !real[pb]) {
+						return;
+					}
+					const int d = color_distance(mapped[pa], mapped[pb]);
+					if (!have || d < best) {
+						have = true;
+						best = d;
+						best_color = average_pair(mapped[pa], mapped[pb]);
+					}
+				};
+				consider(x0 - 1, y0, x0 + 1, y0);
+				consider(x0, y0 - 1, x0, y0 + 1);
+				consider(x0 - 1, y0 - 1, x0 + 1, y0 + 1);
+				consider(x0 + 1, y0 - 1, x0 - 1, y0 + 1);
+				if (have) {
+					filled[pos] = best_color;
+					known[pos] = 1;
+					pass1[pos] = 1;
+					++filled_pass1;
+				}
+			}
+		}
+
+		// A second pass handles the uncommon case where a hole did not have a
+		// complete pair of original samples. Reconstructed samples may participate
+		// only when the opposite endpoint is still a real forward-mapped pixel;
+		// never bridge a hole using two inferred colours.
+		int filled_pass2 = 0;
+		for (int y0 = 0; y0 < display_height; ++y0) {
+			for (int x0 = 0; x0 < display_width; ++x0) {
+				const size_t pos = at(x0, y0);
+				if (known[pos]) {
+					continue;
+				}
+				int best = 1 << 30;
+				unsigned char best_color = static_cast<unsigned char>(pal->get_border_index());
+				bool have = false;
+				const auto consider = [&](int ax, int ay, int bx, int by) {
+					if (ax < 0 || ax >= display_width || bx < 0 || bx >= display_width
+							|| ay < 0 || ay >= display_height || by < 0 || by >= display_height) {
+						return;
+					}
+					const size_t pa = at(ax, ay);
+					const size_t pb = at(bx, by);
+					if (!known[pa] || !known[pb] || (!real[pa] && !real[pb])) {
+						return;
+					}
+					const int d = color_distance(filled[pa], filled[pb]);
+					if (!have || d < best) {
+						have = true;
+						best = d;
+						best_color = average_pair(filled[pa], filled[pb]);
+					}
+				};
+				consider(x0 - 1, y0, x0 + 1, y0);
+				consider(x0, y0 - 1, x0, y0 + 1);
+				consider(x0 - 1, y0 - 1, x0 + 1, y0 + 1);
+				consider(x0 + 1, y0 - 1, x0 - 1, y0 + 1);
+				if (have) {
+					filled[pos] = best_color;
+					known[pos] = 1;
+					++filled_pass2;
+				}
+			}
+		}
+
+		int fallback_holes = 0;
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				const size_t pos = at(dx, dy);
+				if (!known[pos]) {
+					++fallback_holes;
+					const World_view_point source = world_view.display_to_scene(
+							{static_cast<double>(dx) + 0.5, static_cast<double>(dy) + 0.5});
+					filled[pos] = scene_pixel(
+							static_cast<int>(std::floor(source.x)),
+							static_cast<int>(std::floor(source.y)));
+				}
+				win->put_pixel8(filled[pos], dx, dy);
+			}
+		}
+
+		static bool printed_edge_fill_stats = false;
+		if (!printed_edge_fill_stats) {
+			cout << "Forward edge fill: holes=" << total_holes
+				 << ", adjacent=" << adjacent_holes
+				 << ", pass1=" << filled_pass1
+				 << ", pass2=" << filled_pass2
+				 << ", fallback=" << fallback_holes << std::endl;
+			printed_edge_fill_stats = true;
+		}
+	} else if (rotate_sampling_mode == 5) {
 		// Forward square splatting experiment.
 		//
 		// Start from a plain 3x nearest-neighbour lattice (no Scale3x/HQ rules).
