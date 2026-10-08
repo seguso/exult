@@ -403,9 +403,11 @@ Game_window::Game_window(
 	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
+	config->value("config/gameplay/rotate_filter_linear", rotate_filter_linear, true);
 	world_view.set_enabled(rotate_world);
 	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
+	config->set("config/gameplay/rotate_filter_linear", rotate_filter_linear ? "yes" : "no", false);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -577,10 +579,12 @@ void Game_window::resize_rotate_scene() {
 	if (rotated_world_layer >= 0) {
 		win->layer_set_opaque(rotated_world_layer, true);
 		win->layer_set_game_scaler(rotated_world_layer, true);
+		win->layer_set_rotate_linear(rotated_world_layer, rotate_filter_linear);
 		win->layer_set_visible(rotated_world_layer, true);
 		cout << "Rotate backend: sdl-scaled-expanded-layer, scaler="
 			 << Image_window::get_name_for_scaler(win->get_scaler())
 			 << ", fill_scaler=" << Image_window::get_name_for_scaler(win->get_fill_scaler())
+			 << ", rotate_filter=" << (rotate_filter_linear ? "Linear" : "Point")
 			 << ", scene=" << scene_size << "x" << scene_size << std::endl;
 	}
 }
@@ -592,6 +596,20 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 	config->set("config/gameplay/rotate_world", enabled ? "yes" : "no", true);
 	set_all_dirty();
 	paint();
+}
+
+void Game_window::set_rotate_filter_linear(bool linear) {
+	if (rotate_filter_linear == linear) {
+		return;
+	}
+	rotate_filter_linear = linear;
+	config->set("config/gameplay/rotate_filter_linear", rotate_filter_linear ? "yes" : "no", true);
+	cout << "Rotate texture filter: " << (rotate_filter_linear ? "Linear" : "Point") << std::endl;
+	if (rotated_world_layer >= 0) {
+		win->layer_set_rotate_linear(rotated_world_layer, rotate_filter_linear);
+		set_all_dirty();
+		paint();
+	}
 }
 
 void Game_window::set_modern_movement_tau_ms(int ms) {
