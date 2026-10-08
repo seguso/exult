@@ -371,6 +371,7 @@ void GameDisplayOptions_gump::build_buttons() {
 	rotate_quality_text.emplace_back("Nearest3x / forward square splat");
 	rotate_quality_text.emplace_back("Forward 1x / edge fill");
 	rotate_quality_text.emplace_back("Forward topology / red holes");
+	rotate_quality_text.emplace_back("Forward weighted triplets / red holes");
 #endif
 	buttons[id_rotate_sampling_mode] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
