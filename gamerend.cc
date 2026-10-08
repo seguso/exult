@@ -492,9 +492,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// Mode 0 deliberately keeps the clean2 Scale2x + 4-sample path bit-for-bit
 	// equivalent. Modes 1/2 use the standard Scale3x neighbourhood rules and
 	// differ only in the final sampling density. Modes 3/4 run Exult's HQ3x
-	// algorithm into an RGB buffer. Mode 5 is deliberately different: it
-	// generates a plain Nearest3x lattice and forward-maps each subpixel centre,
-	// splatting an axis-aligned square in destination space.
+	// algorithm into an RGB buffer. Modes 5/6/7 are the retained weighted
+	// forward triplet/pair/quadruplet renderers.
 	const auto scene_pixel = [&](int x, int y) {
 		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
 		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
@@ -916,14 +915,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Quad_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(
@@ -1063,12 +1062,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						++low_cohesion;
 					}
 
-					const auto colour_at = [&](double t, float& r, float& g, float& blue) {
-						t = std::clamp(t, 0.0, 1.0);
-						r = static_cast<float>(pal_r[a] + (pal_r[b] - pal_r[a]) * t);
-						g = static_cast<float>(pal_g[a] + (pal_g[b] - pal_g[a]) * t);
-						blue = static_cast<float>(pal_b[a] + (pal_b[b] - pal_b[a]) * t);
-					};
+					// The rasterized cell midpoint is guaranteed to lie on the
+					// A->B segment, so no per-sample clamp/helper is needed.
+					const float ar = static_cast<float>(pal_r[a]);
+					const float ag = static_cast<float>(pal_g[a]);
+					const float ab = static_cast<float>(pal_b[a]);
+					const float dcr = static_cast<float>(pal_r[b] - pal_r[a]);
+					const float dcg = static_cast<float>(pal_g[b] - pal_g[a]);
+					const float dcb = static_cast<float>(pal_b[b] - pal_b[a]);
 
 					if (delta.second > 0) {
 						// Source '\\' pair -> vertical destination segment.
@@ -1084,10 +1085,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							if (coverage <= 0.0) {
 								continue;
 							}
-							const double tmid = ((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent;
-							float r, g, blue;
-							colour_at(tmid, r, g, blue);
-							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							const float tmid = static_cast<float>(((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent);
+							add_rgb(
+									dx, dy,
+									ar + dcr * tmid,
+									ag + dcg * tmid,
+									ab + dcb * tmid,
+									confidence * static_cast<float>(coverage));
 							++segment_cells;
 						}
 					} else {
@@ -1104,10 +1108,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							if (coverage <= 0.0) {
 								continue;
 							}
-							const double tmid = ((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent;
-							float r, g, blue;
-							colour_at(tmid, r, g, blue);
-							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
+							const float tmid = static_cast<float>(((cell_lo + cell_hi) * 0.5 - lo) * inv_pair_extent);
+							add_rgb(
+									dx, dy,
+									ar + dcr * tmid,
+									ag + dcg * tmid,
+									ab + dcb * tmid,
+									confidence * static_cast<float>(coverage));
 							++segment_cells;
 						}
 					}
@@ -1115,14 +1122,14 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Pair_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(
@@ -1359,7 +1366,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		const unsigned char debug_hole_red = static_cast<unsigned char>(pal->find_color(63, 0, 0));
+		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
 		int holes = 0;
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
@@ -1367,7 +1374,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				const Triplet_accum& src = accum[pos];
 				if (src.w <= 0.0f) {
 					++holes;
-					win->put_pixel8(debug_hole_red, dx, dy);
+					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
 					win->put_pixel8(

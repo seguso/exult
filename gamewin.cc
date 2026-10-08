@@ -405,13 +405,10 @@ Game_window::Game_window(
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
 #ifdef USE_HQ3X_SCALER
-	// Migrate the previous experimental numbering:
-	// 8/9/10 were weighted triplets/pairs/quadruplets.
+	// Migrate the previous numbering: 8/9/10 were the weighted
+	// triplet/pair/quadruplet modes. Values 5/6/7 are now reused directly.
 	if (rotate_sampling_mode >= 8 && rotate_sampling_mode <= 10) {
 		rotate_sampling_mode -= 3;
-	} else if (rotate_sampling_mode >= 5 && rotate_sampling_mode <= 7) {
-		// Removed failed forward experiments: fall back to weighted triplets.
-		rotate_sampling_mode = 5;
 	}
 	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 7);
 #else
