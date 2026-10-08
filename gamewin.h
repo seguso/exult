@@ -145,8 +145,6 @@ class Game_window {
 	// 2 = Scale3x + 9 samples
 	// 3 = HQ3x RGB + 9 samples
 	// 4 = HQ3x RGB + 4 samples
-	// 5 = Nearest3x + forward square splat
-	// 6 = Original 1x forward point map + edge-directed hole fill
 	// 5 = Forward weighted diagonal triplets with continuous colour
 	// 6 = Forward weighted diagonal pairs with continuous colour
 	// 7 = Forward weighted diagonal quadruplets with continuous colour
