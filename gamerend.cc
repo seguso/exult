@@ -489,7 +489,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	// Reconstruct the scene with a pixel-art-aware scaler before rotation.
 	// Mode 0 deliberately keeps the clean2 Scale2x + 4-sample path bit-for-bit
 	// equivalent. Modes 1/2 use the standard Scale3x neighbourhood rules and
-	// differ only in the final sampling density.
+	// differ only in the final sampling density. Mode 3 runs Exult's HQ3x
+	// algorithm into an RGB buffer, then performs the same 9-sample rotation
+	// before a single final quantization back to the live U7 palette.
 	const auto scene_pixel = [&](int x, int y) {
 		x = std::clamp(x, scene_x, scene_x + scene_size - 1);
 		y = std::clamp(y, scene_y, scene_y + scene_size - 1);
@@ -528,7 +530,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				rotate_scene_2x->put_pixel8(e3, hx + 1, hy + 1);
 			}
 		}
-	} else {
+	} else if (rotate_sampling_mode <= 2) {
 		rotate_scene_3x->clear_clip();
 		rotate_scene_3x->fill8(pal->get_border_index());
 		for (int sy = 0; sy < scene_size; ++sy) {
@@ -569,6 +571,26 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 	}
+#ifdef USE_HQ3X_SCALER
+	else {
+		// HQ3x produces RGB directly. Feed it a compact copy of the expanded
+		// paletted scene so no palette quantization happens between HQ3x and
+		// the rotated 9-sample integration.
+		std::vector<unsigned char> source8(
+				static_cast<size_t>(scene_size) * static_cast<size_t>(scene_size));
+		for (int sy = 0; sy < scene_size; ++sy) {
+			for (int sx = 0; sx < scene_size; ++sx) {
+				source8[static_cast<size_t>(sy) * scene_size + sx]
+						= scene_pixel(scene_x + sx, scene_y + sy);
+			}
+		}
+		Rotate_hq3x_rgb_manip manip(pal);
+		Scale_Hq3x<uint32, Rotate_hq3x_rgb_manip>(
+				source8.data(), 0, 0, scene_size, scene_size,
+				scene_size, scene_size, rotate_scene_hq3x.data(),
+				scene_size * 3, manip);
+	}
+#endif
 
 	static thread_local std::array<unsigned char, 64 * 64 * 64> rotate_blend_cache;
 	rotate_blend_cache.fill(255);
@@ -596,6 +618,37 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 		return scaled->get_pixel8(sx, sy);
 	};
+	const auto sample_hq3x = [&](const World_view_point& source) {
+		const double fx = (source.x - static_cast<double>(scene_x)) * 3.0 + 0.5;
+		const double fy = (source.y - static_cast<double>(scene_y)) * 3.0 + 0.5;
+		const int sx = static_cast<int>(std::floor(fx));
+		const int sy = static_cast<int>(std::floor(fy));
+		const int hi_size = scene_size * 3;
+		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
+			const unsigned char border = static_cast<unsigned char>(pal->get_border_index());
+			return (static_cast<uint32>(pal->get_red(border) << 2) << 16)
+					| (static_cast<uint32>(pal->get_green(border) << 2) << 8)
+					| static_cast<uint32>(pal->get_blue(border) << 2);
+		}
+		return rotate_scene_hq3x[static_cast<size_t>(sy) * hi_size + sx];
+	};
+	const auto blend9_rgb = [&](const std::array<uint32, 9>& samples) {
+		int r = 0;
+		int g = 0;
+		int b = 0;
+		for (const uint32 sample : samples) {
+			r += static_cast<int>((sample >> 16) & 0xffu);
+			g += static_cast<int>((sample >> 8) & 0xffu);
+			b += static_cast<int>(sample & 0xffu);
+		}
+		// HQ3x works in an 8-bit-like RGB range. Convert the 9-sample average
+		// back to Exult's 6-bit palette channels only once, at the very end.
+		return quantize_rgb(
+				(r + 18) / 36,
+				(g + 18) / 36,
+				(b + 18) / 36);
+	};
+
 	const auto blend4 = [&](unsigned char a, unsigned char b, unsigned char c0, unsigned char d) {
 		if (a == b && a == c0 && a == d) {
 			return a;
@@ -666,13 +719,32 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				}
 			}
 			for (int dx = 0; dx < display_width; ++dx) {
-				std::array<unsigned char, 9> samples;
-				for (size_t n = 0; n < samples.size(); ++n) {
-					samples[n] = sample_scaled(sources[n], 3, rotate_scene_3x.get());
-					sources[n].x += source_dx;
-					sources[n].y += source_dy;
+				if (rotate_sampling_mode == 2) {
+					std::array<unsigned char, 9> samples;
+					for (size_t n = 0; n < samples.size(); ++n) {
+						samples[n] = sample_scaled(sources[n], 3, rotate_scene_3x.get());
+						sources[n].x += source_dx;
+						sources[n].y += source_dy;
+					}
+					win->put_pixel8(blend9(samples), dx, dy);
+				} else {
+#ifdef USE_HQ3X_SCALER
+					std::array<uint32, 9> samples;
+					for (size_t n = 0; n < samples.size(); ++n) {
+						samples[n] = sample_hq3x(sources[n]);
+						sources[n].x += source_dx;
+						sources[n].y += source_dy;
+					}
+					win->put_pixel8(blend9_rgb(samples), dx, dy);
+#else
+					// Builds without HQ3x clamp mode selection to 0..2, so this is
+					// unreachable. Keep source stepping complete for safety.
+					for (auto& source : sources) {
+						source.x += source_dx;
+						source.y += source_dy;
+					}
+#endif
 				}
-				win->put_pixel8(blend9(samples), dx, dy);
 			}
 		}
 	}
