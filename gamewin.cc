@@ -571,14 +571,17 @@ void Game_window::resize_rotate_scene() {
 	rotate_scene.reset(static_cast<Image_buffer8*>(buffer.release()));
 	rotate_scene->set_offset(world_view.get_scene_offset_x(), world_view.get_scene_offset_y());
 
-	// Pixel-art-aware rotation uses a persistent 2x intermediate. Keep this
-	// buffer in ordinary 0-based coordinates; paint_rotated() maps logical
-	// scene coordinates into it after running the Scale2x reconstruction.
-	auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
-	rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
-
-	auto buffer_3x = win->create_buffer(scene_size * 3, scene_size * 3);
-	rotate_scene_3x.reset(static_cast<Image_buffer8*>(buffer_3x.release()));
+	// Allocate only the intermediate required by the selected A/B mode so the
+	// clean2 baseline keeps its original memory/per-frame characteristics.
+	if (rotate_sampling_mode == 0) {
+		auto buffer_2x = win->create_buffer(scene_size * 2, scene_size * 2);
+		rotate_scene_2x.reset(static_cast<Image_buffer8*>(buffer_2x.release()));
+		rotate_scene_3x.reset();
+	} else {
+		auto buffer_3x = win->create_buffer(scene_size * 3, scene_size * 3);
+		rotate_scene_3x.reset(static_cast<Image_buffer8*>(buffer_3x.release()));
+		rotate_scene_2x.reset();
+	}
 }
 
 void Game_window::set_rotate_world_enabled(bool enabled) {
@@ -598,6 +601,7 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 	rotate_sampling_mode = mode;
 	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, true);
 	if (rotate_world) {
+		resize_rotate_scene();
 		set_all_dirty();
 		paint();
 	}
