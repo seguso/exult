@@ -758,7 +758,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 		std::vector<unsigned char> filled = mapped;
 		std::vector<unsigned char> known = real;
-		std::vector<unsigned char> pass1(dest_count, 0);
 
 		int total_holes = 0;
 		int adjacent_holes = 0;
@@ -804,7 +803,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				if (have) {
 					filled[pos] = best_color;
 					known[pos] = 1;
-					pass1[pos] = 1;
 					++filled_pass1;
 				}
 			}
