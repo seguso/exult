@@ -404,7 +404,11 @@ Game_window::Game_window(
 	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
+#ifdef USE_HQ3X_SCALER
 	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 3);
+#else
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
+#endif
 	world_view.set_enabled(rotate_world);
 	resize_rotate_scene();
 	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
@@ -602,7 +606,11 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 }
 
 void Game_window::set_rotate_sampling_mode(int mode) {
+#ifdef USE_HQ3X_SCALER
 	mode = std::clamp(mode, 0, 3);
+#else
+	mode = std::clamp(mode, 0, 2);
+#endif
 	if (rotate_sampling_mode == mode) {
 		return;
 	}
