@@ -197,6 +197,7 @@ public:
 		double        angle = 0.0;          // Optional SDL composite rotation.
 		SDL_FPoint    angle_center{0.0f, 0.0f};
 		bool          game_scaler = false;  // Use the world's scaler rather than UI scaler config.
+		bool          rotate_linear = true; // Linear vs point sampling for SDL layer rotation.
 		// Optional 256-entry ARGB override, one per palette index. A non-zero
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
@@ -739,6 +740,7 @@ public:
 	// Make a layer use the main world's scaler/filtering instead of UI scaler
 	// configuration. Used by the experimental expanded rotated-world layer.
 	void layer_set_game_scaler(int handle, bool enabled);
+	void layer_set_rotate_linear(int handle, bool enabled);
 
 	// -------- Layer scaling config --------
 	// Configure how layers (conversation, mouse cursor) are scaled and
