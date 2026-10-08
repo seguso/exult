@@ -139,6 +139,11 @@ class Game_window {
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
 	bool rotate_world = false;
+	// Experimental rotated-world reconstruction/sampling quality:
+	// 0 = Scale2x + 4 samples (clean2 baseline)
+	// 1 = Scale3x + 4 samples
+	// 2 = Scale3x + 9 samples
+	int rotate_sampling_mode = 0;
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
 	// the dominant requested direction instead of visibly snapping toward each
@@ -147,6 +152,7 @@ class Game_window {
 	World_view_transform world_view;
 	std::unique_ptr<Image_buffer8> rotate_scene;
 	std::unique_ptr<Image_buffer8> rotate_scene_2x;
+	std::unique_ptr<Image_buffer8> rotate_scene_3x;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
@@ -802,6 +808,10 @@ public:
 	}
 
 	void set_rotate_world_enabled(bool enabled);
+	int get_rotate_sampling_mode() const {
+		return rotate_sampling_mode;
+	}
+	void set_rotate_sampling_mode(int mode);
 	void display_to_world(int& x, int& y) const;
 	void world_to_display(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
