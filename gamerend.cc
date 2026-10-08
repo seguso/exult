@@ -39,6 +39,7 @@
 #include "ignore_unused_variable_warning.h"
 #include "objiter.h"
 #include "perf.h"
+#include "palette.h"
 
 #ifdef USE_HQ3X_SCALER
 #	include "scale_hq3x.h"
