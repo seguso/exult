@@ -405,7 +405,7 @@ Game_window::Game_window(
 	config->value("config/gameplay/rotate_world", rotate_world, false);
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
 #ifdef USE_HQ3X_SCALER
-	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 8);
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 9);
 #else
 	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
 #endif
@@ -612,7 +612,7 @@ void Game_window::set_rotate_world_enabled(bool enabled) {
 
 void Game_window::set_rotate_sampling_mode(int mode) {
 #ifdef USE_HQ3X_SCALER
-	mode = std::clamp(mode, 0, 8);
+	mode = std::clamp(mode, 0, 9);
 #else
 	mode = std::clamp(mode, 0, 2);
 #endif
@@ -630,7 +630,8 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 			"Nearest3x + forward square splat",
 			"Forward 1x + edge-directed hole fill",
 			"Forward topology + diagonal links",
-			"Forward weighted diagonal triplets"};
+			"Forward weighted diagonal triplets",
+			"Forward weighted diagonal pairs"};
 	cout << "Rotate quality: " << names[rotate_sampling_mode] << std::endl;
 	if (rotate_world) {
 		resize_rotate_scene();
