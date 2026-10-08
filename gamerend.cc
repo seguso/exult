@@ -713,18 +713,15 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		// distinction between "real lines" and uniform areas. Original source nodes
 		// contribute a small baseline weight so isolated details are not discarded.
 		const size_t dest_count = static_cast<size_t>(display_width) * display_height;
-		static thread_local std::vector<float> accum_r;
-		static thread_local std::vector<float> accum_g;
-		static thread_local std::vector<float> accum_b;
-		static thread_local std::vector<float> accum_w;
-		accum_r.resize(dest_count);
-		accum_g.resize(dest_count);
-		accum_b.resize(dest_count);
-		accum_w.resize(dest_count);
-		std::fill(accum_r.begin(), accum_r.end(), 0.0f);
-		std::fill(accum_g.begin(), accum_g.end(), 0.0f);
-		std::fill(accum_b.begin(), accum_b.end(), 0.0f);
-		std::fill(accum_w.begin(), accum_w.end(), 0.0f);
+		struct Triplet_accum {
+			float r;
+			float g;
+			float b;
+			float w;
+		};
+		static thread_local std::vector<Triplet_accum> accum;
+		accum.resize(dest_count);
+		std::fill(accum.begin(), accum.end(), Triplet_accum{0.0f, 0.0f, 0.0f, 0.0f});
 
 		std::array<int, 256> pal_r;
 		std::array<int, 256> pal_g;
@@ -755,10 +752,11 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				return;
 			}
 			const size_t pos = at(dx, dy);
-			accum_r[pos] += r * weight;
-			accum_g[pos] += g * weight;
-			accum_b[pos] += b * weight;
-			accum_w[pos] += weight;
+			Triplet_accum& dst = accum[pos];
+			dst.r += r * weight;
+			dst.g += g * weight;
+			dst.b += b * weight;
+			dst.w += weight;
 		};
 		const auto colour_at = [&](unsigned char a, unsigned char b, unsigned char cc, double t,
 				float& r, float& g, float& blue) {
@@ -916,16 +914,17 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const size_t pos = at(dx, dy);
-				if (accum_w[pos] <= 0.0f) {
+				const Triplet_accum& src = accum[pos];
+				if (src.w <= 0.0f) {
 					++holes;
 					win->put_pixel8(debug_hole_red, dx, dy);
 				} else {
-					const float inv = 1.0f / accum_w[pos];
+					const float inv = 1.0f / src.w;
 					win->put_pixel8(
 							quantize_rgb(
-									static_cast<int>(std::lround(accum_r[pos] * inv)),
-									static_cast<int>(std::lround(accum_g[pos] * inv)),
-									static_cast<int>(std::lround(accum_b[pos] * inv))),
+									static_cast<int>(std::lround(src.r * inv)),
+									static_cast<int>(std::lround(src.g * inv)),
+									static_cast<int>(std::lround(src.b * inv))),
 							dx, dy);
 				}
 			}
