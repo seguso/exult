@@ -869,7 +869,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 		static bool printed_edge_fill_stats = false;
 		if (!printed_edge_fill_stats) {
-			cout << "Forward edge fill: holes=" << total_holes
+			std::cout << "Forward edge fill: holes=" << total_holes
 				 << ", adjacent=" << adjacent_holes
 				 << ", pass1=" << filled_pass1
 				 << ", pass2=" << filled_pass2
