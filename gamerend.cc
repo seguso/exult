@@ -40,9 +40,36 @@
 #include "objiter.h"
 #include "perf.h"
 
+#ifdef USE_HQ3X_SCALER
+#	include "scale_hq3x.h"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
+
+#ifdef USE_HQ3X_SCALER
+namespace {
+class Rotate_hq3x_rgb_manip {
+	const Palette* palette;
+
+public:
+	explicit Rotate_hq3x_rgb_manip(const Palette* p) : palette(p) {}
+
+	void split_source(unsigned char pix, unsigned int& r, unsigned int& g, unsigned int& b) const {
+		// Palette channels are 6-bit in Exult. HQ3x expects an 8-bit-like RGB
+		// range for its YUV edge tests and interpolation.
+		r = static_cast<unsigned int>(palette->get_red(pix)) << 2;
+		g = static_cast<unsigned int>(palette->get_green(pix)) << 2;
+		b = static_cast<unsigned int>(palette->get_blue(pix)) << 2;
+	}
+
+	uint32 rgb(unsigned int r, unsigned int g, unsigned int b) const {
+		return ((r & 0xffu) << 16) | ((g & 0xffu) << 8) | (b & 0xffu);
+	}
+};
+}    // namespace
+#endif
 
 /*
  *  Paint just the map with given top-left-corner tile.
