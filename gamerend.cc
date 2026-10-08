@@ -48,6 +48,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <utility>
 
 #ifdef USE_HQ3X_SCALER
 namespace {
@@ -736,14 +737,21 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				return;
 			}
 			if (mapped[pos] == color) {
-				support[pos] = static_cast<unsigned short>(
-						std::min<int>(65535, static_cast<int>(support[pos]) + weight));
+				// Repeated node hits do not manufacture structural confidence.
+				// Structural links do accumulate, so the middle of a coherent run
+				// naturally becomes stronger than a single two-pixel connection.
+				if (weight > 1) {
+					support[pos] = static_cast<unsigned short>(
+							std::min<int>(65535, static_cast<int>(support[pos]) + weight));
+				}
 				best_dist[pos] = std::min(best_dist[pos], d2);
 				return;
 			}
-			++link_conflicts;
+			if (weight > 1) {
+				++link_conflicts;
+			}
 			if (weight > support[pos] || (weight == support[pos] && d2 < best_dist[pos])) {
-				if (weight > support[pos]) {
+				if (weight > 1 && weight > support[pos]) {
 					++structural_overwrites;
 				}
 				mapped[pos] = color;
@@ -820,7 +828,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						for (int dy = y0; dy <= y1; ++dy) {
 							const double ddx = mx - (static_cast<double>(dx) + 0.5);
 							const double ddy = my - (static_cast<double>(dy) + 0.5);
-							deposit(dx, dy, color, 2, static_cast<float>(ddx * ddx + ddy * ddy));
+							deposit(dx, dy, color, 4, static_cast<float>(ddx * ddx + ddy * ddy));
 							++link_pixels;
 						}
 					} else {
