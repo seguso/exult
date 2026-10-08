@@ -709,6 +709,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		std::vector<unsigned char> mapped(dest_count, static_cast<unsigned char>(pal->get_border_index()));
 		std::vector<unsigned char> real(dest_count, 0);
 		std::vector<float> best_dist(dest_count, 1.0e30f);
+		int forward_samples = 0;
+		int forward_collisions = 0;
+		int forward_conflicting_collisions = 0;
 
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
@@ -726,6 +729,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				const double ddy = dest.y - (static_cast<double>(dy) + 0.5);
 				const float d2 = static_cast<float>(ddx * ddx + ddy * ddy);
 				const size_t pos = static_cast<size_t>(dy) * display_width + dx;
+				++forward_samples;
+				if (real[pos]) {
+					++forward_collisions;
+					if (mapped[pos] != color) {
+						++forward_conflicting_collisions;
+					}
+				}
 				// A 1x forward lattice can collide after rasterization. Preserve the
 				// source sample whose transformed centre is closest to this pixel centre.
 				if (!real[pos] || d2 < best_dist[pos]) {
@@ -758,6 +768,16 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		int total_holes = 0;
 		int adjacent_holes = 0;
 		int filled_pass1 = 0;
+		int unique_at_radius1 = 0;
+		int initial_ties = 0;
+		int resolved_at_radius2 = 0;
+		int resolved_at_radius3 = 0;
+		int resolved_at_radius4 = 0;
+		int resolved_at_radius5plus = 0;
+		int unresolved_ties = 0;
+		int max_tie_radius = 1;
+		std::array<int, 4> direction_wins = {0, 0, 0, 0};
+		int diagnostic_examples = 0;
 		for (int y0 = 0; y0 < display_height; ++y0) {
 			for (int x0 = 0; x0 < display_width; ++x0) {
 				const size_t pos = at(x0, y0);
@@ -819,6 +839,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							++tied_count;
 						}
 					}
+					const int initial_tied_count = tied_count;
+					if (tied_count == 1) {
+						++unique_at_radius1;
+					} else if (tied_count > 1) {
+						++initial_ties;
+					}
+					int resolved_radius = 1;
 
 					// If several directions are equally continuous at radius 1,
 					// keep expanding symmetrically (2, 3, 4, ...) until the tie
@@ -826,6 +853,8 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					// out of that tie as soon as another tied direction can still
 					// provide real source samples.
 					for (int radius = 2; tied_count > 1; ++radius) {
+						resolved_radius = radius;
+						max_tie_radius = std::max(max_tie_radius, radius);
 						int extended_best = 1 << 30;
 						int extended_count = 0;
 						for (auto& candidate : candidates) {
@@ -877,6 +906,22 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						tied_count = next_tied_count;
 					}
 
+					if (initial_tied_count > 1) {
+						if (tied_count == 1) {
+							if (resolved_radius == 2) {
+								++resolved_at_radius2;
+							} else if (resolved_radius == 3) {
+								++resolved_at_radius3;
+							} else if (resolved_radius == 4) {
+								++resolved_at_radius4;
+							} else if (resolved_radius >= 5) {
+								++resolved_at_radius5plus;
+							}
+						} else {
+							++unresolved_ties;
+						}
+					}
+
 					const Direction_candidate* chosen = nullptr;
 					for (const auto& candidate : candidates) {
 						if (candidate.tied) {
@@ -893,6 +938,31 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						}
 					}
 					if (chosen) {
+						int chosen_index = -1;
+						for (size_t ci = 0; ci < candidates.size(); ++ci) {
+							if (&candidates[ci] == chosen) {
+								chosen_index = static_cast<int>(ci);
+								break;
+							}
+						}
+						if (chosen_index >= 0) {
+							++direction_wins[static_cast<size_t>(chosen_index)];
+						}
+						if (initial_tied_count > 1 && diagnostic_examples < 16) {
+							static constexpr const char* dir_names[] = {"H", "V", "D\\", "D/"};
+							std::cout << "Forward edge tie example " << (diagnostic_examples + 1)
+									  << ": xy=(" << x0 << "," << y0 << ")"
+									  << ", r1=[H:" << candidates[0].initial_score
+									  << " V:" << candidates[1].initial_score
+									  << " D\\:" << candidates[2].initial_score
+									  << " D/:" << candidates[3].initial_score << "]"
+									  << ", initial_ties=" << initial_tied_count
+									  << ", resolved_radius=" << resolved_radius
+									  << ", remaining_ties=" << tied_count
+									  << ", winner=" << (chosen_index >= 0 ? dir_names[chosen_index] : "?")
+									  << std::endl;
+							++diagnostic_examples;
+						}
 						filled[pos] = chosen->color;
 						known[pos] = 1;
 						++filled_pass1;
@@ -962,11 +1032,28 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 
 		static bool printed_edge_fill_stats = false;
 		if (!printed_edge_fill_stats) {
-			std::cout << "Forward edge fill: holes=" << total_holes
+			std::cout << "Forward edge fill ALGO=EXPANDING-TIE-V2"
+				 << ", samples=" << forward_samples
+				 << ", collisions=" << forward_collisions
+				 << ", conflicting_collisions=" << forward_conflicting_collisions
+				 << ", holes=" << total_holes
 				 << ", adjacent=" << adjacent_holes
 				 << ", pass1=" << filled_pass1
 				 << ", pass2=" << filled_pass2
-				 << ", fallback=" << fallback_holes << std::endl;
+				 << ", fallback=" << fallback_holes
+				 << ", unique_r1=" << unique_at_radius1
+				 << ", initial_ties=" << initial_ties
+				 << ", resolved_r2=" << resolved_at_radius2
+				 << ", resolved_r3=" << resolved_at_radius3
+				 << ", resolved_r4=" << resolved_at_radius4
+				 << ", resolved_r5plus=" << resolved_at_radius5plus
+				 << ", unresolved_ties=" << unresolved_ties
+				 << ", max_tie_radius=" << max_tie_radius
+				 << ", wins=[H:" << direction_wins[0]
+				 << " V:" << direction_wins[1]
+				 << " D\\:" << direction_wins[2]
+				 << " D/:" << direction_wins[3] << "]"
+				 << std::endl;
 			printed_edge_fill_stats = true;
 		}
 	} else if (rotate_sampling_mode == 5) {
