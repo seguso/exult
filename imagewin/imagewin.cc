@@ -2219,31 +2219,14 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 		return;
 	}
 
-	static thread_local std::vector<SDL_FRect> rows_dark;
-	static thread_local std::vector<SDL_FRect> rows_bright;
 	static thread_local std::vector<SDL_FRect> cols_dark;
 	static thread_local std::vector<SDL_FRect> cols_bright;
-	rows_dark.clear();
-	rows_bright.clear();
 	cols_dark.clear();
 	cols_bright.clear();
 
-	rows_dark.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
-	rows_bright.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
-	// Lock CRT band phase to the final scaled/cropped content rather than
-	// assuming the source image always starts at physical display row zero.
+	// Lock scanline phase to the content's final scaled/cropped origin.
 	const int row_origin = static_cast<int>(std::lround(
 			-content_rect.y * static_cast<float>(display_height) / content_rect.h));
-	const int period = 2 * crt_horizontal_width;
-	for (int y = 0; y < display_height;) {
-		const int offset = ((y - row_origin) % period + period) % period;
-		const int phase = offset >= crt_horizontal_width ? 1 : 0;
-		const int band_end = std::min(
-				display_height, y + (phase ? period - offset : crt_horizontal_width - offset));
-		SDL_FRect r{0.0f, static_cast<float>(y), static_cast<float>(display_width), static_cast<float>(band_end - y)};
-		(phase ? rows_dark : rows_bright).push_back(r);
-		y = band_end;
-	}
 	cols_dark.reserve(static_cast<size_t>(display_width / std::max(1, crt_vertical_width) + 2));
 	cols_bright.reserve(static_cast<size_t>(display_width / std::max(1, crt_vertical_width) + 2));
 	for (int x = 0; x < display_width;) {
@@ -2292,9 +2275,47 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 		}
 	};
 
-	render_axis(
-			crt_horizontal_strength, crt_horizontal_compensation,
-			rows_dark, rows_bright);
+	// A CRT beam has a soft luminance profile, not alternating flat bands.
+	// Each physical output row receives a Gaussian-shaped contribution near
+	// the centre of the bright half-cycle. The remaining (wider) portion of
+	// the period is dark; the vertical phosphor mask remains unchanged.
+	if (crt_horizontal_strength > 0) {
+		const float strength = static_cast<float>(crt_horizontal_strength) / 100.0f;
+		const float compensation = static_cast<float>(crt_horizontal_compensation) / 100.0f;
+		const int band_width = crt_horizontal_width;
+		const int period = 2 * band_width;
+		constexpr float sigma = 0.30f;
+		for (int y = 0; y < display_height; ++y) {
+			const int phase = ((y - row_origin) % period + period) % period;
+			float lobe = 0.0f;
+			if (phase < band_width) {
+				const float position = (static_cast<float>(phase) + 0.5f) / static_cast<float>(band_width);
+				const float distance = (position - 0.5f) / sigma;
+				lobe = std::exp(-0.5f * distance * distance);
+			}
+			const float dark_amount = strength * (1.0f - lobe);
+			const int dark_rgb = std::clamp(
+					static_cast<int>(std::lround((1.0f - dark_amount) * 255.0f)), 0, 255);
+			const SDL_FRect row_rect{
+					0.0f, static_cast<float>(y), static_cast<float>(display_width), 1.0f};
+			SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
+			SDL_SetRenderDrawColor(
+					screen_renderer, static_cast<Uint8>(dark_rgb),
+					static_cast<Uint8>(dark_rgb), static_cast<Uint8>(dark_rgb), 255);
+			SDL_RenderFillRect(screen_renderer, &row_rect);
+
+			const float boost = strength * compensation * lobe;
+			if (boost > 0.0f) {
+				const int boost_rgb = std::clamp(
+						static_cast<int>(std::lround(boost * 255.0f)), 0, 255);
+				SDL_SetRenderDrawBlendMode(screen_renderer, brighten_mode);
+				SDL_SetRenderDrawColor(
+						screen_renderer, static_cast<Uint8>(boost_rgb),
+						static_cast<Uint8>(boost_rgb), static_cast<Uint8>(boost_rgb), 255);
+				SDL_RenderFillRect(screen_renderer, &row_rect);
+			}
+		}
+	}
 	render_axis(
 			static_cast<float>(crt_vertical_strength) * 0.5f, crt_vertical_compensation,
 			cols_dark, cols_bright);
