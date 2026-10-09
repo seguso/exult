@@ -409,10 +409,14 @@ Game_window::Game_window(
 	config->value("config/video/crt/vertical_strength", crt_vertical_strength, 15);
 	config->value("config/video/crt/horizontal_compensation", crt_horizontal_compensation, 100);
 	config->value("config/video/crt/vertical_compensation", crt_vertical_compensation, 100);
+	config->value("config/video/crt/horizontal_width", crt_horizontal_width, 2);
+	config->value("config/video/crt/vertical_width", crt_vertical_width, 2);
 	crt_horizontal_strength = std::clamp(crt_horizontal_strength, 0, 90);
 	crt_vertical_strength = std::clamp(crt_vertical_strength, 0, 90);
 	crt_horizontal_compensation = std::clamp(crt_horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(crt_vertical_compensation, 0, 200);
+	crt_horizontal_width = std::clamp(crt_horizontal_width, 1, 6);
+	crt_vertical_width = std::clamp(crt_vertical_width, 1, 6);
 #ifdef USE_HQ3X_SCALER
 	// Migrate the previous numbering: 8/9/10 were the weighted
 	// triplet/pair/quadruplet modes. Values 5/6/7 are now reused directly.
@@ -432,12 +436,16 @@ Game_window::Game_window(
 	config->set("config/video/crt/vertical_strength", crt_vertical_strength, false);
 	config->set("config/video/crt/horizontal_compensation", crt_horizontal_compensation, false);
 	config->set("config/video/crt/vertical_compensation", crt_vertical_compensation, false);
+	config->set("config/video/crt/horizontal_width", crt_horizontal_width, false);
+	config->set("config/video/crt/vertical_width", crt_vertical_width, false);
 	win->set_crt_filter(
 			crt_filter_enabled,
 			crt_horizontal_strength,
 			crt_vertical_strength,
 			crt_horizontal_compensation,
-			crt_vertical_compensation);
+			crt_vertical_compensation,
+			crt_horizontal_width,
+			crt_vertical_width);
 	config->value("config/gameplay/alternate_drop", str, "no");
 	alternate_drop = str == "yes";
 	config->set("config/gameplay/alternate_drop", alternate_drop ? "yes" : "no", false);
@@ -664,25 +672,32 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 
 void Game_window::set_crt_filter_settings(
 		bool enabled, int horizontal_strength, int vertical_strength,
-		int horizontal_compensation, int vertical_compensation) {
+		int horizontal_compensation, int vertical_compensation,
+		int horizontal_width, int vertical_width) {
 	crt_filter_enabled = enabled;
 	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 90);
 	crt_vertical_strength = std::clamp(vertical_strength, 0, 90);
 	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
+	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
+	crt_vertical_width = std::clamp(vertical_width, 1, 6);
 
 	config->set("config/video/crt/enabled", crt_filter_enabled ? "yes" : "no", false);
 	config->set("config/video/crt/horizontal_strength", crt_horizontal_strength, false);
 	config->set("config/video/crt/vertical_strength", crt_vertical_strength, false);
 	config->set("config/video/crt/horizontal_compensation", crt_horizontal_compensation, false);
 	config->set("config/video/crt/vertical_compensation", crt_vertical_compensation, false);
+	config->set("config/video/crt/horizontal_width", crt_horizontal_width, false);
+	config->set("config/video/crt/vertical_width", crt_vertical_width, false);
 
 	win->set_crt_filter(
 			crt_filter_enabled,
 			crt_horizontal_strength,
 			crt_vertical_strength,
 			crt_horizontal_compensation,
-			crt_vertical_compensation);
+			crt_vertical_compensation,
+			crt_horizontal_width,
+			crt_vertical_width);
 	set_all_dirty();
 	paint();
 }
