@@ -364,6 +364,8 @@ protected:
 	int  crt_vertical_strength = 15;   // percent darkening of alternate columns
 	int  crt_horizontal_compensation = 100; // percent of mean-preserving bright compensation
 	int  crt_vertical_compensation = 100;
+	int  crt_horizontal_width = 2; // pixels per bright/dark horizontal band
+	int  crt_vertical_width = 2;   // pixels per bright/dark vertical band
 
 	// Layer  scaling configuration for composited layers. Layer sizing is
 	// explicit (width/height), with 0x0 meaning Auto (use game area size).
@@ -629,7 +631,8 @@ public:
 
 	void set_crt_filter(
 			bool enabled, int horizontal_strength, int vertical_strength,
-			int horizontal_compensation, int vertical_compensation);
+			int horizontal_compensation, int vertical_compensation,
+			int horizontal_width, int vertical_width);
 
 	Image_buffer* get_ibuf() {
 		return ibuf;
