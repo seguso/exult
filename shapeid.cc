@@ -119,6 +119,26 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	const std::string font_path = file.empty() ? std::string() : get_system_path(file);
 	auto generated = Gen_runtime_font_shape(
 			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow, 2);
+#if defined(__APPLE__)
+	// Unlike Win32 GDI, FreeType does not resolve a font family name by
+	// itself. When the user enables readable text without configuring a file
+	// or family, pick a preinstalled macOS sans-serif font automatically.
+	// Keep explicit user choices untouched, including their failure fallback.
+	if (!generated && file.empty() && family == "Tahoma") {
+		const char* const mac_fonts[] = {
+				"/System/Library/Fonts/Helvetica.ttc",
+				"/System/Library/Fonts/Supplemental/Arial.ttf",
+				"/Library/Fonts/Arial.ttf",
+				"/System/Library/Fonts/Supplemental/Verdana.ttf"};
+		for (const char* candidate : mac_fonts) {
+			generated = Gen_runtime_font_shape(candidate, "", 256, pixels, fg, bg, shadow, 2);
+			if (generated) {
+				std::cout << "Using macOS system conversation font " << candidate << " at " << pixels << " px." << std::endl;
+				break;
+			}
+		}
+	}
+#endif
 	if (!generated) {
 		std::cerr << "Unable to load custom conversation font";
 		if (!file.empty()) {
