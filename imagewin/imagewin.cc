@@ -2321,52 +2321,59 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 			static_cast<float>(crt_vertical_strength) * 0.5f, crt_vertical_compensation,
 			cols_dark, cols_bright);
 
-	// Shape each enlarged source pixel into a rounded, separable 2-D spot.
-	// The horizontal envelope combines with the existing vertical Gaussian:
-	// corners receive attenuation in both axes, unlike a flat Point pixel.
-	// Work in physical display coordinates, anchored to the scaled source grid.
-	// Keep the original nearest-neighbour color sampling untouched.
+	// Rounded pixel spots: normalize the one-dimensional Gaussian envelopes
+	// before multiplying X and Y. Narrow beams used to discard most of the
+	// light: normalization holds mean emitted energy approximately constant
+	// as sigma changes. Gains above one use the proportional brighten blend;
+	// clipping on saturated highlights is the only remaining energy loss.
 	if (scale > 1) {
 		const int pixel_size = scale;
 		const int origin_x = static_cast<int>(std::lround(
 				-content_rect.x * static_cast<float>(display_width) / content_rect.w));
 		const float sigma = static_cast<float>(crt_beam_sigma) / 100.0f;
-		const float edge_depth = 0.70f;
-		for (int x = 0; x < display_width; ++x) {
-			const int phase = ((x - origin_x) % pixel_size + pixel_size) % pixel_size;
+		constexpr float edge_depth = 0.70f;
+		std::vector<float> spot_gain(static_cast<size_t>(pixel_size));
+		float total = 0.0f;
+		for (int phase = 0; phase < pixel_size; ++phase) {
 			const float position = (static_cast<float>(phase) + 0.5f) / static_cast<float>(pixel_size);
 			const float d = (position - 0.5f) / sigma;
-			const float lobe = std::exp(-0.5f * d * d);
-			const int rgb = std::clamp(static_cast<int>(std::lround(
-					(1.0f - edge_depth * (1.0f - lobe)) * 255.0f)), 0, 255);
-			const SDL_FRect column{static_cast<float>(x), 0.0f, 1.0f, static_cast<float>(display_height)};
-			SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
-			SDL_SetRenderDrawColor(screen_renderer,
-					static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), 255);
-			SDL_RenderFillRect(screen_renderer, &column);
+			const float envelope = 1.0f - edge_depth * (1.0f - std::exp(-0.5f * d * d));
+			spot_gain[static_cast<size_t>(phase)] = envelope;
+			total += envelope;
 		}
-	}
+		const float mean = total / static_cast<float>(pixel_size);
+		for (float& gain : spot_gain) {
+			gain /= mean;
+		}
 
-	// Complete the 2-D spot envelope along Y as well. Applying both
-	// one-dimensional envelopes produces rounded light spots at Point Nx:
-	// pixel corners are attenuated twice, centers remain strongest.
-	if (scale > 1) {
-		const int pixel_size = scale;
-		const float sigma = static_cast<float>(crt_beam_sigma) / 100.0f;
-		const float edge_depth = 0.70f;
-		for (int y = 0; y < display_height; ++y) {
-			const int phase = ((y - row_origin) % pixel_size + pixel_size) % pixel_size;
-			const float position = (static_cast<float>(phase) + 0.5f) / static_cast<float>(pixel_size);
-			const float d = (position - 0.5f) / sigma;
-			const float lobe = std::exp(-0.5f * d * d);
-			const int rgb = std::clamp(static_cast<int>(std::lround(
-					(1.0f - edge_depth * (1.0f - lobe)) * 255.0f)), 0, 255);
-			const SDL_FRect row{0.0f, static_cast<float>(y), static_cast<float>(display_width), 1.0f};
-			SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
-			SDL_SetRenderDrawColor(screen_renderer,
-					static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), 255);
-			SDL_RenderFillRect(screen_renderer, &row);
-		}
+		const auto apply_spot_axis = [&](bool horizontal) {
+			const int count = horizontal ? display_width : display_height;
+			const int origin = horizontal ? origin_x : row_origin;
+			for (int coord = 0; coord < count; ++coord) {
+				const int phase = ((coord - origin) % pixel_size + pixel_size) % pixel_size;
+				const float gain = spot_gain[static_cast<size_t>(phase)];
+				const bool darken = gain < 1.0f;
+				// Multiplicative: darken uses dst * source; brighten uses
+				// dst + source * dst. Quantize only the final blend factor.
+				const float blend_value = darken ? gain : gain - 1.0f;
+				const int rgb = std::clamp(
+						static_cast<int>(std::lround(blend_value * 255.0f)), 0, 255);
+				if (darken) {
+					SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
+				} else {
+					SDL_SetRenderDrawBlendMode(screen_renderer, brighten_mode);
+				}
+				SDL_SetRenderDrawColor(screen_renderer,
+						static_cast<Uint8>(rgb), static_cast<Uint8>(rgb),
+						static_cast<Uint8>(rgb), 255);
+				const SDL_FRect rect = horizontal
+						? SDL_FRect{static_cast<float>(coord), 0.0f, 1.0f, static_cast<float>(display_height)}
+						: SDL_FRect{0.0f, static_cast<float>(coord), static_cast<float>(display_width), 1.0f};
+				SDL_RenderFillRect(screen_renderer, &rect);
+			}
+		};
+		apply_spot_axis(true);
+		apply_spot_axis(false);
 	}
 
 	// Avoid leaking CRT renderer state into the next frame.
