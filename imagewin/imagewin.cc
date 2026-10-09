@@ -2182,6 +2182,14 @@ void Image_window::apply_crt_filter() {
 		return;
 	}
 
+	Uint8 old_r = 0;
+	Uint8 old_g = 0;
+	Uint8 old_b = 0;
+	Uint8 old_a = 255;
+	SDL_BlendMode old_blend = SDL_BLENDMODE_NONE;
+	SDL_GetRenderDrawColor(screen_renderer, &old_r, &old_g, &old_b, &old_a);
+	SDL_GetRenderDrawBlendMode(screen_renderer, &old_blend);
+
 	// Darkening is multiplicative: dst = dst * source_colour.
 	const SDL_BlendMode darken_mode = SDL_ComposeCustomBlendMode(
 			SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_SRC_COLOR, SDL_BLENDOPERATION_ADD,
@@ -2191,6 +2199,22 @@ void Image_window::apply_crt_filter() {
 	const SDL_BlendMode brighten_mode = SDL_ComposeCustomBlendMode(
 			SDL_BLENDFACTOR_DST_COLOR, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD,
 			SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+
+	// Custom blend support depends on the active SDL renderer. Probe both modes
+	// before drawing anything so unsupported backends don't produce a half-filter.
+	if (!SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode)
+			|| !SDL_SetRenderDrawBlendMode(screen_renderer, brighten_mode)) {
+		static bool warned = false;
+		if (!warned) {
+			std::cerr << "CRT filter disabled: renderer does not support required custom blend modes: "
+					  << SDL_GetError() << std::endl;
+			warned = true;
+		}
+		SDL_SetRenderDrawBlendMode(screen_renderer, old_blend);
+		SDL_SetRenderDrawColor(screen_renderer, old_r, old_g, old_b, old_a);
+		SDL_ClearError();
+		return;
+	}
 
 	static thread_local std::vector<SDL_FRect> rows_dark;
 	static thread_local std::vector<SDL_FRect> rows_bright;
@@ -2259,8 +2283,9 @@ void Image_window::apply_crt_filter() {
 			crt_vertical_strength, crt_vertical_compensation,
 			cols_dark, cols_bright);
 
-	// Avoid leaking the custom mode into later renderer users.
-	SDL_SetRenderDrawBlendMode(screen_renderer, SDL_BLENDMODE_NONE);
+	// Avoid leaking CRT renderer state into the next frame.
+	SDL_SetRenderDrawBlendMode(screen_renderer, old_blend);
+	SDL_SetRenderDrawColor(screen_renderer, old_r, old_g, old_b, old_a);
 }
 
 void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool for_screenshot) {
