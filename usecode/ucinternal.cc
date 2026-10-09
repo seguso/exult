@@ -569,7 +569,10 @@ void Usecode_internal::show_pending_text() {
 		int y;
 		while (book->show_next_page() && Get_click(x, y, Mouse::hand, nullptr, false, book, true))
 			;
-		gwin->paint();
+		// Reading a book/scroll must preserve the rendered smooth-camera origin.
+		// A plain paint() redraws at the canonical logical tile scroll and
+		// visibly snaps the background when the text overlay closes.
+		gwin->paint_current_view();
 	}
 	// Normal conversation:
 	else if (conv->is_npc_text_pending()) {
