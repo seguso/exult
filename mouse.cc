@@ -784,7 +784,13 @@ void Mouse::set_speed_cursor() {
 		}
 
 		const int base_speed = 200 * gwin->get_std_delay();
-		if (!in_speed_rect) {
+		if (gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()) {
+			// A* mouse target speed is controlled by the Shift fast/medium
+			// toggle, not cursor distance. Use a constant medium-sized arrow.
+			// Keep combat artwork, continuous rotation and all other modes.
+			cursor = gwin->in_combat() ? get_medium_combat_arrow(dir) : get_medium_arrow(dir);
+			avatar_speed = base_speed / medium_speed_factor;
+		} else if (!in_speed_rect) {
 			// Beyond the 200x200 rectangle - use long arrow with fast movement
 			// But respect combat/hostile conditions just like inside the
 			// rectangle
