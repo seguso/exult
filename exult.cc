@@ -1420,6 +1420,7 @@ static void Handle_events() {
 	int  last_y = -1;
 	int  lerp_mswait = 0;
 	bool lerp_stop_anchored = false;
+	uint32 last_modern_mouse_target = 0;
 	/*
 	 *  Main event loop.
 	 */
@@ -1475,12 +1476,18 @@ static void Handle_events() {
 		// Moved this out of the animation loop, since we want movement to be
 		// more responsive. Also, if the step delta is only 1 tile,
 		// always check every loop
-		if ((!gwin->is_moving() || gwin->get_step_tile_delta() == 1) && gwin->main_actor_can_act_charmed()) {
+		if ((!gwin->is_moving() || gwin->get_step_tile_delta() == 1
+			 || (gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()))
+			&& gwin->main_actor_can_act_charmed()) {
 			int       x  = Mouse::mouse()->get_mousex();
 			int       y  = Mouse::mouse()->get_mousey();
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
-				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
+				if (!gwin->is_modern_movement_enabled() || !gwin->is_modern_mouse_target_enabled()
+					|| ticks - last_modern_mouse_target >= 500) {
+					gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
+					last_modern_mouse_target = ticks;
+				}
 			} else if (ticks > last_rest) {
 				const int resttime = ticks - last_rest;
 				gwin->get_main_actor()->resting(resttime);
@@ -2195,7 +2202,8 @@ static void Handle_event(SDL_Event& event) {
 			dragged = gwin->drag(mx, my);
 		}
 		// Dragging with right?
-		else if ((event.motion.state & SDL_BUTTON_RMASK) && !right_on_gump) {
+		else if ((event.motion.state & SDL_BUTTON_RMASK) && !right_on_gump
+				 && !(gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled())) {
 			if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
 				gwin->start_actor_from_display(mx, my, Mouse::mouse()->avatar_speed);
 			}

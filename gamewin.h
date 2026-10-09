@@ -1073,6 +1073,7 @@ private:
 	// Our independent modern movement/camera package.
 	bool modern_movement_enabled;
 	bool smooth_avatar_walk_enabled = false;
+	bool modern_mouse_target_enabled = false;
 	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
 	// original Exult keymap and event-driven cardinal movement semantics.
 	bool modern_keyboard_enabled;
@@ -1133,6 +1134,8 @@ public:
 		lerping_enabled = e;
 	}
 
+	bool is_modern_mouse_target_enabled() const { return modern_mouse_target_enabled; }
+	void set_modern_mouse_target_enabled(bool enabled);
 	bool is_smooth_avatar_walk_enabled() const { return smooth_avatar_walk_enabled; }
 	void set_smooth_avatar_walk_enabled(bool enabled);
 	bool is_modern_movement_enabled() const {

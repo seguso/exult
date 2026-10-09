@@ -397,6 +397,8 @@ Game_window::Game_window(
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/modern_mouse_target", modern_mouse_target_enabled, false);
+	config->set("config/gameplay/modern_mouse_target", modern_mouse_target_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled, false);
 	config->set("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
@@ -731,6 +733,11 @@ void Game_window::set_modern_movement_tau_ms(int ms) {
 void Game_window::set_modern_keyboard_enabled(bool enabled) {
 	modern_keyboard_enabled = enabled;
 	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
+}
+
+void Game_window::set_modern_mouse_target_enabled(bool enabled) {
+	modern_mouse_target_enabled = enabled;
+	config->set("config/gameplay/modern_mouse_target", enabled ? "yes" : "no", true);
 }
 
 void Game_window::set_smooth_avatar_walk_enabled(bool enabled) {
@@ -2147,6 +2154,29 @@ void Game_window::start_actor_alt(
 			}
 			return;
 		}
+	}
+
+	// Optional screen-anchored target mode: the cursor's world tile changes
+	// as the smooth camera moves, even with a stationary screen cursor.
+	// Only the temporary walking goal changes; diagonal/Bresenham stepping,
+	// formation and the normal double-right-click pathfinder stay untouched.
+	if (modern_mouse_steering && modern_mouse_target_enabled) {
+		const int lift = main_actor->get_lift();
+		const int liftpixels = 4 * lift;
+		const int tx = (get_scrolltx() + (winx + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
+		const int ty = (get_scrollty() + (winy + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
+		const Tile_coord current = main_actor->get_tile();
+		if (tx == current.tx && ty == current.ty) {
+			stop_actor();
+			return;
+		}
+		main_actor->walk_to_tile(tx, ty, lift, speed, 0);
+		if (walk_in_formation && main_actor->get_action()) {
+			main_actor->get_action()->set_get_party(true);
+		} else {
+			main_actor->get_followers();
+		}
+		return;
 	}
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
