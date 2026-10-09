@@ -39,6 +39,8 @@
 #include "tqueue.h"
 #include "useval.h"
 
+#include <algorithm>
+
 using std::size_t;
 using std::string;
 
@@ -556,6 +558,12 @@ void Conversation::show_npc_message(const char* msg) {
 	}
 	string translated(msg);
 	translate_usecode_text(translated);
+	// Ultima VI's usecode text sometimes contains '@' as an invisible
+	// separator. The original bitmap conversation font has no visible glyph
+	// for it, whereas the optional readable font does. Remove it only from
+	// the presentation copy: Usecode flow and the '*' page-break syntax stay
+	// unchanged.
+	translated.erase(std::remove(translated.begin(), translated.end(), '@'), translated.end());
 	msg = translated.c_str();
 	// Wait for any sprite effects to finish before showing text.
 	Effects_manager* eman = gwin->get_effects();
