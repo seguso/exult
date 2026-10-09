@@ -1089,6 +1089,7 @@ private:
 	double smooth_cam_y;
 	uint32 smooth_cam_last_ticks;
 	bool smooth_cam_valid;
+	int camera_target_trace_frames = 0;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
@@ -1100,6 +1101,8 @@ public:
 	// Monotonic three-stage low-pass camera. Returns true if it painted a frame.
 	bool paint_velocity_camera(uint32 ticks);
 	void reset_velocity_camera();
+	void trace_target_camera(const char* event);
+	void begin_target_camera_trace();
 
 	inline int get_scrolltx_lo() const {
 		return scrolltx_lo;

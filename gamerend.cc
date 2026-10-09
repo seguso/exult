@@ -1485,6 +1485,7 @@ void Game_window::update_lighting(int light_sources) {
  *  Paint whole window.
  */
 void Game_window::paint() {
+	trace_target_camera("paint-raw");
 	if (main_actor != nullptr) {
 		map->read_map_data();    // Gather in all objs., etc.
 	}
@@ -1600,7 +1601,27 @@ void Game_window::paint_lerped(int factor) {
 	avposx_ld = avposy_ld = 0;
 }
 
+void Game_window::begin_target_camera_trace() {
+	camera_target_trace_frames = 90;
+	trace_target_camera("target-begin");
+}
+
+void Game_window::trace_target_camera(const char* event) {
+	if (camera_target_trace_frames <= 0) {
+		return;
+	}
+	std::fprintf(stderr,
+			"[CAM-TARGET] %s logical=(%d,%d)+(%d,%d) visual=(%.2f,%.2f) stage1=(%.2f,%.2f) stage2=(%.2f,%.2f) valid=%d modern=%d frames=%d\\n",
+			event, scrolltx, scrollty, scrolltx_lo, scrollty_lo,
+			smooth_cam_x, smooth_cam_y, smooth_cam_stage1_x, smooth_cam_stage1_y,
+			smooth_cam_stage2_x, smooth_cam_stage2_y,
+			static_cast<int>(smooth_cam_valid), static_cast<int>(modern_movement_enabled),
+			camera_target_trace_frames);
+	std::fflush(stderr);
+}
+
 void Game_window::paint_current_view() {
+	trace_target_camera("paint-current");
 	if (!modern_movement_enabled || !smooth_cam_valid) {
 		paint();
 		return;
@@ -1644,6 +1665,7 @@ void Game_window::paint_current_view() {
 }
 
 void Game_window::reset_velocity_camera() {
+	trace_target_camera("camera-reset");
 	smooth_cam_stage1_x = 0.0;
 	smooth_cam_stage1_y = 0.0;
 	smooth_cam_stage2_x = 0.0;
@@ -1655,6 +1677,10 @@ void Game_window::reset_velocity_camera() {
 }
 
 bool Game_window::paint_velocity_camera(uint32 ticks) {
+	if (camera_target_trace_frames > 0) {
+		trace_target_camera("velocity-frame");
+		--camera_target_trace_frames;
+	}
 	if (!camera_actor) {
 		reset_velocity_camera();
 		return false;
