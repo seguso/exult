@@ -43,8 +43,7 @@ private:
 	int                      crt_enabled;
 	int                      crt_horizontal_strength;
 	int                      crt_vertical_strength;
-	int                      crt_horizontal_compensation;
-	int                      crt_vertical_compensation;
+	int                      crt_brightness_compensation;
 	int                      crt_horizontal_width;
 	int                      crt_vertical_width;
 	bool                     usecode_intro;
@@ -76,8 +75,7 @@ private:
 		id_crt_enabled,
 		id_crt_horizontal_strength,
 		id_crt_vertical_strength,
-		id_crt_horizontal_compensation,
-		id_crt_vertical_compensation,
+		id_crt_brightness_compensation,
 		id_crt_horizontal_width,
 		id_crt_vertical_width,
 		id_menu_intro,
@@ -106,6 +104,8 @@ public:
 	void update_legacy_smooth_button();
 	void update_conversation_font_size_button();
 	void update_crt_strength_buttons();
+	void update_crt_compensation_button();
+	void preview_crt();
 
 	void load_settings();
 	void save_settings();
@@ -172,12 +172,7 @@ public:
 	}
 	void choose_crt_horizontal_strength();
 	void choose_crt_vertical_strength();
-	void toggle_crt_horizontal_compensation(int state) {
-		crt_horizontal_compensation = state;
-	}
-	void toggle_crt_vertical_compensation(int state) {
-		crt_vertical_compensation = state;
-	}
+	void choose_crt_brightness_compensation();
 	void toggle_crt_horizontal_width(int state) {
 		crt_horizontal_width = state;
 	}

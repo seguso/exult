@@ -847,6 +847,9 @@ public:
 	int get_crt_vertical_width() const {
 		return crt_vertical_width;
 	}
+	void preview_crt_filter_settings(
+			bool enabled, int horizontal_strength, int vertical_strength,
+			int compensation, int horizontal_width, int vertical_width);
 	void set_crt_filter_settings(
 			bool enabled, int horizontal_strength, int vertical_strength,
 			int horizontal_compensation, int vertical_compensation,

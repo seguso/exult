@@ -1161,9 +1161,10 @@ int Gump_manager::prompt_for_number(
 		int        step,
 		int        defval,    // Default to start with.
 		Paintable* paint,     // Should be the conversation.
-		bool*      escaped    // If non-null, allow user to escape and will be set indicating if user escaped
+		bool*      escaped,   // If non-null, allow user to escape
+		std::function<void(int)> on_change
 ) {
-	auto*      slider = new Slider_gump(minval, maxval, step, defval, escaped != nullptr);
+	auto*      slider = new Slider_gump(minval, maxval, step, defval, escaped != nullptr, std::move(on_change));
 	const bool ok     = do_modal_gump(slider, Mouse::hand, paint);
 	if (escaped) {
 		*escaped = !ok;

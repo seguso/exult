@@ -674,6 +674,15 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 	}
 }
 
+void Game_window::preview_crt_filter_settings(
+		bool enabled, int horizontal_strength, int vertical_strength,
+		int compensation, int horizontal_width, int vertical_width) {
+	win->set_crt_filter(
+			enabled, horizontal_strength, vertical_strength,
+			compensation, compensation, horizontal_width, vertical_width);
+	set_all_dirty();
+}
+
 void Game_window::set_crt_filter_settings(
 		bool enabled, int horizontal_strength, int vertical_strength,
 		int horizontal_compensation, int vertical_compensation,

@@ -21,6 +21,7 @@
 #ifndef GUMP_MANAGER_INCLUDED
 #define GUMP_MANAGER_INCLUDED
 
+#include <functional>
 #include "mouse.h"
 #include "singles.h"
 
@@ -125,7 +126,8 @@ public:
 	void set_gumps_dont_pause_game(bool p);
 
 	bool okay_to_quit(Paintable* paint = nullptr);
-	int  prompt_for_number(int minval, int maxval, int step, int def, Paintable* paint = nullptr, bool* escaped = nullptr);
+	int  prompt_for_number(int minval, int maxval, int step, int def, Paintable* paint = nullptr, bool* escaped = nullptr,
+			std::function<void(int)> on_change = {});
 	bool do_modal_gump(Modal_gump*, Mouse::Mouse_shapes, Paintable* paint = nullptr);
 	void paint_num(int num, int x, int y, std::shared_ptr<Font> font = nullptr);
 

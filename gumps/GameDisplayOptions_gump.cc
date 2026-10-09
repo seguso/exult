@@ -264,7 +264,6 @@ using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gu
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
 
 static constexpr int modern_tau_values[] = {90, 120, 150, 180, 220, 300, 400, 500};
-static constexpr int crt_compensation_values[] = {0, 50, 75, 100, 125, 150, 200};
 static constexpr int crt_width_values[] = {1, 2, 3, 4, 5, 6};
 
 // Android stuff
@@ -392,16 +391,10 @@ void GameDisplayOptions_gump::build_buttons() {
 			(std::to_string(crt_vertical_strength / 2) + (crt_vertical_strength % 2 ? ".5%" : "%")),
 			get_button_pos_for_label("CRT vertical mask:"), yForRow(++y_index), small_size);
 
-	std::vector<std::string> crt_comp_text;
-	for (const int value : crt_compensation_values) {
-		crt_comp_text.emplace_back(std::to_string(value) + "%");
-	}
-	buttons[id_crt_horizontal_compensation] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_crt_horizontal_compensation, crt_comp_text, crt_horizontal_compensation,
-			get_button_pos_for_label("CRT H brightness comp:"), yForRow(++y_index), small_size);
-	buttons[id_crt_vertical_compensation] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_crt_vertical_compensation, std::move(crt_comp_text), crt_vertical_compensation,
-			get_button_pos_for_label("CRT V brightness comp:"), yForRow(++y_index), small_size);
+	buttons[id_crt_brightness_compensation] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_crt_brightness_compensation,
+			std::to_string(crt_brightness_compensation) + "%",
+			get_button_pos_for_label("CRT brightness comp:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> crt_width_text;
 	for (const int value : crt_width_values) {
@@ -470,25 +463,65 @@ void GameDisplayOptions_gump::build_buttons() {
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
 
+void GameDisplayOptions_gump::preview_crt() {
+	gwin->preview_crt_filter_settings(
+			crt_enabled != 0, crt_horizontal_strength, crt_vertical_strength,
+			crt_brightness_compensation, crt_horizontal_width, crt_vertical_width);
+}
+
+void GameDisplayOptions_gump::choose_crt_brightness_compensation() {
+	bool escaped = false;
+	const int original = crt_brightness_compensation;
+	const int value = gwin->get_gump_man()->prompt_for_number(
+			50, 150, 1, original, this, &escaped,
+			[this](int v) {
+				crt_brightness_compensation = v;
+				preview_crt();
+			});
+	crt_brightness_compensation = escaped ? original : value;
+	preview_crt();
+	update_crt_compensation_button();
+}
+
+void GameDisplayOptions_gump::update_crt_compensation_button() {
+	constexpr int small_size = 44;
+	const int button_y = buttons[id_crt_brightness_compensation]->get_y();
+	buttons[id_crt_brightness_compensation] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_crt_brightness_compensation,
+			std::to_string(crt_brightness_compensation) + "%",
+			get_button_pos_for_label("CRT brightness comp:"), button_y, small_size);
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+}
+
 void GameDisplayOptions_gump::choose_crt_horizontal_strength() {
 	bool escaped = false;
+	const int original = crt_horizontal_strength;
 	const int value = gwin->get_gump_man()->prompt_for_number(
-			0, 20, 1, crt_horizontal_strength, this, &escaped);
+			0, 20, 1, crt_horizontal_strength, this, &escaped,
+			[this](int v) { crt_horizontal_strength = v; preview_crt(); });
 	if (!escaped) {
 		crt_horizontal_strength = value;
 		update_crt_strength_buttons();
 		gwin->set_all_dirty();
+	} else {
+		crt_horizontal_strength = original;
+		preview_crt();
 	}
 }
 
 void GameDisplayOptions_gump::choose_crt_vertical_strength() {
 	bool escaped = false;
+	const int original = crt_vertical_strength;
 	const int value = gwin->get_gump_man()->prompt_for_number(
-			0, 40, 1, crt_vertical_strength, this, &escaped);
+			0, 40, 1, crt_vertical_strength, this, &escaped,
+			[this](int v) { crt_vertical_strength = v; preview_crt(); });
 	if (!escaped) {
 		crt_vertical_strength = value;
 		update_crt_strength_buttons();
 		gwin->set_all_dirty();
+	} else {
+		crt_vertical_strength = original;
+		preview_crt();
 	}
 }
 
@@ -590,10 +623,7 @@ void GameDisplayOptions_gump::load_settings() {
 	};
 	crt_horizontal_strength = std::clamp(gwin->get_crt_horizontal_strength(), 0, 20);
 	crt_vertical_strength = std::clamp(gwin->get_crt_vertical_strength(), 0, 40);
-	crt_horizontal_compensation = nearest_index(
-			gwin->get_crt_horizontal_compensation(), crt_compensation_values, std::size(crt_compensation_values));
-	crt_vertical_compensation = nearest_index(
-			gwin->get_crt_vertical_compensation(), crt_compensation_values, std::size(crt_compensation_values));
+	crt_brightness_compensation = std::clamp(gwin->get_crt_horizontal_compensation(), 50, 150);
 	crt_horizontal_width = nearest_index(
 			gwin->get_crt_horizontal_width(), crt_width_values, std::size(crt_width_values));
 	crt_vertical_width = nearest_index(
@@ -703,8 +733,8 @@ void GameDisplayOptions_gump::save_settings() {
 			crt_enabled != 0,
 			std::clamp(crt_horizontal_strength, 0, 20),
 			std::clamp(crt_vertical_strength, 0, 40),
-			crt_compensation_values[std::clamp(crt_horizontal_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)],
-			crt_compensation_values[std::clamp(crt_vertical_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)],
+			crt_brightness_compensation,
+			crt_brightness_compensation,
 			crt_width_values[std::clamp(crt_horizontal_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)],
 			crt_width_values[std::clamp(crt_vertical_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)]);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
@@ -764,8 +794,7 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), "CRT filter:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT horizontal scanlines:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT vertical mask:", x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), "CRT H brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), "CRT V brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT H line width:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT V mask width:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
