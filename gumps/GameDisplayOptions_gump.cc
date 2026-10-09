@@ -298,6 +298,14 @@ void GameDisplayOptions_gump::close() {
 }
 
 void GameDisplayOptions_gump::cancel() {
+	// A live preview must not survive cancelling the display options.
+	gwin->preview_crt_filter_settings(
+			gwin->is_crt_filter_enabled(),
+			gwin->get_crt_horizontal_strength(),
+			gwin->get_crt_vertical_strength(),
+			gwin->get_crt_horizontal_compensation(),
+			gwin->get_crt_horizontal_width(),
+			gwin->get_crt_vertical_width());
 	done = true;
 }
 
