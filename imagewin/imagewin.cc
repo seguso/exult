@@ -2347,6 +2347,28 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 		}
 	}
 
+	// Complete the 2-D spot envelope along Y as well. Applying both
+	// one-dimensional envelopes produces rounded light spots at Point Nx:
+	// pixel corners are attenuated twice, centers remain strongest.
+	if (scale > 1) {
+		const int pixel_size = scale;
+		const float sigma = static_cast<float>(crt_beam_sigma) / 100.0f;
+		const float edge_depth = 0.70f;
+		for (int y = 0; y < display_height; ++y) {
+			const int phase = ((y - row_origin) % pixel_size + pixel_size) % pixel_size;
+			const float position = (static_cast<float>(phase) + 0.5f) / static_cast<float>(pixel_size);
+			const float d = (position - 0.5f) / sigma;
+			const float lobe = std::exp(-0.5f * d * d);
+			const int rgb = std::clamp(static_cast<int>(std::lround(
+					(1.0f - edge_depth * (1.0f - lobe)) * 255.0f)), 0, 255);
+			const SDL_FRect row{0.0f, static_cast<float>(y), static_cast<float>(display_width), 1.0f};
+			SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
+			SDL_SetRenderDrawColor(screen_renderer,
+					static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), 255);
+			SDL_RenderFillRect(screen_renderer, &row);
+		}
+	}
+
 	// Avoid leaking CRT renderer state into the next frame.
 	SDL_SetRenderDrawBlendMode(screen_renderer, old_blend);
 	SDL_SetRenderDrawColor(screen_renderer, old_r, old_g, old_b, old_a);
