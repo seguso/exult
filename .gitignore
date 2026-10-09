@@ -340,3 +340,8 @@ android/lib/build/
 docs/xml/web_tmp/docs.html
 docs/xml/web_tmp/faq.html
 docs/xml/web_tmp/studio.html
+data/README_audiopack.txt
+data/readme_jmsfx.txt
+data/readme_jmsisfx.txt
+data/readme_sqsfxbg.txt
+data/readme_sqsfxsi.txt
