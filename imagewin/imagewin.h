@@ -361,7 +361,7 @@ protected:
 
 	bool crt_enabled = false;
 	int  crt_horizontal_strength = 8;  // percent darkening of alternate rows
-	int  crt_vertical_strength = 4;    // percent darkening of alternate columns
+	int  crt_vertical_strength = 8;    // half-percent units (8 = 4%)
 	int  crt_horizontal_compensation = 100; // percent of mean-preserving bright compensation
 	int  crt_vertical_compensation = 100;
 	int  crt_horizontal_width = 2; // pixels per bright/dark horizontal band
@@ -437,7 +437,7 @@ protected:
 
 	// Final display-space CRT pass. This runs after the main image and all
 	// overlay/UI layers have been composited, immediately before present.
-	void apply_crt_filter();
+	void apply_crt_filter(const SDL_FRect& content_rect);
 
 	// (Re)upload a layer's 8-bit pixels into its texture, using the palette.
 	// Overridden by the palettized 8-bit window.

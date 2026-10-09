@@ -1280,7 +1280,7 @@ void Image_window::set_crt_filter(
 		int horizontal_width, int vertical_width) {
 	crt_enabled = enabled;
 	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 20);
-	crt_vertical_strength = std::clamp(vertical_strength, 0, 20);
+	crt_vertical_strength = std::clamp(vertical_strength, 0, 40);
 	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
 	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
@@ -2180,7 +2180,7 @@ void Image_window::composite_layers() {
 	}
 }
 
-void Image_window::apply_crt_filter() {
+void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 	if (!crt_enabled || !screen_renderer || display_width <= 1 || display_height <= 1) {
 		return;
 	}
@@ -2230,9 +2230,16 @@ void Image_window::apply_crt_filter() {
 
 	rows_dark.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
 	rows_bright.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
+	// Lock CRT band phase to the final scaled/cropped content rather than
+	// assuming the source image always starts at physical display row zero.
+	const int row_origin = static_cast<int>(std::lround(
+			-content_rect.y * static_cast<float>(display_height) / content_rect.h));
+	const int period = 2 * crt_horizontal_width;
 	for (int y = 0; y < display_height;) {
-		const int phase = (y / crt_horizontal_width) & 1;
-		const int band_end = std::min(display_height, ((y / crt_horizontal_width) + 1) * crt_horizontal_width);
+		const int offset = ((y - row_origin) % period + period) % period;
+		const int phase = offset >= crt_horizontal_width ? 1 : 0;
+		const int band_end = std::min(
+				display_height, y + (phase ? period - offset : crt_horizontal_width - offset));
 		SDL_FRect r{0.0f, static_cast<float>(y), static_cast<float>(display_width), static_cast<float>(band_end - y)};
 		(phase ? rows_dark : rows_bright).push_back(r);
 		y = band_end;
@@ -2247,7 +2254,7 @@ void Image_window::apply_crt_filter() {
 		x = band_end;
 	}
 
-	const auto render_axis = [&](int strength, int compensation,
+	const auto render_axis = [&](float strength, int compensation,
 			const std::vector<SDL_FRect>& dark_rects,
 			const std::vector<SDL_FRect>& bright_rects) {
 		if (strength <= 0) {
@@ -2255,7 +2262,7 @@ void Image_window::apply_crt_filter() {
 		}
 
 		// Dark line multiplier: 1-strength. For 30%, alternate lines are 0.70.
-		const float s = static_cast<float>(strength) / 100.0f;
+		const float s = strength / 100.0f;
 		const int dark_rgb = std::clamp(
 				static_cast<int>(std::lround((1.0f - s) * 255.0f)), 0, 255);
 		SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
@@ -2289,7 +2296,7 @@ void Image_window::apply_crt_filter() {
 			crt_horizontal_strength, crt_horizontal_compensation,
 			rows_dark, rows_bright);
 	render_axis(
-			crt_vertical_strength, crt_vertical_compensation,
+			static_cast<float>(crt_vertical_strength) * 0.5f, crt_vertical_compensation,
 			cols_dark, cols_bright);
 
 	// Avoid leaking CRT renderer state into the next frame.
@@ -2342,7 +2349,7 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool fo
 
 	// CRT is deliberately the final visual pass: it affects the scaled/rotated
 	// world and every gump/text/overlay layer equally, like a physical display.
-	apply_crt_filter();
+	apply_crt_filter(*fullRect);
 
 	if (!for_screenshot) {
 		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");

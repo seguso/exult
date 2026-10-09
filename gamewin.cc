@@ -406,13 +406,17 @@ Game_window::Game_window(
 	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
 	config->value("config/video/crt/enabled", crt_filter_enabled, false);
 	config->value("config/video/crt/horizontal_strength", crt_horizontal_strength, 8);
-	config->value("config/video/crt/vertical_strength", crt_vertical_strength, 4);
+	// Read existing whole-percent configurations before the new half-percent key.
+	int legacy_crt_vertical_strength = 4;
+	config->value("config/video/crt/vertical_strength", legacy_crt_vertical_strength, 4);
+	crt_vertical_strength = 2 * legacy_crt_vertical_strength;
+	config->value("config/video/crt/vertical_strength_half", crt_vertical_strength, crt_vertical_strength);
 	config->value("config/video/crt/horizontal_compensation", crt_horizontal_compensation, 100);
 	config->value("config/video/crt/vertical_compensation", crt_vertical_compensation, 100);
 	config->value("config/video/crt/horizontal_width", crt_horizontal_width, 2);
 	config->value("config/video/crt/vertical_width", crt_vertical_width, 2);
 	crt_horizontal_strength = std::clamp(crt_horizontal_strength, 0, 20);
-	crt_vertical_strength = std::clamp(crt_vertical_strength, 0, 20);
+	crt_vertical_strength = std::clamp(crt_vertical_strength, 0, 40);
 	crt_horizontal_compensation = std::clamp(crt_horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(crt_vertical_compensation, 0, 200);
 	crt_horizontal_width = std::clamp(crt_horizontal_width, 1, 6);
@@ -433,7 +437,7 @@ Game_window::Game_window(
 	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, false);
 	config->set("config/video/crt/enabled", crt_filter_enabled ? "yes" : "no", false);
 	config->set("config/video/crt/horizontal_strength", crt_horizontal_strength, false);
-	config->set("config/video/crt/vertical_strength", crt_vertical_strength, false);
+	config->set("config/video/crt/vertical_strength_half", crt_vertical_strength, false);
 	config->set("config/video/crt/horizontal_compensation", crt_horizontal_compensation, false);
 	config->set("config/video/crt/vertical_compensation", crt_vertical_compensation, false);
 	config->set("config/video/crt/horizontal_width", crt_horizontal_width, false);
@@ -676,7 +680,7 @@ void Game_window::set_crt_filter_settings(
 		int horizontal_width, int vertical_width) {
 	crt_filter_enabled = enabled;
 	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 20);
-	crt_vertical_strength = std::clamp(vertical_strength, 0, 20);
+	crt_vertical_strength = std::clamp(vertical_strength, 0, 40);
 	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
 	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
@@ -684,7 +688,7 @@ void Game_window::set_crt_filter_settings(
 
 	config->set("config/video/crt/enabled", crt_filter_enabled ? "yes" : "no", false);
 	config->set("config/video/crt/horizontal_strength", crt_horizontal_strength, false);
-	config->set("config/video/crt/vertical_strength", crt_vertical_strength, false);
+	config->set("config/video/crt/vertical_strength_half", crt_vertical_strength, false);
 	config->set("config/video/crt/horizontal_compensation", crt_horizontal_compensation, false);
 	config->set("config/video/crt/vertical_compensation", crt_vertical_compensation, false);
 	config->set("config/video/crt/horizontal_width", crt_horizontal_width, false);

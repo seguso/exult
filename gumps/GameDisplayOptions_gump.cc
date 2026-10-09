@@ -389,7 +389,7 @@ void GameDisplayOptions_gump::build_buttons() {
 			get_button_pos_for_label("CRT horizontal scanlines:"), yForRow(++y_index), small_size);
 	buttons[id_crt_vertical_strength] = std::make_unique<GameDisplayOptions_button>(
 			this, &GameDisplayOptions_gump::choose_crt_vertical_strength,
-			std::to_string(crt_vertical_strength) + "%",
+			(std::to_string(crt_vertical_strength / 2) + (crt_vertical_strength % 2 ? ".5%" : "%")),
 			get_button_pos_for_label("CRT vertical mask:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> crt_comp_text;
@@ -484,7 +484,7 @@ void GameDisplayOptions_gump::choose_crt_horizontal_strength() {
 void GameDisplayOptions_gump::choose_crt_vertical_strength() {
 	bool escaped = false;
 	const int value = gwin->get_gump_man()->prompt_for_number(
-			0, 20, 1, crt_vertical_strength, this, &escaped);
+			0, 40, 1, crt_vertical_strength, this, &escaped);
 	if (!escaped) {
 		crt_vertical_strength = value;
 		update_crt_strength_buttons();
@@ -505,7 +505,7 @@ void GameDisplayOptions_gump::update_crt_strength_buttons() {
 		const int button_y = buttons[id_crt_vertical_strength]->get_y();
 		buttons[id_crt_vertical_strength] = std::make_unique<GameDisplayOptions_button>(
 				this, &GameDisplayOptions_gump::choose_crt_vertical_strength,
-				std::to_string(crt_vertical_strength) + "%",
+				(std::to_string(crt_vertical_strength / 2) + (crt_vertical_strength % 2 ? ".5%" : "%")),
 				get_button_pos_for_label("CRT vertical mask:"), button_y, small_size);
 	}
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
@@ -589,7 +589,7 @@ void GameDisplayOptions_gump::load_settings() {
 		return static_cast<int>(best);
 	};
 	crt_horizontal_strength = std::clamp(gwin->get_crt_horizontal_strength(), 0, 20);
-	crt_vertical_strength = std::clamp(gwin->get_crt_vertical_strength(), 0, 20);
+	crt_vertical_strength = std::clamp(gwin->get_crt_vertical_strength(), 0, 40);
 	crt_horizontal_compensation = nearest_index(
 			gwin->get_crt_horizontal_compensation(), crt_compensation_values, std::size(crt_compensation_values));
 	crt_vertical_compensation = nearest_index(
@@ -702,7 +702,7 @@ void GameDisplayOptions_gump::save_settings() {
 	gwin->set_crt_filter_settings(
 			crt_enabled != 0,
 			std::clamp(crt_horizontal_strength, 0, 20),
-			std::clamp(crt_vertical_strength, 0, 20),
+			std::clamp(crt_vertical_strength, 0, 40),
 			crt_compensation_values[std::clamp(crt_horizontal_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)],
 			crt_compensation_values[std::clamp(crt_vertical_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)],
 			crt_width_values[std::clamp(crt_horizontal_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)],
