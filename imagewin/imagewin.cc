@@ -1276,12 +1276,15 @@ void Image_window::set_title(const char* title) {
 
 void Image_window::set_crt_filter(
 		bool enabled, int horizontal_strength, int vertical_strength,
-		int horizontal_compensation, int vertical_compensation) {
+		int horizontal_compensation, int vertical_compensation,
+		int horizontal_width, int vertical_width) {
 	crt_enabled = enabled;
 	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 90);
 	crt_vertical_strength = std::clamp(vertical_strength, 0, 90);
 	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
+	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
+	crt_vertical_width = std::clamp(vertical_width, 1, 6);
 }
 
 void Image_window::screen_to_game(int sx, int sy, bool fast, int& gx, int& gy) {
@@ -2225,17 +2228,23 @@ void Image_window::apply_crt_filter() {
 	cols_dark.clear();
 	cols_bright.clear();
 
-	rows_dark.reserve(static_cast<size_t>(display_height / 2 + 1));
-	rows_bright.reserve(static_cast<size_t>(display_height / 2 + 1));
-	for (int y = 0; y < display_height; ++y) {
-		SDL_FRect r{0.0f, static_cast<float>(y), static_cast<float>(display_width), 1.0f};
-		((y & 1) ? rows_dark : rows_bright).push_back(r);
+	rows_dark.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
+	rows_bright.reserve(static_cast<size_t>(display_height / std::max(1, crt_horizontal_width) + 2));
+	for (int y = 0; y < display_height;) {
+		const int phase = (y / crt_horizontal_width) & 1;
+		const int band_end = std::min(display_height, ((y / crt_horizontal_width) + 1) * crt_horizontal_width);
+		SDL_FRect r{0.0f, static_cast<float>(y), static_cast<float>(display_width), static_cast<float>(band_end - y)};
+		(phase ? rows_dark : rows_bright).push_back(r);
+		y = band_end;
 	}
-	cols_dark.reserve(static_cast<size_t>(display_width / 2 + 1));
-	cols_bright.reserve(static_cast<size_t>(display_width / 2 + 1));
-	for (int x = 0; x < display_width; ++x) {
-		SDL_FRect r{static_cast<float>(x), 0.0f, 1.0f, static_cast<float>(display_height)};
-		((x & 1) ? cols_dark : cols_bright).push_back(r);
+	cols_dark.reserve(static_cast<size_t>(display_width / std::max(1, crt_vertical_width) + 2));
+	cols_bright.reserve(static_cast<size_t>(display_width / std::max(1, crt_vertical_width) + 2));
+	for (int x = 0; x < display_width;) {
+		const int phase = (x / crt_vertical_width) & 1;
+		const int band_end = std::min(display_width, ((x / crt_vertical_width) + 1) * crt_vertical_width);
+		SDL_FRect r{static_cast<float>(x), 0.0f, static_cast<float>(band_end - x), static_cast<float>(display_height)};
+		(phase ? cols_dark : cols_bright).push_back(r);
+		x = band_end;
 	}
 
 	const auto render_axis = [&](int strength, int compensation,
