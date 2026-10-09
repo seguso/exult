@@ -2135,6 +2135,11 @@ void Game_window::start_actor_alt(
 	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
+	if (modern_mouse_steering && modern_mouse_target_enabled) {
+		std::cerr << "[MOUSE-ASTAR] directional precheck requested_dir=" << dir
+				  << " blocked=" << blocked[dir] << " left=" << blocked[(dir + 1) % 8]
+				  << " right=" << blocked[(dir + 7) % 8] << std::endl;
+	}
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
 	} else if (blocked[dir] && !blocked[(dir + 7) % 8]) {
@@ -2144,6 +2149,10 @@ void Game_window::start_actor_alt(
 		// We already know the blocking object isn't the avatar, so don't
 		// double check it here.
 		if (!block || !block->move_aside(main_actor, dir)) {
+			if (modern_mouse_steering && modern_mouse_target_enabled) {
+				std::cerr << "[MOUSE-ASTAR] rejected: directional precheck blocked; stop_actor"
+						  << " dir=" << dir << " actor-queue=" << main_actor->in_queue() << std::endl;
+			}
 			stop_actor();
 			if (main_actor->get_lift() % 5) {    // Up on something?
 				// See if we're stuck in the air.
@@ -2166,7 +2175,11 @@ void Game_window::start_actor_alt(
 		const int tx = (get_scrolltx() + (winx + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
 		const int ty = (get_scrollty() + (winy + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
 		const Tile_coord current = main_actor->get_tile();
+		std::cerr << "[MOUSE-ASTAR] target=(" << tx << "," << ty << ",any-lift)"
+				  << " actor=(" << current.tx << "," << current.ty << "," << current.tz
+				  << ") queued=" << main_actor->in_queue() << std::endl;
 		if (tx == current.tx && ty == current.ty) {
+			std::cerr << "[MOUSE-ASTAR] rejected: same tile; stop_actor" << std::endl;
 			stop_actor();
 			return;
 		}
@@ -2178,18 +2191,30 @@ void Game_window::start_actor_alt(
 		Actor_action* current_action = main_actor->get_action();
 		bool routed = false;
 		if (current_action && current_action->following_smart_path()) {
+			std::cerr << "[MOUSE-ASTAR] existing-smart-path; queued-before="
+					  << main_actor->in_queue() << " current-speed=" << main_actor->get_frame_time() << std::endl;
 			// Match the currently selected Shift speed without restarting the
 			// walking action, animation frame or time-queue entry.
 			main_actor->set_frame_time(speed);
 			// A failed replan leaves the existing path and animation intact.
-			current_action->retarget_smart_path(main_actor, target);
+			const bool replanned = current_action->retarget_smart_path(main_actor, target);
+			std::cerr << "[MOUSE-ASTAR] retarget result=" << replanned
+					  << " queued-after=" << main_actor->in_queue()
+					  << " frame-time=" << main_actor->get_frame_time() << std::endl;
 			routed = true;
 		} else {
 			// Initial press: create a walking action only once.
 			routed = main_actor->walk_path_to_tile(target, speed) != 0;
+			std::cerr << "[MOUSE-ASTAR] new-path result=" << routed
+					  << " queued-after=" << main_actor->in_queue()
+					  << " frame-time=" << main_actor->get_frame_time() << std::endl;
 		}
 		if (!routed) {
+			std::cerr << "[MOUSE-ASTAR] rejected: no route" << std::endl;
 			return;
+		}
+		if (!main_actor->in_queue()) {
+			std::cerr << "[MOUSE-ASTAR] WARNING: route exists but avatar is NOT in time queue" << std::endl;
 		}
 		if (walk_in_formation && main_actor->get_action()) {
 			main_actor->get_action()->set_get_party(true);
@@ -2276,13 +2301,24 @@ void Game_window::start_actor(
 		int speed,             // Msecs. between frames.
 		bool mouse_steering
 ) {
+	const bool trace_mouse = modern_movement_enabled && modern_mouse_target_enabled && mouse_steering;
+	if (trace_mouse) {
+		std::cerr << "[MOUSE-ASTAR] request screen=(" << winx << "," << winy
+				  << ") actor=" << main_actor->get_tile().tx << "," << main_actor->get_tile().ty
+				  << "," << main_actor->get_tile().tz << " speed=" << speed
+				  << " queued=" << main_actor->in_queue() << " moving=" << main_actor->is_moving()
+				  << " action=" << (main_actor->get_action() != nullptr) << std::endl;
+	}
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
+		if (trace_mouse) std::cerr << "[MOUSE-ASTAR] rejected: asleep" << std::endl;
 		return;    // Zzzzz....
 	}
 	if (!cheat.in_map_editor() && (main_actor->in_usecode_control() || main_actor->get_flag(Obj_flags::paralyzed))) {
+		if (trace_mouse) std::cerr << "[MOUSE-ASTAR] rejected: usecode-control or paralyzed" << std::endl;
 		return;
 	}
 	if (gump_man->gump_mode() && !gump_man->gumps_dont_pause_game()) {
+		if (trace_mouse) std::cerr << "[MOUSE-ASTAR] rejected: pausing gump" << std::endl;
 		return;
 	}
 	//	teleported = 0;

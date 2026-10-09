@@ -2010,8 +2010,22 @@ static void Handle_event(SDL_Event& event) {
 				gump          = nullptr;
 				right_on_gump = true;
 			} else if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
-				// Try removing old queue entry.
+				if (gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()) {
+					Actor* av = gwin->get_main_actor();
+					std::cerr << "[MOUSE-ASTAR] right-down before queue removal"
+							  << " in_queue=" << av->in_queue()
+							  << " moving=" << av->is_moving()
+							  << " action=" << (av->get_action() != nullptr)
+							  << " smart=" << (av->get_action() && av->get_action()->following_smart_path())
+							  << " speed=" << av->get_frame_time()
+							  << " screen=(" << x << "," << y << ")" << std::endl;
+				}
+				// Existing Exult behavior: remove current time-queue entry.
 				gwin->get_tqueue()->remove(gwin->get_main_actor());
+				if (gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()) {
+					std::cerr << "[MOUSE-ASTAR] right-down after queue removal"
+							  << " in_queue=" << gwin->get_main_actor()->in_queue() << std::endl;
+				}
 				gwin->start_actor_from_display(x, y,
 						gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()
 							? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
