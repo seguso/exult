@@ -40,6 +40,7 @@
 #include "objiter.h"
 #include "perf.h"
 #include "palette.h"
+#include "party.h"
 
 #ifdef USE_HQ3X_SCALER
 #	include "scale_hq3x.h"
