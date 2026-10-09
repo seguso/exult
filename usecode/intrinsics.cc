@@ -1048,7 +1048,6 @@ USECODE_INTRINSIC(display_runes) {
 
 USECODE_INTRINSIC(click_on_item) {
 	ignore_unused_variable_warning(parms);
-	gwin->begin_target_camera_trace();
 	// Doesn't ret. until user single-
 	//   clicks on an item.  Rets. item.
 	Game_object* obj;
@@ -1083,10 +1082,8 @@ USECODE_INTRINSIC(click_on_item) {
 		int x;
 		int y;    // Allow dragging while here:
 		if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
-			gwin->trace_target_camera("target-cancel");
 			return Usecode_value(0);
 		}
-		gwin->trace_target_camera("target-click");
 		// Look for obj. in open gump.
 		Gump* gump = gumpman->find_gump(x, y);
 		if (gump) {
@@ -1106,7 +1103,6 @@ USECODE_INTRINSIC(click_on_item) {
 			}
 		}
 	}
-	gwin->trace_target_camera(obj ? "target-resolved-object" : "target-resolved-empty");
 	Usecode_value oval(obj);    // Ret. array with obj as 1st elem.
 	Usecode_value ret(4, &oval);
 	Usecode_value xval(t.tx);
