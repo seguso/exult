@@ -45,6 +45,8 @@ private:
 	int                      crt_vertical_strength;
 	int                      crt_horizontal_compensation;
 	int                      crt_vertical_compensation;
+	int                      crt_horizontal_width;
+	int                      crt_vertical_width;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -76,6 +78,8 @@ private:
 		id_crt_vertical_strength,
 		id_crt_horizontal_compensation,
 		id_crt_vertical_compensation,
+		id_crt_horizontal_width,
+		id_crt_vertical_width,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -176,6 +180,12 @@ public:
 	}
 	void toggle_crt_vertical_compensation(int state) {
 		crt_vertical_compensation = state;
+	}
+	void toggle_crt_horizontal_width(int state) {
+		crt_horizontal_width = state;
+	}
+	void toggle_crt_vertical_width(int state) {
+		crt_vertical_width = state;
 	}
 
 	void toggle_menu_intro(int state) {
