@@ -1666,15 +1666,31 @@ bool Game_window::update_smooth_avatar_walk(uint32 ticks) {
 			while (step_y < -c_num_tiles / 2) step_y += c_num_tiles;
 			while (step_y > c_num_tiles / 2) step_y -= c_num_tiles;
 			if (step_x || step_y) {
+				// Formation can move a follower by up to two tiles per axis in
+				// one logical step. Start from its *current visual position*,
+				// not the preceding tile, so consecutive steps cannot rewind
+				// the sprite or make it oscillate.
+				const bool formation_step = std::abs(step_x) <= 2 && std::abs(step_y) <= 2;
+				const int carry_x = state.offset_x;
+				const int carry_y = state.offset_y;
 				state.last_tx = pos.tx;
 				state.last_ty = pos.ty;
 				state.step_ticks = ticks;
-				const bool adjacent = std::abs(step_x) <= 1 && std::abs(step_y) <= 1;
-				state.from_dx = adjacent ? step_x * c_tilesize : 0;
-				state.from_dy = adjacent ? step_y * c_tilesize : 0;
+				state.from_dx = formation_step ? carry_x + step_x * c_tilesize : 0;
+				state.from_dy = formation_step ? carry_y + step_y * c_tilesize : 0;
 			}
 		}
-		const float duration = static_cast<float>(std::max(1, member->get_frame_time()));
+		// Formation steps are driven directly by Party_manager::step(), not
+		// necessarily by an Actor action: frame_time can be zero. Use the
+		// Avatar's actual walk cadence, then the standard delay as fallback.
+		int step_ms = member->get_frame_time();
+		if (step_ms <= 0) {
+			step_ms = camera_actor->get_frame_time();
+		}
+		if (step_ms <= 0) {
+			step_ms = get_std_delay();
+		}
+		const float duration = static_cast<float>(std::max(1, step_ms));
 		const float progress = std::min(1.0f, static_cast<float>(ticks - state.step_ticks) / duration);
 		state.offset_x = static_cast<int>(std::lround(state.from_dx * (1.0f - progress)));
 		state.offset_y = static_cast<int>(std::lround(state.from_dy * (1.0f - progress)));
