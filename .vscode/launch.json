@@ -2,6 +2,70 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Ultima 6 Release (No Debugger)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "noDebug": true,
+            "preLaunchTask": "Build Exult (Release x64)",
+            "program": "${workspaceFolder}/Exult.exe",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.vscode/exult-launch.cfg",
+                "--bg",
+                "--mod",
+                "Ultima6v1.3"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false
+        },
+        {
+            "name": "Debug Ultima 6 Release (Journey onward)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build Exult (Release x64)",
+            "program": "${workspaceFolder}/Exult.exe",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.vscode/exult-launch.cfg",
+                "--bg",
+                "--mod",
+                "Ultima6v1.3"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "justMyCode": false,
+            "logging": {
+                "engineLogging": true,
+                "trace": true,
+                "traceResponse": true
+            }
+        },
+        {
+            "name": "Debug Ultima 6 (Journey onward)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build Exult (Debug x64)",
+            "program": "${workspaceFolder}/Exult.exe",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.vscode/exult-launch.cfg",
+                "--bg",
+                "--mod",
+                "Ultima6v1.3"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "justMyCode": false,
+            "logging": {
+                "engineLogging": true,
+                "trace": true,
+                "traceResponse": true
+            }
+        },
+        {
             "name": "Launch Exult (Black Gate)",
             "type": "cppvsdbg",
             "request": "launch",

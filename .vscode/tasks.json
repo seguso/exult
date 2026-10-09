@@ -2,6 +2,28 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Build Exult (Debug x64)",
+            "type": "process",
+            "command": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\msvcstuff\\vs2019\\Exult.vcxproj",
+                "/m",
+                "/p:Configuration=Debug",
+                "/p:Platform=x64",
+                "/p:PlatformToolset=v143",
+                "/v:minimal"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": false
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "Build Exult (Release x64)",
             "type": "process",
             "command": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
