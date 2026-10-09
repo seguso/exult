@@ -360,8 +360,8 @@ protected:
 	int      fill_scaler;
 
 	bool crt_enabled = false;
-	int  crt_horizontal_strength = 30; // percent darkening of alternate rows
-	int  crt_vertical_strength = 15;   // percent darkening of alternate columns
+	int  crt_horizontal_strength = 8;  // percent darkening of alternate rows
+	int  crt_vertical_strength = 4;    // percent darkening of alternate columns
 	int  crt_horizontal_compensation = 100; // percent of mean-preserving bright compensation
 	int  crt_vertical_compensation = 100;
 	int  crt_horizontal_width = 2; // pixels per bright/dark horizontal band
