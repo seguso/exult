@@ -1274,6 +1274,16 @@ void Image_window::set_title(const char* title) {
 	SDL_SetWindowTitle(screen_window, title);
 }
 
+void Image_window::set_crt_filter(
+		bool enabled, int horizontal_strength, int vertical_strength,
+		int horizontal_compensation, int vertical_compensation) {
+	crt_enabled = enabled;
+	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 90);
+	crt_vertical_strength = std::clamp(vertical_strength, 0, 90);
+	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
+	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
+}
+
 void Image_window::screen_to_game(int sx, int sy, bool fast, int& gx, int& gy) {
 	// While a full-screen scene layer owns the display, map through it so mouse
 	// hit-testing lines up with widgets drawn in the (scaled) scene.
@@ -2167,6 +2177,92 @@ void Image_window::composite_layers() {
 	}
 }
 
+void Image_window::apply_crt_filter() {
+	if (!crt_enabled || !screen_renderer || display_width <= 1 || display_height <= 1) {
+		return;
+	}
+
+	// Darkening is multiplicative: dst = dst * source_colour.
+	const SDL_BlendMode darken_mode = SDL_ComposeCustomBlendMode(
+			SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_SRC_COLOR, SDL_BLENDOPERATION_ADD,
+			SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+	// Bright compensation is proportional to the existing pixel rather than an
+	// additive white lift: dst = dst + source_colour * dst.
+	const SDL_BlendMode brighten_mode = SDL_ComposeCustomBlendMode(
+			SDL_BLENDFACTOR_DST_COLOR, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD,
+			SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+
+	static thread_local std::vector<SDL_FRect> rows_dark;
+	static thread_local std::vector<SDL_FRect> rows_bright;
+	static thread_local std::vector<SDL_FRect> cols_dark;
+	static thread_local std::vector<SDL_FRect> cols_bright;
+	rows_dark.clear();
+	rows_bright.clear();
+	cols_dark.clear();
+	cols_bright.clear();
+
+	rows_dark.reserve(static_cast<size_t>(display_height / 2 + 1));
+	rows_bright.reserve(static_cast<size_t>(display_height / 2 + 1));
+	for (int y = 0; y < display_height; ++y) {
+		SDL_FRect r{0.0f, static_cast<float>(y), static_cast<float>(display_width), 1.0f};
+		((y & 1) ? rows_dark : rows_bright).push_back(r);
+	}
+	cols_dark.reserve(static_cast<size_t>(display_width / 2 + 1));
+	cols_bright.reserve(static_cast<size_t>(display_width / 2 + 1));
+	for (int x = 0; x < display_width; ++x) {
+		SDL_FRect r{static_cast<float>(x), 0.0f, 1.0f, static_cast<float>(display_height)};
+		((x & 1) ? cols_dark : cols_bright).push_back(r);
+	}
+
+	const auto render_axis = [&](int strength, int compensation,
+			const std::vector<SDL_FRect>& dark_rects,
+			const std::vector<SDL_FRect>& bright_rects) {
+		if (strength <= 0) {
+			return;
+		}
+
+		// Dark line multiplier: 1-strength. For 30%, alternate lines are 0.70.
+		const float s = static_cast<float>(strength) / 100.0f;
+		const int dark_rgb = std::clamp(
+				static_cast<int>(std::lround((1.0f - s) * 255.0f)), 0, 255);
+		SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
+		SDL_SetRenderDrawColor(
+				screen_renderer,
+				static_cast<Uint8>(dark_rgb),
+				static_cast<Uint8>(dark_rgb),
+				static_cast<Uint8>(dark_rgb), 255);
+		if (!dark_rects.empty()) {
+			SDL_RenderFillRects(screen_renderer, dark_rects.data(), static_cast<int>(dark_rects.size()));
+		}
+
+		// At compensation=100, the bright line gets +strength, so the ideal
+		// two-line mean is ((1-s) + (1+s)) / 2 = 1.0. The user can deliberately
+		// under/over-compensate from 0..200%.
+		const float boost = s * (static_cast<float>(compensation) / 100.0f);
+		if (boost > 0.0f && !bright_rects.empty()) {
+			const int boost_rgb = std::clamp(
+					static_cast<int>(std::lround(boost * 255.0f)), 0, 255);
+			SDL_SetRenderDrawBlendMode(screen_renderer, brighten_mode);
+			SDL_SetRenderDrawColor(
+					screen_renderer,
+					static_cast<Uint8>(boost_rgb),
+					static_cast<Uint8>(boost_rgb),
+					static_cast<Uint8>(boost_rgb), 255);
+			SDL_RenderFillRects(screen_renderer, bright_rects.data(), static_cast<int>(bright_rects.size()));
+		}
+	};
+
+	render_axis(
+			crt_horizontal_strength, crt_horizontal_compensation,
+			rows_dark, rows_bright);
+	render_axis(
+			crt_vertical_strength, crt_vertical_compensation,
+			cols_dark, cols_bright);
+
+	// Avoid leaking the custom mode into later renderer users.
+	SDL_SetRenderDrawBlendMode(screen_renderer, SDL_BLENDMODE_NONE);
+}
+
 void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool for_screenshot) {
 	auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__);
 
@@ -2209,6 +2305,11 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool fo
 
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
+
+	// CRT is deliberately the final visual pass: it affects the scaled/rotated
+	// world and every gump/text/overlay layer equally, like a physical display.
+	apply_crt_filter();
+
 	if (!for_screenshot) {
 		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
 		if (!SDL_RenderPresent(screen_renderer)) {
