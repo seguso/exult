@@ -1279,8 +1279,8 @@ void Image_window::set_crt_filter(
 		int horizontal_compensation, int vertical_compensation,
 		int horizontal_width, int vertical_width) {
 	crt_enabled = enabled;
-	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 90);
-	crt_vertical_strength = std::clamp(vertical_strength, 0, 90);
+	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 20);
+	crt_vertical_strength = std::clamp(vertical_strength, 0, 20);
 	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
 	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
