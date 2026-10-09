@@ -761,7 +761,7 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	if (owner != nullptr) {    // Inside something?
 		owner->change_member_shape(item, shape);
 		if (light_changed) {    // Maybe we should repaint all.
-			gwin->paint();      // Repaint finds all lights.
+			gwin->paint_current_view();      // Repaint finds all lights.
 		} else {
 			Gump* gump = gumpman->find_gump(item);
 			if (gump) {
@@ -787,7 +787,7 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	//	rect.enlarge(8);
 	//	rect = gwin->clip_to_win(rect);
 	if (light_changed) {
-		gwin->paint();    // Complete repaint refigures lights.
+		gwin->paint_current_view();    // Complete repaint refigures lights.
 	}
 	//	else
 	//		gwin->paint(rect);  // Not sure...
