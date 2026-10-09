@@ -359,6 +359,12 @@ protected:
 	FillMode fill_mode;
 	int      fill_scaler;
 
+	bool crt_enabled = false;
+	int  crt_horizontal_strength = 30; // percent darkening of alternate rows
+	int  crt_vertical_strength = 15;   // percent darkening of alternate columns
+	int  crt_horizontal_compensation = 100; // percent of mean-preserving bright compensation
+	int  crt_vertical_compensation = 100;
+
 	// Layer  scaling configuration for composited layers. Layer sizing is
 	// explicit (width/height), with 0x0 meaning Auto (use game area size).
 	// Scaler/fill settings come from ui_scaler / ui_fill_mode /
@@ -426,6 +432,10 @@ protected:
 	// Composite all visible layers onto the renderer (after the main image,
 	// before presenting).
 	void composite_layers();
+
+	// Final display-space CRT pass. This runs after the main image and all
+	// overlay/UI layers have been composited, immediately before present.
+	void apply_crt_filter();
 
 	// (Re)upload a layer's 8-bit pixels into its texture, using the palette.
 	// Overridden by the palettized 8-bit window.
@@ -616,6 +626,10 @@ public:
 
 	// Set title.
 	void set_title(const char* title);
+
+	void set_crt_filter(
+			bool enabled, int horizontal_strength, int vertical_strength,
+			int horizontal_compensation, int vertical_compensation);
 
 	Image_buffer* get_ibuf() {
 		return ibuf;
