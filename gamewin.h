@@ -1094,6 +1094,16 @@ private:
 	int avatar_walk_last_tx = -1, avatar_walk_last_ty = -1;
 	uint32 avatar_walk_step_ticks = 0;
 	int avatar_walk_from_dx = 0, avatar_walk_from_dy = 0;
+	// Each follower moves on its own tick schedule. Never share the Avatar's
+	// visual offset with the entire party.
+	struct Party_walk_visual {
+		const Actor* actor = nullptr;
+		int last_tx = -1, last_ty = -1;
+		uint32 step_ticks = 0;
+		int from_dx = 0, from_dy = 0;
+		int offset_x = 0, offset_y = 0;
+	};
+	std::map<int, Party_walk_visual> party_walk_visuals;
 
 public:
 	// Reset (well update really) saved lerp scroll positions

@@ -738,6 +738,7 @@ void Game_window::set_smooth_avatar_walk_enabled(bool enabled) {
 	config->set("config/gameplay/smooth_avatar_walk", enabled ? "yes" : "no", true);
 	avatar_walk_last_tx = avatar_walk_last_ty = -1;
 	avatar_walk_from_dx = avatar_walk_from_dy = 0;
+	party_walk_visuals.clear();
 	avposx_ld = avposy_ld = 0;
 	set_all_dirty();
 	paint_current_view();
@@ -1628,7 +1629,7 @@ void Game_window::get_shape_location(const Game_object* obj, int& x, int& y) {
 		const Actor* actor = obj->as_actor();
 		if (obj == get_camera_actor()) {
 			apply_avpos = true;
-		} else if (actor && actor->is_in_party() && lerping_enabled) {
+		} else if (actor && actor->is_in_party() && lerping_enabled && !modern_movement_enabled) {
 			// Apply the same lerping offset to party members
 			apply_avpos = true;
 		} else if (landing_barge && lerping_enabled && landing_barge->is_grouped_member(obj)) {
@@ -1639,6 +1640,18 @@ void Game_window::get_shape_location(const Game_object* obj, int& x, int& y) {
 	if (apply_avpos) {
 		x += avposx_ld;
 		y += avposy_ld;
+	}
+	// Modern smooth walk follows each party member's own discrete movements.
+	// In particular, never apply the Avatar's lerp offset to other actors.
+	if (modern_movement_enabled && smooth_avatar_walk_enabled && obj != get_camera_actor()) {
+		const Actor* actor = obj->as_actor();
+		if (actor && actor->is_in_party()) {
+			const auto it = party_walk_visuals.find(actor->get_npc_num());
+			if (it != party_walk_visuals.end() && it->second.actor == actor) {
+				x += it->second.offset_x;
+				y += it->second.offset_y;
+			}
+		}
 	}
 	x -= scrolltx_lo;
 	y -= scrollty_lo;

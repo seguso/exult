@@ -1605,7 +1605,9 @@ bool Game_window::update_smooth_avatar_walk(uint32 ticks) {
 		const bool changed = avposx_ld != 0 || avposy_ld != 0;
 		avposx_ld = avposy_ld = 0;
 		avatar_walk_last_tx = avatar_walk_last_ty = -1;
-		return changed;
+		const bool followers_changed = !party_walk_visuals.empty();
+		party_walk_visuals.clear();
+		return changed || followers_changed;
 	}
 	const Tile_coord tile = camera_actor->get_tile();
 	if (avatar_walk_last_tx < 0) {
@@ -1633,7 +1635,59 @@ bool Game_window::update_smooth_avatar_walk(uint32 ticks) {
 	const float progress = std::min(1.0f, static_cast<float>(ticks - avatar_walk_step_ticks) / duration);
 	avposx_ld = static_cast<int>(std::lround(avatar_walk_from_dx * (1.0f - progress)));
 	avposy_ld = static_cast<int>(std::lround(avatar_walk_from_dy * (1.0f - progress)));
-	return avposx_ld != oldx || avposy_ld != oldy;
+	bool changed = avposx_ld != oldx || avposy_ld != oldy;
+	// Party member interpolation is visual only. Use each NPC's own last tile
+	// and frame time; their AI schedules, formation, collision and movement
+	// decisions remain untouched.
+	std::map<int, Party_walk_visual> next_party;
+	for (int i = 0; i < party_man->get_count(); ++i) {
+		Actor* member = get_npc(party_man->get_member(i));
+		if (!member || member == camera_actor || !member->is_in_party()) {
+			continue;
+		}
+		const int npc_num = member->get_npc_num();
+		Party_walk_visual state;
+		const auto previous = party_walk_visuals.find(npc_num);
+		if (previous != party_walk_visuals.end() && previous->second.actor == member) {
+			state = previous->second;
+		}
+		const Tile_coord pos = member->get_tile();
+		if (state.last_tx < 0) {
+			state.actor = member;
+			state.last_tx = pos.tx;
+			state.last_ty = pos.ty;
+			state.step_ticks = ticks;
+		} else {
+			int step_x = state.last_tx - pos.tx;
+			int step_y = state.last_ty - pos.ty;
+			while (step_x < -c_num_tiles / 2) step_x += c_num_tiles;
+			while (step_x > c_num_tiles / 2) step_x -= c_num_tiles;
+			while (step_y < -c_num_tiles / 2) step_y += c_num_tiles;
+			while (step_y > c_num_tiles / 2) step_y -= c_num_tiles;
+			if (step_x || step_y) {
+				state.last_tx = pos.tx;
+				state.last_ty = pos.ty;
+				state.step_ticks = ticks;
+				const bool adjacent = std::abs(step_x) <= 1 && std::abs(step_y) <= 1;
+				state.from_dx = adjacent ? step_x * c_tilesize : 0;
+				state.from_dy = adjacent ? step_y * c_tilesize : 0;
+			}
+		}
+		const float duration = static_cast<float>(std::max(1, member->get_frame_time()));
+		const float progress = std::min(1.0f, static_cast<float>(ticks - state.step_ticks) / duration);
+		state.offset_x = static_cast<int>(std::lround(state.from_dx * (1.0f - progress)));
+		state.offset_y = static_cast<int>(std::lround(state.from_dy * (1.0f - progress)));
+		if (previous == party_walk_visuals.end()
+			|| previous->second.offset_x != state.offset_x || previous->second.offset_y != state.offset_y) {
+			changed = true;
+		}
+		next_party.emplace(npc_num, state);
+	}
+	if (next_party.size() != party_walk_visuals.size()) {
+		changed = true;
+	}
+	party_walk_visuals.swap(next_party);
+	return changed;
 }
 
 void Game_window::paint_current_view() {
