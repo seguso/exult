@@ -40,6 +40,11 @@ private:
 	int                      modern_tau;
 	int                      rotate_world;
 	int                      rotate_sampling_mode;
+	int                      crt_enabled;
+	int                      crt_horizontal_strength;
+	int                      crt_vertical_strength;
+	int                      crt_horizontal_compensation;
+	int                      crt_vertical_compensation;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -66,6 +71,11 @@ private:
 		id_modern_tau,
 		id_rotate_world,
 		id_rotate_sampling_mode,
+		id_crt_enabled,
+		id_crt_horizontal_strength,
+		id_crt_vertical_strength,
+		id_crt_horizontal_compensation,
+		id_crt_vertical_compensation,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -150,6 +160,22 @@ public:
 
 	void toggle_rotate_sampling_mode(int state) {
 		rotate_sampling_mode = state;
+	}
+
+	void toggle_crt_enabled(int state) {
+		crt_enabled = state;
+	}
+	void toggle_crt_horizontal_strength(int state) {
+		crt_horizontal_strength = state;
+	}
+	void toggle_crt_vertical_strength(int state) {
+		crt_vertical_strength = state;
+	}
+	void toggle_crt_horizontal_compensation(int state) {
+		crt_horizontal_compensation = state;
+	}
+	void toggle_crt_vertical_compensation(int state) {
+		crt_vertical_compensation = state;
 	}
 
 	void toggle_menu_intro(int state) {
