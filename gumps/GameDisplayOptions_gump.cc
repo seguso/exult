@@ -264,6 +264,8 @@ using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gu
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
 
 static constexpr int modern_tau_values[] = {90, 120, 150, 180, 220, 300, 400, 500};
+static constexpr int crt_strength_values[] = {0, 10, 20, 30, 40, 50, 60, 70, 80};
+static constexpr int crt_compensation_values[] = {0, 50, 75, 100, 125, 150, 200};
 
 // Android stuff
 
@@ -376,6 +378,32 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
 			std::move(rotate_quality_text), rotate_sampling_mode,
 			get_button_pos_for_label(Strings::Rotatequality_()), yForRow(++y_index), large_size);
+
+	buttons[id_crt_enabled] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_crt_enabled, yesNo, crt_enabled,
+			get_button_pos_for_label("CRT filter:"), yForRow(++y_index), small_size);
+
+	std::vector<std::string> crt_strength_text;
+	for (const int value : crt_strength_values) {
+		crt_strength_text.emplace_back(std::to_string(value) + "%");
+	}
+	buttons[id_crt_horizontal_strength] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_crt_horizontal_strength, crt_strength_text, crt_horizontal_strength,
+			get_button_pos_for_label("CRT horizontal scanlines:"), yForRow(++y_index), small_size);
+	buttons[id_crt_vertical_strength] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_crt_vertical_strength, crt_strength_text, crt_vertical_strength,
+			get_button_pos_for_label("CRT vertical mask:"), yForRow(++y_index), small_size);
+
+	std::vector<std::string> crt_comp_text;
+	for (const int value : crt_compensation_values) {
+		crt_comp_text.emplace_back(std::to_string(value) + "%");
+	}
+	buttons[id_crt_horizontal_compensation] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_crt_horizontal_compensation, crt_comp_text, crt_horizontal_compensation,
+			get_button_pos_for_label("CRT H brightness comp:"), yForRow(++y_index), small_size);
+	buttons[id_crt_vertical_compensation] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_crt_vertical_compensation, std::move(crt_comp_text), crt_vertical_compensation,
+			get_button_pos_for_label("CRT V brightness comp:"), yForRow(++y_index), small_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -499,6 +527,26 @@ void GameDisplayOptions_gump::load_settings() {
 	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
 	rotate_world         = gwin->is_rotate_world_enabled() ? 1 : 0;
 	rotate_sampling_mode = gwin->get_rotate_sampling_mode();
+	crt_enabled = gwin->is_crt_filter_enabled() ? 1 : 0;
+
+	const auto nearest_index = [](int value, const int* values, size_t count) {
+		size_t best = 0;
+		for (size_t i = 1; i < count; ++i) {
+			if (std::abs(values[i] - value) < std::abs(values[best] - value)) {
+				best = i;
+			}
+		}
+		return static_cast<int>(best);
+	};
+	crt_horizontal_strength = nearest_index(
+			gwin->get_crt_horizontal_strength(), crt_strength_values, std::size(crt_strength_values));
+	crt_vertical_strength = nearest_index(
+			gwin->get_crt_vertical_strength(), crt_strength_values, std::size(crt_strength_values));
+	crt_horizontal_compensation = nearest_index(
+			gwin->get_crt_horizontal_compensation(), crt_compensation_values, std::size(crt_compensation_values));
+	crt_vertical_compensation = nearest_index(
+			gwin->get_crt_vertical_compensation(), crt_compensation_values, std::size(crt_compensation_values));
+
 	const int tau_ms = gwin->get_modern_movement_tau_ms();
 	modern_tau = 0;
 	for (size_t i = 1; i < std::size(modern_tau_values); ++i) {
@@ -542,7 +590,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(19)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(24)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -550,13 +598,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(18), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(23), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(18), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(23), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(18), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(23), 50);
 
 	load_settings();
 	build_buttons();
@@ -599,6 +647,12 @@ void GameDisplayOptions_gump::save_settings() {
 	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
 	gwin->set_rotate_sampling_mode(rotate_sampling_mode);
 	gwin->set_rotate_world_enabled(rotate_world != 0);
+	gwin->set_crt_filter_settings(
+			crt_enabled != 0,
+			crt_strength_values[std::clamp(crt_horizontal_strength, 0, static_cast<int>(std::size(crt_strength_values)) - 1)],
+			crt_strength_values[std::clamp(crt_vertical_strength, 0, static_cast<int>(std::size(crt_strength_values)) - 1)],
+			crt_compensation_values[std::clamp(crt_horizontal_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)],
+			crt_compensation_values[std::clamp(crt_vertical_compensation, 0, static_cast<int>(std::size(crt_compensation_values)) - 1)]);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
 	config->set("config/gameplay/extended_intro", extended_intro ? "yes" : "no", false);
 	gwin->set_extended_intro(extended_intro);
@@ -653,6 +707,11 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Rotateworld45deg_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Rotatequality_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT filter:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT horizontal scanlines:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT vertical mask:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT H brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT V brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);
