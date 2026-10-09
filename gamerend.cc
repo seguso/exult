@@ -1622,10 +1622,11 @@ void Game_window::trace_target_camera(const char* event) {
 
 void Game_window::paint_current_view() {
 	trace_target_camera("paint-current");
-	if (!modern_movement_enabled || !smooth_cam_valid) {
+	if (!modern_movement_enabled || !smooth_cam_valid || painting_smooth_view) {
 		paint();
 		return;
 	}
+	painting_smooth_view = true;
 
 	const int world_pixels = c_num_tiles * c_tilesize;
 	const auto wrap_pixel = [&](int p) {
@@ -1662,6 +1663,7 @@ void Game_window::paint_current_view() {
 	scrollty_lo = saved_scrollty_lo;
 	avposx_ld = saved_avposx_ld;
 	avposy_ld = saved_avposy_ld;
+	painting_smooth_view = false;
 }
 
 void Game_window::reset_velocity_camera() {
@@ -1818,7 +1820,9 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	avposx_ld = 0;
 	avposy_ld = 0;
 
+	painting_smooth_view = true;
 	paint();
+	painting_smooth_view = false;
 
 	scrolltx = saved_scrolltx;
 	scrollty = saved_scrollty;
@@ -1938,6 +1942,15 @@ void Game_render::paint_object(Game_object* obj) {
  */
 
 void Game_window::paint_dirty() {
+	// Usecode and target-selection loops can call paint_dirty() outside the
+	// main camera tick. Render through the current visual origin in that case.
+	// The guard prevents recursion when paint_current_view()/velocity already
+	// temporarily installed their own smooth scroll coordinates.
+	if (modern_movement_enabled && smooth_cam_valid && !painting_smooth_view) {
+		trace_target_camera("paint-dirty-smooth-redirect");
+		paint_current_view();
+		return;
+	}
 	effects->update_dirty_text();
 
 	TileRect box = clip_to_win(dirty);

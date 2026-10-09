@@ -1089,6 +1089,7 @@ private:
 	double smooth_cam_y;
 	uint32 smooth_cam_last_ticks;
 	bool smooth_cam_valid;
+	bool painting_smooth_view = false;
 	int camera_target_trace_frames = 0;
 
 public:
