@@ -105,6 +105,7 @@ public:
 	void build_buttons();
 	void update_legacy_smooth_button();
 	void update_conversation_font_size_button();
+	void update_crt_strength_buttons();
 
 	void load_settings();
 	void save_settings();
@@ -169,12 +170,8 @@ public:
 	void toggle_crt_enabled(int state) {
 		crt_enabled = state;
 	}
-	void toggle_crt_horizontal_strength(int state) {
-		crt_horizontal_strength = state;
-	}
-	void toggle_crt_vertical_strength(int state) {
-		crt_vertical_strength = state;
-	}
+	void choose_crt_horizontal_strength();
+	void choose_crt_vertical_strength();
 	void toggle_crt_horizontal_compensation(int state) {
 		crt_horizontal_compensation = state;
 	}
