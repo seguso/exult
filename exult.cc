@@ -31,6 +31,7 @@
 #include "Audio.h"
 #include "AudioMixer.h"
 #include "Configuration.h"
+#include "actions.h"
 #include "Face_stats.h"
 #include "Gump_button.h"
 #include "Gump_manager.h"
