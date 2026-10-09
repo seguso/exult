@@ -230,6 +230,13 @@ static Uint32               last_speed_cursor = 0;    // When we last updated th
 // fast and medium. Shift used as a modifier for another key (e.g. Shift+Q or
 // the displaced Shift+W/A/S/D bindings) does not toggle the speed.
 static bool   keyboard_medium_speed         = false;
+
+// Modern mouse A* uses the same Shift-toggled fast/medium speed mode as
+// modern WASD, rather than the cursor-distance-dependent mouse speed.
+static int modern_mouse_walk_speed() {
+	const int factor = keyboard_medium_speed ? Mouse::medium_speed_factor : Mouse::fast_speed_factor;
+	return 200 * gwin->get_std_delay() / factor;
+}
 static bool   lshift_speed_toggle_candidate = false;
 static bool   rshift_speed_toggle_candidate = false;
 static int    keyboard_speed_layer          = -1;
@@ -1485,7 +1492,9 @@ static void Handle_events() {
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
 				if (!gwin->is_modern_movement_enabled() || !gwin->is_modern_mouse_target_enabled()
 					|| ticks - last_modern_mouse_target >= 500) {
-					gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
+					gwin->start_actor_from_display(x, y,
+							gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()
+								? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
 					last_modern_mouse_target = ticks;
 				}
 			} else if (ticks > last_rest) {
@@ -2003,7 +2012,9 @@ static void Handle_event(SDL_Event& event) {
 			} else if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
 				// Try removing old queue entry.
 				gwin->get_tqueue()->remove(gwin->get_main_actor());
-				gwin->start_actor_from_display(x, y, Mouse::mouse()->avatar_speed);
+				gwin->start_actor_from_display(x, y,
+						gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()
+							? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
 			}
 		}
 		break;

@@ -2178,6 +2178,9 @@ void Game_window::start_actor_alt(
 		Actor_action* current_action = main_actor->get_action();
 		bool routed = false;
 		if (current_action && current_action->following_smart_path()) {
+			// Match the currently selected Shift speed without restarting the
+			// walking action, animation frame or time-queue entry.
+			main_actor->set_frame_time(speed);
 			// A failed replan leaves the existing path and animation intact.
 			current_action->retarget_smart_path(main_actor, target);
 			routed = true;
