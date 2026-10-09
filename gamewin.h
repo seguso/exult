@@ -139,6 +139,11 @@ class Game_window {
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
 	bool rotate_world = false;
+	bool crt_filter_enabled = false;
+	int  crt_horizontal_strength = 30;
+	int  crt_vertical_strength = 15;
+	int  crt_horizontal_compensation = 100;
+	int  crt_vertical_compensation = 100;
 	// Experimental rotated-world reconstruction/sampling quality:
 	// 0 = Scale2x + 4 samples (clean2 baseline)
 	// 1 = Scale3x + 4 samples
@@ -818,6 +823,25 @@ public:
 		return rotate_sampling_mode;
 	}
 	void set_rotate_sampling_mode(int mode);
+
+	bool is_crt_filter_enabled() const {
+		return crt_filter_enabled;
+	}
+	int get_crt_horizontal_strength() const {
+		return crt_horizontal_strength;
+	}
+	int get_crt_vertical_strength() const {
+		return crt_vertical_strength;
+	}
+	int get_crt_horizontal_compensation() const {
+		return crt_horizontal_compensation;
+	}
+	int get_crt_vertical_compensation() const {
+		return crt_vertical_compensation;
+	}
+	void set_crt_filter_settings(
+			bool enabled, int horizontal_strength, int vertical_strength,
+			int horizontal_compensation, int vertical_compensation);
 	void display_to_world(int& x, int& y) const;
 	void world_to_display(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
