@@ -1611,7 +1611,7 @@ void Game_window::trace_target_camera(const char* event) {
 		return;
 	}
 	std::fprintf(stderr,
-			"[CAM-TARGET] %s logical=(%d,%d)+(%d,%d) visual=(%.2f,%.2f) stage1=(%.2f,%.2f) stage2=(%.2f,%.2f) valid=%d modern=%d frames=%d\\n",
+			"[CAM-TARGET] %s logical=(%d,%d)+(%d,%d) visual=(%.2f,%.2f) stage1=(%.2f,%.2f) stage2=(%.2f,%.2f) valid=%d modern=%d frames=%d\n",
 			event, scrolltx, scrollty, scrolltx_lo, scrollty_lo,
 			smooth_cam_x, smooth_cam_y, smooth_cam_stage1_x, smooth_cam_stage1_y,
 			smooth_cam_stage2_x, smooth_cam_stage2_y,
