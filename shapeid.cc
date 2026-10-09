@@ -93,7 +93,8 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	std::string family;
 	config->value("config/gameplay/conversation_font/file", file, "");
 	config->value("config/gameplay/conversation_font/family", family, "");
-	if (family.empty() && file.empty()) {
+	const bool automatic_family = family.empty() && file.empty();
+	if (automatic_family) {
 		family = "Tahoma";
 	}
 
@@ -124,7 +125,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	// itself. When the user enables readable text without configuring a file
 	// or family, pick a preinstalled macOS sans-serif font automatically.
 	// Keep explicit user choices untouched, including their failure fallback.
-	if (!generated && file.empty() && family == "Tahoma") {
+	if (!generated && automatic_family) {
 		const char* const mac_fonts[] = {
 				"/System/Library/Fonts/Helvetica.ttc",
 				"/System/Library/Fonts/Supplemental/Arial.ttf",
