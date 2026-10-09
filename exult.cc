@@ -2084,6 +2084,11 @@ static void Handle_event(SDL_Event& event) {
 					gump          = nullptr;
 					right_on_gump = false;
 				}
+			} else if (avatar_can_act && gwin->is_modern_movement_enabled()
+					   && gwin->is_modern_mouse_target_enabled()) {
+				// Releasing the right button freezes the most recently
+				// calculated A* destination; the actor continues walking.
+				// No double-right-click detection in this optional mode.
 			} else if (avatar_can_act) {
 				// Last right click not within .5 secs (not a doubleclick or
 				// rapid right clicking)?
