@@ -1277,7 +1277,7 @@ void Image_window::set_title(const char* title) {
 void Image_window::set_crt_filter(
 		bool enabled, int horizontal_strength, int vertical_strength,
 		int horizontal_compensation, int vertical_compensation,
-		int horizontal_width, int vertical_width) {
+		int horizontal_width, int vertical_width, int beam_sigma) {
 	crt_enabled = enabled;
 	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 20);
 	crt_vertical_strength = std::clamp(vertical_strength, 0, 40);
@@ -1285,6 +1285,7 @@ void Image_window::set_crt_filter(
 	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
 	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
 	crt_vertical_width = std::clamp(vertical_width, 1, 6);
+	crt_beam_sigma = std::clamp(beam_sigma, 10, 100);
 }
 
 void Image_window::screen_to_game(int sx, int sy, bool fast, int& gx, int& gy) {
@@ -2284,7 +2285,7 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 		const float compensation = static_cast<float>(crt_horizontal_compensation) / 100.0f;
 		const int band_width = crt_horizontal_width;
 		const int period = 2 * band_width;
-		constexpr float sigma = 0.30f;
+		const float sigma = static_cast<float>(crt_beam_sigma) / 100.0f;
 		for (int y = 0; y < display_height; ++y) {
 			const int phase = ((y - row_origin) % period + period) % period;
 			float lobe = 0.0f;
@@ -2319,6 +2320,32 @@ void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
 	render_axis(
 			static_cast<float>(crt_vertical_strength) * 0.5f, crt_vertical_compensation,
 			cols_dark, cols_bright);
+
+	// Shape each enlarged source pixel into a rounded, separable 2-D spot.
+	// The horizontal envelope combines with the existing vertical Gaussian:
+	// corners receive attenuation in both axes, unlike a flat Point pixel.
+	// Work in physical display coordinates, anchored to the scaled source grid.
+	// Keep the original nearest-neighbour color sampling untouched.
+	if (scale > 1) {
+		const int pixel_size = scale;
+		const int origin_x = static_cast<int>(std::lround(
+				-content_rect.x * static_cast<float>(display_width) / content_rect.w));
+		const float sigma = static_cast<float>(crt_beam_sigma) / 100.0f;
+		const float edge_depth = 0.70f;
+		for (int x = 0; x < display_width; ++x) {
+			const int phase = ((x - origin_x) % pixel_size + pixel_size) % pixel_size;
+			const float position = (static_cast<float>(phase) + 0.5f) / static_cast<float>(pixel_size);
+			const float d = (position - 0.5f) / sigma;
+			const float lobe = std::exp(-0.5f * d * d);
+			const int rgb = std::clamp(static_cast<int>(std::lround(
+					(1.0f - edge_depth * (1.0f - lobe)) * 255.0f)), 0, 255);
+			const SDL_FRect column{static_cast<float>(x), 0.0f, 1.0f, static_cast<float>(display_height)};
+			SDL_SetRenderDrawBlendMode(screen_renderer, darken_mode);
+			SDL_SetRenderDrawColor(screen_renderer,
+					static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), static_cast<Uint8>(rgb), 255);
+			SDL_RenderFillRect(screen_renderer, &column);
+		}
+	}
 
 	// Avoid leaking CRT renderer state into the next frame.
 	SDL_SetRenderDrawBlendMode(screen_renderer, old_blend);

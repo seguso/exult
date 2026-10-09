@@ -305,7 +305,8 @@ void GameDisplayOptions_gump::cancel() {
 			gwin->get_crt_vertical_strength(),
 			gwin->get_crt_horizontal_compensation(),
 			gwin->get_crt_horizontal_width(),
-			gwin->get_crt_vertical_width());
+			gwin->get_crt_vertical_width(),
+			gwin->get_crt_beam_sigma());
 	done = true;
 }
 
@@ -415,6 +416,11 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_crt_vertical_width, std::move(crt_width_text), crt_vertical_width,
 			get_button_pos_for_label("CRT V mask width:"), yForRow(++y_index), small_size);
 
+	buttons[id_crt_beam_sigma] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_crt_sigma,
+			std::to_string(crt_beam_sigma / 100.0f).substr(0, 4),
+			get_button_pos_for_label("CRT beam sigma:"), yForRow(++y_index), small_size);
+
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
 			yForRow(++y_index), small_size);
@@ -474,7 +480,28 @@ void GameDisplayOptions_gump::build_buttons() {
 void GameDisplayOptions_gump::preview_crt() {
 	gwin->preview_crt_filter_settings(
 			crt_enabled != 0, crt_horizontal_strength, crt_vertical_strength,
-			crt_brightness_compensation, crt_horizontal_width, crt_vertical_width);
+			crt_brightness_compensation, crt_horizontal_width, crt_vertical_width, crt_beam_sigma);
+}
+
+void GameDisplayOptions_gump::choose_crt_sigma() {
+	bool escaped = false;
+	const int previous = crt_beam_sigma;
+	const int value = gwin->get_gump_man()->prompt_for_number(
+			10, 100, 1, previous, this, &escaped,
+			[this](int v) { crt_beam_sigma = v; preview_crt(); });
+	crt_beam_sigma = escaped ? previous : value;
+	preview_crt();
+	update_crt_sigma_button();
+}
+
+void GameDisplayOptions_gump::update_crt_sigma_button() {
+	constexpr int small_size = 44;
+	const int button_y = buttons[id_crt_beam_sigma]->get_y();
+	buttons[id_crt_beam_sigma] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_crt_sigma,
+			std::to_string(crt_beam_sigma / 100.0f).substr(0, 4),
+			get_button_pos_for_label("CRT beam sigma:"), button_y, small_size);
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
 
 void GameDisplayOptions_gump::choose_crt_brightness_compensation() {
@@ -632,6 +659,7 @@ void GameDisplayOptions_gump::load_settings() {
 	crt_horizontal_strength = std::clamp(gwin->get_crt_horizontal_strength(), 0, 20);
 	crt_vertical_strength = std::clamp(gwin->get_crt_vertical_strength(), 0, 40);
 	crt_brightness_compensation = std::clamp(gwin->get_crt_horizontal_compensation(), 50, 150);
+	crt_beam_sigma = std::clamp(gwin->get_crt_beam_sigma(), 10, 100);
 	crt_horizontal_width = nearest_index(
 			gwin->get_crt_horizontal_width(), crt_width_values, std::size(crt_width_values));
 	crt_vertical_width = nearest_index(
@@ -744,7 +772,7 @@ void GameDisplayOptions_gump::save_settings() {
 			crt_brightness_compensation,
 			crt_brightness_compensation,
 			crt_width_values[std::clamp(crt_horizontal_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)],
-			crt_width_values[std::clamp(crt_vertical_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)]);
+			crt_width_values[std::clamp(crt_vertical_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)], crt_beam_sigma);
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
 	config->set("config/gameplay/extended_intro", extended_intro ? "yes" : "no", false);
 	gwin->set_extended_intro(extended_intro);
@@ -805,6 +833,7 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), "CRT brightness comp:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT H line width:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "CRT V mask width:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT beam sigma:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Skipintro_(), x + label_margin, y + yForRow(++y_index) + 1);
 	if (buttons[id_usecode_intro]) {
 		font->paint_text(iwin->get_ib8(), Strings::Skipscriptedfirstscene_(), x + label_margin, y + yForRow(++y_index) + 1);

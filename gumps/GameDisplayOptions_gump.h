@@ -46,6 +46,7 @@ private:
 	int                      crt_brightness_compensation;
 	int                      crt_horizontal_width;
 	int                      crt_vertical_width;
+	int                      crt_beam_sigma;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -78,6 +79,7 @@ private:
 		id_crt_brightness_compensation,
 		id_crt_horizontal_width,
 		id_crt_vertical_width,
+		id_crt_beam_sigma,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -105,6 +107,8 @@ public:
 	void update_conversation_font_size_button();
 	void update_crt_strength_buttons();
 	void update_crt_compensation_button();
+	void update_crt_sigma_button();
+	void choose_crt_sigma();
 	void preview_crt();
 
 	void load_settings();

@@ -366,6 +366,7 @@ protected:
 	int  crt_vertical_compensation = 100;
 	int  crt_horizontal_width = 2; // pixels per bright/dark horizontal band
 	int  crt_vertical_width = 2;   // pixels per bright/dark vertical band
+	int  crt_beam_sigma = 30;      // hundredths of source-pixel spot width, 10..100
 
 	// Layer  scaling configuration for composited layers. Layer sizing is
 	// explicit (width/height), with 0x0 meaning Auto (use game area size).
@@ -632,7 +633,7 @@ public:
 	void set_crt_filter(
 			bool enabled, int horizontal_strength, int vertical_strength,
 			int horizontal_compensation, int vertical_compensation,
-			int horizontal_width, int vertical_width);
+			int horizontal_width, int vertical_width, int beam_sigma);
 
 	Image_buffer* get_ibuf() {
 		return ibuf;
