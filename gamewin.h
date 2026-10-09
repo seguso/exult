@@ -140,8 +140,8 @@ class Game_window {
 	TileRect dirty;                 // Dirty rectangle.
 	bool rotate_world = false;
 	bool crt_filter_enabled = false;
-	int  crt_horizontal_strength = 30;
-	int  crt_vertical_strength = 15;
+	int  crt_horizontal_strength = 8;
+	int  crt_vertical_strength = 4;
 	int  crt_horizontal_compensation = 100;
 	int  crt_vertical_compensation = 100;
 	int  crt_horizontal_width = 2;
