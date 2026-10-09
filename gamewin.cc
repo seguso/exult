@@ -2170,7 +2170,11 @@ void Game_window::start_actor_alt(
 			stop_actor();
 			return;
 		}
-		const Tile_coord target(tx, ty, lift);
+		// Astar's Actor_pathfinder_client adjusts tz as each step climbs or
+		// descends. A fixed destination lift would incorrectly require the
+		// clicked tile to be reachable at the Avatar's starting elevation.
+		// -1 means accept the naturally reached elevation at these x/y coords.
+		const Tile_coord target(tx, ty, -1);
 		Actor_action* current_action = main_actor->get_action();
 		bool routed = false;
 		if (current_action && current_action->following_smart_path()) {
