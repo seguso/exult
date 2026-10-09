@@ -507,6 +507,31 @@ Actor_action* Path_walking_actor_action::walk_to_tile(
  *  @return     0 if none.
  */
 
+bool Path_walking_actor_action::retarget_smart_path(Actor* actor, const Tile_coord& dest) {
+	// Replan in place: preserve the action, walking animation index, actor's
+	// time queue, walking speed and get_party formation state.
+	if (!actor || !path || !path->following_smart_path() || subseq || handling_door || deleted) {
+		return false;
+	}
+	if (path->get_dest() == dest) {
+		return true;
+	}
+	auto* replacement = new Astar();
+	Actor_pathfinder_client cost(actor, 0, false);
+	if (!replacement->NewPath(actor->get_tile(), dest, &cost)) {
+		delete replacement;
+		return false;
+	}
+	delete path;
+	path = replacement;
+	reached_end = false;
+	blocked = 0;
+	from_offscreen = false;
+	const Tile_coord src = actor->get_tile();
+	original_dir = static_cast<int>(Get_direction4(src.ty - dest.ty, dest.tx - src.tx));
+	return true;
+}
+
 bool Path_walking_actor_action::get_dest(Tile_coord& dest    // Returned here.
 ) const {
 	dest = path->get_dest();

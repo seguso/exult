@@ -2170,7 +2170,20 @@ void Game_window::start_actor_alt(
 			stop_actor();
 			return;
 		}
-		main_actor->walk_to_tile(tx, ty, lift, speed, 0);
+		const Tile_coord target(tx, ty, lift);
+		Actor_action* current_action = main_actor->get_action();
+		bool routed = false;
+		if (current_action && current_action->following_smart_path()) {
+			// A failed replan leaves the existing path and animation intact.
+			current_action->retarget_smart_path(main_actor, target);
+			routed = true;
+		} else {
+			// Initial press: create a walking action only once.
+			routed = main_actor->walk_path_to_tile(target, speed) != 0;
+		}
+		if (!routed) {
+			return;
+		}
 		if (walk_in_formation && main_actor->get_action()) {
 			main_actor->get_action()->set_get_party(true);
 		} else {
