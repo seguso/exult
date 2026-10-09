@@ -2144,8 +2144,6 @@ void Game_window::start_actor_alt(
 		// We already know the blocking object isn't the avatar, so don't
 		// double check it here.
 		if (!block || !block->move_aside(main_actor, dir)) {
-			if (modern_mouse_steering && modern_mouse_target_enabled) {
-			}
 			stop_actor();
 			if (main_actor->get_lift() % 5) {    // Up on something?
 				// See if we're stuck in the air.
@@ -2184,7 +2182,7 @@ void Game_window::start_actor_alt(
 			// walking action, animation frame or time-queue entry.
 			main_actor->set_frame_time(speed);
 			// A failed replan leaves the existing path and animation intact.
-			const bool replanned = current_action->retarget_smart_path(main_actor, target);
+			current_action->retarget_smart_path(main_actor, target);
 			routed = true;
 		} else {
 			// Initial press: create a walking action only once.
