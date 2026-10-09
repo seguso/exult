@@ -1072,6 +1072,7 @@ private:
 	int lerping_enabled;
 	// Our independent modern movement/camera package.
 	bool modern_movement_enabled;
+	bool smooth_avatar_walk_enabled = false;
 	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
 	// original Exult keymap and event-driven cardinal movement semantics.
 	bool modern_keyboard_enabled;
@@ -1090,6 +1091,9 @@ private:
 	uint32 smooth_cam_last_ticks;
 	bool smooth_cam_valid;
 	bool painting_smooth_view = false;
+	int avatar_walk_last_tx = -1, avatar_walk_last_ty = -1;
+	uint32 avatar_walk_step_ticks = 0;
+	int avatar_walk_from_dx = 0, avatar_walk_from_dy = 0;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
@@ -1100,6 +1104,7 @@ public:
 
 	// Monotonic three-stage low-pass camera. Returns true if it painted a frame.
 	bool paint_velocity_camera(uint32 ticks);
+	bool update_smooth_avatar_walk(uint32 ticks);
 	void reset_velocity_camera();
 
 	inline int get_scrolltx_lo() const {
@@ -1118,6 +1123,8 @@ public:
 		lerping_enabled = e;
 	}
 
+	bool is_smooth_avatar_walk_enabled() const { return smooth_avatar_walk_enabled; }
+	void set_smooth_avatar_walk_enabled(bool enabled);
 	bool is_modern_movement_enabled() const {
 		return modern_movement_enabled;
 	}

@@ -1600,6 +1600,42 @@ void Game_window::paint_lerped(int factor) {
 	avposx_ld = avposy_ld = 0;
 }
 
+bool Game_window::update_smooth_avatar_walk(uint32 ticks) {
+	if (!smooth_avatar_walk_enabled || !modern_movement_enabled || !camera_actor) {
+		const bool changed = avposx_ld != 0 || avposy_ld != 0;
+		avposx_ld = avposy_ld = 0;
+		avatar_walk_last_tx = avatar_walk_last_ty = -1;
+		return changed;
+	}
+	const Tile_coord tile = camera_actor->get_tile();
+	if (avatar_walk_last_tx < 0) {
+		avatar_walk_last_tx = tile.tx;
+		avatar_walk_last_ty = tile.ty;
+		avatar_walk_step_ticks = ticks;
+		return false;
+	}
+	int dx = avatar_walk_last_tx - tile.tx;
+	int dy = avatar_walk_last_ty - tile.ty;
+	while (dx < -c_num_tiles / 2) dx += c_num_tiles;
+	while (dx > c_num_tiles / 2) dx -= c_num_tiles;
+	while (dy < -c_num_tiles / 2) dy += c_num_tiles;
+	while (dy > c_num_tiles / 2) dy -= c_num_tiles;
+	if (dx || dy) {
+		avatar_walk_last_tx = tile.tx;
+		avatar_walk_last_ty = tile.ty;
+		avatar_walk_step_ticks = ticks;
+		// Only interpolate adjacent logical steps; teleports remain immediate.
+		avatar_walk_from_dx = (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) ? dx * c_tilesize : 0;
+		avatar_walk_from_dy = (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) ? dy * c_tilesize : 0;
+	}
+	const int oldx = avposx_ld, oldy = avposy_ld;
+	const int duration = std::max(1, camera_actor->get_frame_time());
+	const float progress = std::min(1.0f, static_cast<float>(ticks - avatar_walk_step_ticks) / duration);
+	avposx_ld = static_cast<int>(std::lround(avatar_walk_from_dx * (1.0f - progress)));
+	avposy_ld = static_cast<int>(std::lround(avatar_walk_from_dy * (1.0f - progress)));
+	return avposx_ld != oldx || avposy_ld != oldy;
+}
+
 void Game_window::paint_current_view() {
 	if (!modern_movement_enabled || !smooth_cam_valid || painting_smooth_view) {
 		paint();
@@ -1631,8 +1667,7 @@ void Game_window::paint_current_view() {
 	scrollty = wrapped_y / c_tilesize;
 	scrolltx_lo = wrapped_x % c_tilesize;
 	scrollty_lo = wrapped_y % c_tilesize;
-	avposx_ld = 0;
-	avposy_ld = 0;
+	// Preserve the independently interpolated avatar offset while rendering.
 
 	paint();
 
@@ -1656,11 +1691,12 @@ void Game_window::reset_velocity_camera() {
 	smooth_cam_valid = false;
 }
 
-bool Game_window::paint_velocity_camera(uint32 ticks) {
+	bool Game_window::paint_velocity_camera(uint32 ticks) {
 	if (!camera_actor) {
 		reset_velocity_camera();
 		return false;
 	}
+	const bool avatar_changed = update_smooth_avatar_walk(ticks);
 
 	const int world_pixels = c_num_tiles * c_tilesize;
 	const double half_world = static_cast<double>(world_pixels) * 0.5;
@@ -1767,7 +1803,7 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	const int render_x = static_cast<int>(std::lround(smooth_cam_x));
 	const int render_y = static_cast<int>(std::lround(smooth_cam_y));
 	const bool camera_changed = render_x != old_render_x || render_y != old_render_y;
-	if (!camera_changed && !is_dirty()) {
+	if (!camera_changed && !avatar_changed && !is_dirty()) {
 		return false;
 	}
 
@@ -1788,11 +1824,8 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	scrolltx_lo = wrapped_x % c_tilesize;
 	scrollty_lo = wrapped_y % c_tilesize;
 
-	// The Avatar is deliberately not compensated back to screen centre: the
-	// camera is a true lagging follower, not an interpolation offset glued to
-	// the actor.
-	avposx_ld = 0;
-	avposy_ld = 0;
+	// The independent avatar walk offset is retained while the camera follows
+	// its own three-stage trajectory. Neither alters the logical tile path.
 
 	painting_smooth_view = true;
 	paint();
@@ -1802,8 +1835,7 @@ bool Game_window::paint_velocity_camera(uint32 ticks) {
 	scrollty = saved_scrollty;
 	scrolltx_lo = 0;
 	scrollty_lo = 0;
-	avposx_ld = 0;
-	avposy_ld = 0;
+	// Keep avatar offsets for out-of-band smooth-view repaints.
 	return true;
 }
 

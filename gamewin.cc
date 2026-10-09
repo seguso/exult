@@ -397,6 +397,8 @@ Game_window::Game_window(
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled, false);
+	config->set("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
 	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 150);
@@ -729,6 +731,16 @@ void Game_window::set_modern_movement_tau_ms(int ms) {
 void Game_window::set_modern_keyboard_enabled(bool enabled) {
 	modern_keyboard_enabled = enabled;
 	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
+}
+
+void Game_window::set_smooth_avatar_walk_enabled(bool enabled) {
+	smooth_avatar_walk_enabled = enabled;
+	config->set("config/gameplay/smooth_avatar_walk", enabled ? "yes" : "no", true);
+	avatar_walk_last_tx = avatar_walk_last_ty = -1;
+	avatar_walk_from_dx = avatar_walk_from_dy = 0;
+	avposx_ld = avposy_ld = 0;
+	set_all_dirty();
+	paint_current_view();
 }
 
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {

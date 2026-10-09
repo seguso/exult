@@ -360,6 +360,9 @@ void GameDisplayOptions_gump::build_buttons() {
 	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
 			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
+	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk, yesNo, smooth_avatar_walk,
+			get_button_pos_for_label("Smooth avatar walk:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> tau_text;
 	for (int value : modern_tau_values) {
@@ -643,6 +646,7 @@ void GameDisplayOptions_gump::load_settings() {
 	text_bg          = gwin->get_text_bg() + 1;
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
 	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
+	smooth_avatar_walk = gwin->is_smooth_avatar_walk_enabled() ? 1 : 0;
 	rotate_world         = gwin->is_rotate_world_enabled() ? 1 : 0;
 	rotate_sampling_mode = gwin->get_rotate_sampling_mode();
 	crt_enabled = gwin->is_crt_filter_enabled() ? 1 : 0;
@@ -763,6 +767,7 @@ void GameDisplayOptions_gump::save_settings() {
 	config->set("config/gameplay/smooth_scrolling", smooth_scrolling * 25, false);
 	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
 	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
+	gwin->set_smooth_avatar_walk_enabled(smooth_avatar_walk != 0);
 	gwin->set_rotate_sampling_mode(rotate_sampling_mode);
 	gwin->set_rotate_world_enabled(rotate_world != 0);
 	gwin->set_crt_filter_settings(
@@ -824,6 +829,7 @@ void GameDisplayOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::TextBackground_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Modernsmoothscrolling_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Smooth avatar walk:", x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Rotateworld45deg_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Rotatequality_(), x + label_margin, y + yForRow(++y_index) + 1);
