@@ -592,7 +592,7 @@ bool Dragging_info::drop(
 		mouse_widget->mouse_up(wx, wy, Gump::MouseButton::Left);
 		mouse_widget = nullptr;
 		widget_gump  = nullptr;
-		gwin->paint_current_view();
+		gwin->paint();
 		return true;
 	}
 	if (button) {
@@ -622,7 +622,7 @@ bool Dragging_info::drop(
 	obj  = nullptr;    // Clear so we don't paint them.
 	gump = nullptr;
 	free_item_layer();    // Object returns to the main layer.
-	gwin->paint_current_view();
+	gwin->paint();
 	return handled;
 }
 
