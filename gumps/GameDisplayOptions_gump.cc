@@ -333,13 +333,13 @@ void GameDisplayOptions_gump::build_buttons() {
 	int large_size = 85;
 	if (page == Page::home) {
 		buttons[id_nav_movement] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_movement, "Movement / Camera...", 20, yForRow(0), 200);
+				this, &GameDisplayOptions_gump::open_movement, "Movement / Camera...", 4, yForRow(0), 160);
 		buttons[id_nav_crt] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_crt, "CRT...", 20, yForRow(1), 200);
+				this, &GameDisplayOptions_gump::open_crt, "CRT...", 4, yForRow(1), 160);
 		buttons[id_nav_fonts] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_fonts, "Fonts...", 20, yForRow(2), 200);
+				this, &GameDisplayOptions_gump::open_fonts, "Fonts...", 4, yForRow(2), 160);
 		buttons[id_nav_gameplay] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_gameplay, "Gameplay...", 20, yForRow(3), 200);
+				this, &GameDisplayOptions_gump::open_gameplay, "Gameplay...", 4, yForRow(3), 160);
 	} else {
 		buttons[id_back] = std::make_unique<GameDisplayOptions_button>(
 				this, &GameDisplayOptions_gump::back_to_home, "Back", 20, yForRow(9), 70);
@@ -508,18 +508,29 @@ void GameDisplayOptions_gump::build_buttons() {
 
 
 	}
-	// Recompute the procedural backdrop for each page. The former backdrop
-	// retained the home page width, clipping long gameplay labels/controls.
-	// Keep button rows close together, as in Exult's stock options dialogs.
-	const int bottom_row = page == Page::home ? 6 : 11;
-	const int width = page == Page::home ? 250 : 310;
-	SetProceduralBackground(TileRect(0, 0, width, yForRow(bottom_row + 1)), -1);
-	buttons[id_ok]->set_pos(15, yForRow(bottom_row));
-	buttons[id_help]->set_pos(80, yForRow(bottom_row));
-	buttons[id_cancel]->set_pos(145, yForRow(bottom_row));
-		ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
+	// Match Gamemenu_gump's compact four-pixel outer margins instead of
+	// maintaining an arbitrary 250/310-pixel-wide background. Resize the
+	// dialog around its actual buttons and rows on every page change.
+	constexpr int margin = 4;
+	const int footer_row = page == Page::home ? 5 : 11;
+	buttons[id_ok]->set_pos(margin, yForRow(footer_row));
+	buttons[id_help]->set_pos(margin + 50, yForRow(footer_row));
+	buttons[id_cancel]->set_pos(margin + 100, yForRow(footer_row));
+	SetProceduralBackground(
+			TileRect(0, yForRow(0) - margin, 100, yForRow(footer_row + 1) - yForRow(0) + 2 * margin),
+			-1, true);
+	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count), margin);
+	if (page == Page::home) {
+		for (auto id : {id_nav_movement, id_nav_crt, id_nav_fonts, id_nav_gameplay}) {
+			auto& button = buttons[id];
+			if (button) {
+				HorizontalArrangeWidgets(tcb::span(&button, 1), 0);
+			}
+		}
+	} else {
+		RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+	}
 	HorizontalArrangeWidgets(tcb::span(buttons.data() + id_ok, 3));
-	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
 
 void GameDisplayOptions_gump::preview_crt() {
