@@ -94,10 +94,23 @@ private:
 		id_conversation_font,
 		id_conversation_font_size,
 
+		id_nav_movement,
+		id_nav_crt,
+		id_nav_fonts,
+		id_nav_gameplay,
+		id_back,
 		id_count
 	};
 
 	std::array<std::unique_ptr<Gump_button>, id_count> buttons;
+	enum class Page { home, movement, crt, fonts, gameplay };
+	Page page = Page::home;
+	Page pending_page = Page::home;
+	void open_movement() { pending_page = Page::movement; }
+	void open_crt() { pending_page = Page::crt; }
+	void open_fonts() { pending_page = Page::fonts; }
+	void open_gameplay() { pending_page = Page::gameplay; }
+	void back_to_home() { pending_page = Page::home; }
 
 public:
 	GameDisplayOptions_gump();
