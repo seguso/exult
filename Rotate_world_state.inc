@@ -60,16 +60,6 @@ void Game_window::set_rotate_sampling_mode(int mode) {
 	}
 	rotate_sampling_mode = mode;
 	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, true);
-	static constexpr const char* names[] = {
-			"Scale2x + 4 samples",
-			"Scale3x + 4 samples",
-			"Scale3x + 9 samples",
-			"HQ3x RGB + 9 samples",
-			"HQ3x RGB + 4 samples",
-			"Forward weighted diagonal triplets",
-			"Forward weighted diagonal pairs",
-			"Forward weighted diagonal quadruplets"};
-	cout << "Rotate quality: " << names[rotate_sampling_mode] << std::endl;
 	if (rotate_world) {
 		resize_rotate_scene();
 		set_all_dirty();
