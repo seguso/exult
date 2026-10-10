@@ -784,7 +784,7 @@ void Mouse::set_speed_cursor() {
 		}
 
 		const int base_speed = 200 * gwin->get_std_delay();
-		if (gwin->is_modern_movement_enabled() && gwin->is_modern_mouse_target_enabled()) {
+		if (gwin->is_modern_mouse_target_enabled()) {
 			// A* mouse target speed is controlled by the Shift fast/medium
 			// toggle, not cursor distance. Use a constant medium-sized arrow.
 			// Keep combat artwork, continuous rotation and all other modes.
