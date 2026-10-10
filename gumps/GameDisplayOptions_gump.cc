@@ -666,29 +666,10 @@ void GameDisplayOptions_gump::save_settings() {
 	gwin->set_lerping_enabled(smooth_scrolling * 25);
 	config->set("config/gameplay/smooth_scrolling", smooth_scrolling * 25, false);
 	}
-	if (page == Page::movement) {
-
-	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
-	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
-	gwin->set_smooth_avatar_walk_enabled(smooth_avatar_walk != 0);
-
-	}
-	if (page == Page::rotation) {
-
-	gwin->set_rotate_sampling_mode(rotate_sampling_mode);
-	gwin->set_rotate_world_enabled(rotate_world != 0);
-	}
-	if (page == Page::crt) {
-
-	gwin->set_crt_filter_settings(
-			crt_enabled != 0,
-			std::clamp(crt_horizontal_strength, 0, 20),
-			std::clamp(crt_vertical_strength, 0, 40),
-			crt_brightness_compensation,
-			crt_brightness_compensation,
-			crt_width_values[std::clamp(crt_horizontal_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)],
-			crt_width_values[std::clamp(crt_vertical_width, 0, static_cast<int>(std::size(crt_width_values)) - 1)], crt_beam_sigma);
-	}
+	// Independent feature persistence callbacks.
+#include "Modern_camera_persistence.inc"
+#include "Rotate_persistence.inc"
+#include "Crt_persistence.inc"
 	if (page == Page::display) {
 
 	config->set("config/gameplay/skip_intro", usecode_intro ? "yes" : "no", false);
@@ -718,19 +699,8 @@ void GameDisplayOptions_gump::save_settings() {
 		Game::setup_fonts();
 		Game::setup_text();
 	}
-	if (page == Page::fonts) {
-
-	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
-	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
-	config->set("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking * 2, false);
-	config->set("config/gameplay/conversation_font/file", conversation_font_file, false);
-	config->set("config/gameplay/conversation_font/family", conversation_font_family, false);
-	// Reload fonts after both font-related settings have been stored.
-	Game::setup_fonts();
-	// Re-translate text messages with the correct UTF-8 map.
-	Game::setup_text();
-
-	}
+	// Readable font persistence.
+#include "Readable_font_persistence.inc"
 	config->write_back();
 }
 
