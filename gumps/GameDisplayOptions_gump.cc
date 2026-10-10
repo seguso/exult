@@ -20,6 +20,15 @@
 #	include <config.h>
 #endif
 #include "istring.h"
+#include <algorithm>
+#include <mutex>
+#if defined(SDL_PLATFORM_WINDOWS)
+#	include <windows.h>
+#	include <commdlg.h>
+#	if defined(_MSC_VER)
+#		pragma comment(lib, "Comdlg32.lib")
+#	endif
+#endif
 
 #include <cstring>
 #include <iostream>
@@ -234,6 +243,29 @@ using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gu
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
 
 // Android stuff
+
+struct ConversationFontDialogResult {
+	std::mutex mutex;
+	std::string selected_path;
+	bool pending = false;
+};
+
+static void SDLCALL conversation_font_picked(
+		void* userdata, const char* const* files, int /*filter*/) {
+	std::unique_ptr<std::shared_ptr<ConversationFontDialogResult>> state(
+			static_cast<std::shared_ptr<ConversationFontDialogResult>*>(userdata));
+	if (files && files[0] && files[0][0]) {
+		{
+			std::lock_guard<std::mutex> lock((*state)->mutex);
+			(*state)->selected_path = files[0];
+			(*state)->pending = true;
+		}
+		// Wake the Exult event loop even when the cursor doesn't move.
+		SDL_Event wake{};
+		wake.type = SDL_EVENT_USER;
+		SDL_PushEvent(&wake);
+	}
+}
 
 bool (*GameDisplayOptions_gump::Android_getAutoLaunch)()     = nullptr;
 void (*GameDisplayOptions_gump::Android_setAutoLaunch)(bool) = nullptr;
