@@ -634,7 +634,7 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
 	buttons[id_conversation_font_tracking] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_conversation_font_tracking,
-			std::vector<std::string>{"Normal", "+0.5 px", "+1 px"},
+			std::vector<std::string>{"Normal", "+1 px"},
 			conversation_font_tracking, get_button_pos_for_label("Character spacing:"),
 			yForRow(++y_index), small_size);
 	buttons[id_conversation_font_file] = std::make_unique<GameDisplayOptions_button>(
@@ -894,7 +894,8 @@ void GameDisplayOptions_gump::load_settings() {
 	conversation_font_size = conversation_font_default_size;
 	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
 	config->value("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, 0);
-	conversation_font_tracking = std::clamp(conversation_font_tracking, 0, 2);
+	// Old half-pixel values become Normal; the former +1 value remains +1.
+	conversation_font_tracking = conversation_font_tracking >= 2 ? 1 : 0;
 	conversation_font_size = std::clamp(conversation_font_size, 5, conversation_font_default_size);
 }
 
@@ -1011,7 +1012,7 @@ void GameDisplayOptions_gump::save_settings() {
 
 	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
 	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
-	config->set("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, false);
+	config->set("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking * 2, false);
 	config->set("config/gameplay/conversation_font/file", conversation_font_file, false);
 	config->set("config/gameplay/conversation_font/family", conversation_font_family, false);
 	// Reload fonts after both font-related settings have been stored.
