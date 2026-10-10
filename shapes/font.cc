@@ -323,8 +323,8 @@ int Font::paint_text(
 							const int margin = 8;
 							const int left = std::max(0, x - glyph->get_width() - margin);
 							const int top = std::max(0, baseline_y - glyph->get_height() - margin);
-							const int right = std::min(win->get_width(), x + glyph->get_width() + margin + 2);
-							const int bottom = std::min(win->get_height(), baseline_y + glyph->get_height() + margin);
+							const int right = std::min<int>(static_cast<int>(win->get_width()), x + glyph->get_width() + margin + 2);
+							const int bottom = std::min<int>(static_cast<int>(win->get_height()), baseline_y + glyph->get_height() + margin);
 							if (left < right && top < bottom) {
 								const int w = right - left, h = bottom - top;
 								std::vector<unsigned char> before(static_cast<size_t>(w) * h);
