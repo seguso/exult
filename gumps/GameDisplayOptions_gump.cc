@@ -355,6 +355,9 @@ void GameDisplayOptions_gump::toggle_modern_smooth(int state) {
 void GameDisplayOptions_gump::open_modern_scrolling() {
 	GameDisplayOptions_gump child(Page::movement);
 	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	// The child owns the modern setting. Resync when it closes, including
+	// cancellation, so the parent immediately fades/unfades legacy scrolling.
+	modern_smooth = gwin->is_modern_movement_enabled() ? 1 : 0;
 	gwin->set_all_dirty();
 }
 
@@ -794,17 +797,12 @@ void GameDisplayOptions_gump::update_conversation_font_size_button() {
 void GameDisplayOptions_gump::update_legacy_smooth_button() {
 	constexpr int legacy_row = 5;
 	const int small_size = 44;
-	if (modern_smooth) {
-		std::vector<std::string> disabled = {Strings::Disabled()};
-		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
-				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(disabled), 0,
-				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
-	} else {
-		std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
-		buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
-				this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
-				get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
-	}
+	// Preserve the actual original setting even while the modern algorithm
+	// makes it inactive. Opacity and click suppression express that state.
+	std::vector<std::string> smooth_text = {Strings::No(), "25%", "50%", "75%", "100%"};
+	buttons[id_smooth_scrolling] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_smooth_scrolling, std::move(smooth_text), smooth_scrolling,
+			get_button_pos_for_label(Strings::Smoothscrolling_()), yForRow(legacy_row), small_size);
 }
 
 void GameDisplayOptions_gump::load_settings() {
@@ -1056,8 +1054,11 @@ void GameDisplayOptions_gump::paint() {
 		std::vector<unsigned char> backdrop;
 	};
 	std::vector<FadedRow> faded_rows;
-	if (page == Page::movement && !modern_smooth) {
-		for (const button_ids id : {id_smooth_avatar_walk, id_modern_tau}) {
+	if ((page == Page::movement && !modern_smooth) || (page == Page::display && modern_smooth)) {
+		const std::vector<button_ids> inactive_buttons = page == Page::movement
+				? std::vector<button_ids>{id_smooth_avatar_walk, id_modern_tau}
+				: std::vector<button_ids>{id_smooth_scrolling};
+		for (const button_ids id : inactive_buttons) {
 			if (!buttons[id]) continue;
 			const int row_y = y + buttons[id]->get_y();
 			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
