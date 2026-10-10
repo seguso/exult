@@ -299,13 +299,10 @@ static void SDLCALL conversation_font_picked(
 			(*state)->selected_path = files[0];
 			(*state)->pending = true;
 		}
-		std::cout << "[FONT-PICKER] Accepted font file: " << files[0] << std::endl;
 		// Wake the Exult event loop even when the cursor doesn't move.
 		SDL_Event wake{};
 		wake.type = SDL_EVENT_USER;
 		SDL_PushEvent(&wake);
-	} else {
-		std::cerr << "[FONT-PICKER] " << (files ? "Canceled" : SDL_GetError()) << std::endl;
 	}
 }
 
@@ -424,13 +421,8 @@ void GameDisplayOptions_gump::choose_installed_conversation_font() {
 				utf8, sizeof(utf8), nullptr, nullptr)) {
 			conversation_font_family = utf8;
 			conversation_font_file.clear(); // A newly chosen family overrides the previous file.
-			std::cout << "[FONT-PICKER] Selected installed family: "
-					<< conversation_font_family << std::endl;
 			update_conversation_font_source_buttons();
 		}
-	} else {
-		const DWORD error = CommDlgExtendedError();
-		if (error) std::cerr << "[FONT-PICKER] ChooseFont error: " << error << std::endl;
 	}
 #else
 	browse_conversation_font(true);
@@ -1046,7 +1038,6 @@ void GameDisplayOptions_gump::paint() {
 		if (!selection.empty()) {
 			conversation_font_file = selection;
 			conversation_font_family.clear(); // Explicit file always wins.
-			std::cout << "Readable conversation font selected: " << selection << std::endl;
 			update_conversation_font_source_buttons();
 		}
 	}
