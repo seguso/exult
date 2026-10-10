@@ -336,13 +336,13 @@ void GameDisplayOptions_gump::toggle_modern_smooth(int state) {
 	const int tau_y = buttons[id_modern_tau]->get_y();
 	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
-			modern_smooth ? yesNo : std::vector<std::string>{"Disabled"}, modern_smooth ? smooth_avatar_walk : 0,
+			yesNo, smooth_avatar_walk,
 			get_button_pos_for_label("Smooth avatar walk:"), avatar_y, 44);
 	std::vector<std::string> tau_text;
 	for (int ms : modern_tau_values) tau_text.emplace_back(std::to_string(ms) + " ms");
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_tau,
-			modern_smooth ? std::move(tau_text) : std::vector<std::string>{"Disabled"}, modern_smooth ? modern_tau : 0,
+			std::move(tau_text), modern_tau,
 			get_button_pos_for_label(Strings::Smoothcameratau_()), tau_y, 44);
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 	gwin->set_all_dirty();
@@ -1059,10 +1059,10 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_smooth_scrolling, Strings::Smoothscrolling_());
 	draw_label(id_nav_movement, "Modern smooth scrolling:");
 	draw_label(id_modern_smooth, Strings::Modernsmoothscrolling_());
-	draw_label(id_smooth_avatar_walk, "Smooth avatar walk:");
+	draw_label(id_smooth_avatar_walk, modern_smooth ? "Smooth avatar walk:" : "Smooth avatar walk (inactive):");
 
 
-	draw_label(id_modern_tau, Strings::Smoothcameratau_());
+	draw_label(id_modern_tau, modern_smooth ? Strings::Smoothcameratau_() : "Smooth camera tau (inactive):");
 	draw_label(id_rotate_world, Strings::Rotateworld45deg_());
 	draw_label(id_rotate_sampling_mode, Strings::Rotatequality_());
 	draw_label(id_crt_enabled, "CRT filter:");
