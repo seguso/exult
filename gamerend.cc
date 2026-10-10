@@ -1403,7 +1403,38 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			printed_triplet_stats = true;
 		}
 
+	} else if (rotate_sampling_mode == 0 || rotate_sampling_mode == 1 || rotate_sampling_mode == 4) {
+		// Four-subpixel integration is independent of the nine-sample path.
+		// In particular, modes 0/1 do not allocate an HQ3x RGB buffer.
+		constexpr std::array<double, 2> offsets = {0.25, 0.75};
+		for (int dy = 0; dy < display_height; ++dy) {
+			for (int dx = 0; dx < display_width; ++dx) {
+				std::array<World_view_point, 4> sources;
+				for (int oy = 0; oy < 2; ++oy) {
+					for (int ox = 0; ox < 2; ++ox) {
+						sources[oy * 2 + ox] = world_view.display_to_scene(
+								{static_cast<double>(dx) + offsets[ox], static_cast<double>(dy) + offsets[oy]});
+					}
+				}
+#ifdef USE_HQ3X_SCALER
+				if (rotate_sampling_mode == 4) {
+					win->put_pixel8(blend4_rgb(
+							sample_hq3x(sources[0]), sample_hq3x(sources[1]),
+							sample_hq3x(sources[2]), sample_hq3x(sources[3])), dx, dy);
+					continue;
+				}
+#endif
+				const int factor = rotate_sampling_mode == 0 ? 2 : 3;
+				Image_buffer8* scaled = rotate_sampling_mode == 0 ? rotate_scene_2x.get() : rotate_scene_3x.get();
+				win->put_pixel8(blend4(
+						sample_scaled(sources[0], factor, scaled),
+						sample_scaled(sources[1], factor, scaled),
+						sample_scaled(sources[2], factor, scaled),
+						sample_scaled(sources[3], factor, scaled)), dx, dy);
+			}
+		}
 	} else {
+		// Modes 2 and 3: nine-subpixel integration.
 		constexpr std::array<double, 3> offsets = {1.0 / 6.0, 0.5, 5.0 / 6.0};
 		for (int dy = 0; dy < display_height; ++dy) {
 			std::array<World_view_point, 9> sources;
