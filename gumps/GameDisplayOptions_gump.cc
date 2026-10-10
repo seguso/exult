@@ -1060,10 +1060,10 @@ void GameDisplayOptions_gump::paint() {
 		for (const button_ids id : {id_smooth_avatar_walk, id_modern_tau}) {
 			if (!buttons[id]) continue;
 			const int row_y = y + buttons[id]->get_y();
-			const int left = std::clamp(x + label_margin, 0, framebuffer->get_width());
-			const int right = std::clamp(x + get_rect().w - 4, 0, framebuffer->get_width());
-			const int top = std::clamp(row_y, 0, framebuffer->get_height());
-			const int bottom = std::clamp(row_y + 16, 0, framebuffer->get_height());
+			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
+			const int right = std::clamp<int>(x + get_rect().w - 4, 0, static_cast<int>(framebuffer->get_width()));
+			const int top = std::clamp<int>(row_y, 0, static_cast<int>(framebuffer->get_height()));
+			const int bottom = std::clamp<int>(row_y + 16, 0, static_cast<int>(framebuffer->get_height()));
 			if (right <= left || bottom <= top) continue;
 			FadedRow row{left, top, right - left, bottom - top, {}};
 			row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
