@@ -24,6 +24,7 @@
 #endif
 
 #include "actors.h"
+#include "exult_horse_collision_diagnostics.h"
 
 #include "Astar.h"
 #include "Audio.h"
@@ -5241,6 +5242,7 @@ bool Npc_actor::step(
 		return false;
 	}
 	const Tile_coord oldtile = get_tile();
+	const bool traceHorse = ExultHorseTraceEnabled(this);
 	// Get old chunk.
 	t.fixme();
 	// Get chunk.
@@ -5258,8 +5260,14 @@ bool Npc_actor::step(
 	bool water;
 	bool poison;    // Get tile info.
 	get_tile_info(this, gwin, nlist, tx, ty, water, poison);
-	if (is_blocked(t, nullptr, force ? MOVE_ALL : 0)) {
+	const Tile_coord requested = t;
+	const bool worldBlocked = is_blocked(t, nullptr, force ? MOVE_ALL : 0);
+	if (worldBlocked) {
 		if (is_really_blocked(t, force)) {
+			if (traceHorse)
+				ExultHorseTrace("step-rejected shape=%d from=(%d,%d,%d) requested=(%d,%d,%d) resolved=(%d,%d,%d) worldBlocked=1",
+					get_shapenum(), oldtile.tx, oldtile.ty, oldtile.tz,
+					requested.tx, requested.ty, requested.tz, t.tx, t.ty, t.tz);
 			if (schedule) {    // Tell scheduler.
 				schedule->set_blocked(t);
 			}
@@ -5282,6 +5290,11 @@ bool Npc_actor::step(
 	// Move it.
 	Map_chunk* olist = get_chunk();
 	movef(olist, nlist, tx, ty, frame, t.tz);
+	if (traceHorse)
+		ExultHorseTrace("step-accepted shape=%d from=(%d,%d,%d) requested=(%d,%d,%d) to=(%d,%d,%d) frame=%d worldBlocked=%d",
+			get_shapenum(), oldtile.tx, oldtile.ty, oldtile.tz,
+			requested.tx, requested.ty, requested.tz,
+			t.tx, t.ty, t.tz, frame, worldBlocked ? 1 : 0);
 
 	// Near an egg?  (Do this last, since
 	//   it may teleport.)
