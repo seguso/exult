@@ -298,13 +298,30 @@ void GameDisplayOptions_gump::help() {
 	SDL_OpenURL("https://exult.info/docs.html#game_display_gump");
 }
 
+void GameDisplayOptions_gump::open_readable_fonts_page() {
+	fonts_page = true;
+	build_buttons();
+	gwin->set_all_dirty();
+}
+void GameDisplayOptions_gump::close_readable_fonts_page() {
+	fonts_page = false;
+	build_buttons();
+	gwin->set_all_dirty();
+}
+
+#include "Readable_font_picker.inc"
+#include "Readable_font_size_controls.inc"
+
 void GameDisplayOptions_gump::build_buttons() {
+	for (size_t i = id_first_setting; i < buttons.size(); ++i)
+		buttons[i].reset();
 	const std::vector<std::string> yesNo = {Strings::No(), Strings::Yes()};
 
-	int y_index    = 0;
+	int y_index    = fonts_page ? -1 : 0;
 	int small_size = 44;
 	int large_size = 85;
 
+	if (!fonts_page) {
 	// Status Bar Positions
 	std::vector<std::string> stats
 			= {Strings::Disabled(), Strings::Left(), Strings::Middle(), Strings::Right(), Strings::Vertical()};
@@ -381,6 +398,15 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts, get_button_pos_for_label(Strings::Fonts_()),
 			yForRow(++y_index), large_size);
 
+	buttons[id_readable_fonts_page] = std::make_unique<GameDisplayOptions_button>(
+		this, &GameDisplayOptions_gump::open_readable_fonts_page, "Readable fonts...",
+		get_button_pos_for_label("Readable conversation font:"), yForRow(++y_index), large_size);
+	} else {
+#include "Readable_fonts_options_page.inc"
+		buttons[id_readable_fonts_back] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::close_readable_fonts_page, "Back",
+			get_button_pos_for_label("Return to display:"), yForRow(8), large_size);
+	}
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 
@@ -412,6 +438,7 @@ void GameDisplayOptions_gump::load_settings() {
 	paperdolls       = sman->are_paperdolls_enabled();
 	text_bg          = gwin->get_text_bg() + 1;
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
+#include "Readable_font_options_load.inc"
 
 	android_autolaunch = Android_getAutoLaunch ? Android_getAutoLaunch() : 0;
 	config->value("config/gameplay/language", value, "");
@@ -440,7 +467,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(15)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -448,13 +475,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(14), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(14), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(14), 50);
 
 	load_settings();
 	build_buttons();
@@ -522,10 +549,29 @@ void GameDisplayOptions_gump::save_settings() {
 		Game::setup_text();
 	}
 
+	// Settings are persistent even after returning to the original display page.
+#include "Readable_font_persistence.inc"
 	config->write_back();
 }
 
 void GameDisplayOptions_gump::paint() {
+	// SDL file dialogs complete asynchronously. Poll only the state owned by
+	// this gump; the callback may outlive the dialog itself.
+	if (font_dialog_result) {
+		std::string picked;
+		{
+			std::lock_guard<std::mutex> guard(font_dialog_result->mutex);
+			if (font_dialog_result->pending) {
+				picked = std::move(font_dialog_result->selected_path);
+				font_dialog_result->pending = false;
+			}
+		}
+		if (!picked.empty()) {
+			conversation_font_file = std::move(picked);
+			conversation_font_family.clear();
+			update_conversation_font_source_buttons();
+		}
+	}
 	Modal_gump::paint();
 	for (auto& btn : buttons) {
 		if (btn) {
@@ -535,6 +581,7 @@ void GameDisplayOptions_gump::paint() {
 
 	Image_window8* iwin    = gwin->get_win();
 	int            y_index = 0;
+	if (!fonts_page) {
 	font->paint_text(iwin->get_ib8(), Strings::StatusBars_(), x + label_margin, y + yForRow(y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::UseShortcutBar_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Useoutlinecolor_(), x + label_margin, y + yForRow(++y_index) + 1);
@@ -559,6 +606,16 @@ void GameDisplayOptions_gump::paint() {
 	}
 	if (buttons[id_fonts]) {
 		font->paint_text(iwin->get_ib8(), Strings::Fonts_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+		font->paint_text(iwin->get_ib8(), "Readable conversation font:", x + label_margin, y + yForRow(++y_index) + 1);
+	} else {
+		const char* labels[] = {"Readable conversation font:", "Conversation font size:",
+			"Character spacing:", "TTF / OTF file:", "Installed fonts:",
+			"Restore automatic font:"};
+		int row = 0;
+		for (const char* label : labels)
+			font->paint_text(iwin->get_ib8(), label, x + label_margin, y + yForRow(row++) + 1);
+		font->paint_text(iwin->get_ib8(), "Return to display:", x + label_margin, y + yForRow(8) + 1);
 	}
 	gwin->set_painted();
 }
