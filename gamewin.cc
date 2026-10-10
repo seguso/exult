@@ -384,6 +384,13 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
+	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled, true);
+	config->set("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled ? "yes" : "no", false);
+	config->value("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, 90);
+	modern_movement_tau_ms = std::clamp(modern_movement_tau_ms, 10, 500);
+	config->set("config/gameplay/modern_movement_tau_ms", modern_movement_tau_ms, false);
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
@@ -627,6 +634,8 @@ void Game_window::init_files(bool cycle) {
 /*
  *  Read any map. (This is for "multimap" games, not U7.)
  */
+
+#include "Modern_movement_options.inc"
 
 Game_map* Game_window::get_map(int num    // Should be > 0.
 ) {
@@ -923,6 +932,11 @@ void Game_window::resized(
 		return;
 	}
 	center_view(main_actor->get_tile());
+	if (modern_movement_enabled) {
+		scrolltx_lo = scrollty_lo = 0;
+		avposx_ld = avposy_ld = 0;
+		reset_velocity_camera();
+	}
 	paint();
 	// Do the following only if in game (not for menus)
 	if (!gump_man->gump_mode()) {
@@ -1135,6 +1149,7 @@ void Game_window::set_scrolls(Tile_coord cent    // Want center here.
 
 void Game_window::center_view(const Tile_coord& t) {
 	set_scrolls(t);
+	reset_velocity_camera();
 	set_all_dirty();
 }
 
@@ -1152,6 +1167,7 @@ void Game_window::set_camera_actor(Actor* a) {
 	camera_actor       = a;
 	const Tile_coord t = a->get_tile();
 	set_scrolls(t);    // Set scrolling around position,
+	reset_velocity_camera();
 	// and read in map there.
 	set_all_dirty();
 }
@@ -1290,7 +1306,7 @@ void Game_window::get_shape_location(const Game_object* obj, int& x, int& y) {
 		const Actor* actor = obj->as_actor();
 		if (obj == get_camera_actor()) {
 			apply_avpos = true;
-		} else if (actor && actor->is_in_party() && lerping_enabled) {
+		} else if (actor && actor->is_in_party() && lerping_enabled && !modern_movement_enabled) {
 			// Apply the same lerping offset to party members
 			apply_avpos = true;
 		} else if (landing_barge && lerping_enabled && landing_barge->is_grouped_member(obj)) {
@@ -1301,6 +1317,17 @@ void Game_window::get_shape_location(const Game_object* obj, int& x, int& y) {
 	if (apply_avpos) {
 		x += avposx_ld;
 		y += avposy_ld;
+	}
+	// Smooth follower positions independently of the Avatar.
+	if (modern_movement_enabled && smooth_avatar_walk_enabled && obj != get_camera_actor()) {
+		const Actor* actor = obj->as_actor();
+		if (actor && actor->is_in_party()) {
+			const auto it = party_walk_visuals.find(actor->get_npc_num());
+			if (it != party_walk_visuals.end() && it->second.actor == actor) {
+				x += it->second.offset_x;
+				y += it->second.offset_y;
+			}
+		}
 	}
 	x -= scrolltx_lo;
 	y -= scrollty_lo;
