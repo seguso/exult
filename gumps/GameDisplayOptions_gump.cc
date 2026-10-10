@@ -293,12 +293,25 @@ Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 }
 
 bool GameDisplayOptions_gump::mouse_up(int mx, int my, MouseButton button) {
+	// The button callback only records the requested page. Wait until
+	// Modal_gump::mouse_up has finished activating and unpushing the button
+	// before destroying/recreating its widget in build_buttons().
+	bool handled;
 	if (button == MouseButton::Right && page != Page::home) {
 		pending_page = Page::home;
-		gwin->set_all_dirty();
+		handled = true;
+	} else {
+		handled = Modal_gump::mouse_up(mx, my, button);
+	}
+	if (pending_page != page && !done) {
+		page = pending_page;
+		build_buttons();      // Resize and recenter the background now.
+		gwin->set_all_dirty(); // Repaint the old footprint as well.
+		gwin->paint_current_view();
+		gwin->show(true);
 		return true;
 	}
-	return Modal_gump::mouse_up(mx, my, button);
+	return handled;
 }
 
 void GameDisplayOptions_gump::close() {
@@ -868,11 +881,9 @@ void GameDisplayOptions_gump::save_settings() {
 }
 
 void GameDisplayOptions_gump::paint() {
-	if (page != pending_page) {
-		page = pending_page;
-		build_buttons();
-		gwin->set_all_dirty();
-	}
+	// Page changes are committed in mouse_up(), after the activating button
+	// has finished its callback. paint() must never resize the gump midway
+	// through a frame: that left the old menu visible until another event.
 	Modal_gump::paint();
 	for (auto& btn : buttons) {
 		if (btn) btn->paint();
