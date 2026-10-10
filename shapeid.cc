@@ -122,6 +122,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	const unsigned char shadow = static_cast<unsigned char>(pal.find_color(0, 0, 0));
 
 	const std::string font_path = file.empty() ? std::string() : get_system_path(file);
+	std::string resolved_font_path = font_path;
 	auto generated = Gen_runtime_font_shape(
 			font_path.c_str(), family.c_str(), 256, pixels, fg, bg, shadow, 2);
 #if defined(__APPLE__)
@@ -138,6 +139,7 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 		for (const char* candidate : mac_fonts) {
 			generated = Gen_runtime_font_shape(candidate, "", 256, pixels, fg, bg, shadow, 2);
 			if (generated) {
+				resolved_font_path = candidate;
 				std::cout << "Using macOS system conversation font " << candidate << " at " << pixels << " px." << std::endl;
 				break;
 			}
@@ -157,6 +159,17 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	}
 
 	auto result = std::make_shared<Font>(std::move(generated), hlead, vlead);
+	// Generate the same padded outlines with the shadow painted transparent.
+	// This keeps identical glyph metrics, but lets Font draw all fills on top
+	// after drawing the outlined glyphs of the complete string.
+	auto fill_only = Gen_runtime_font_shape(
+			resolved_font_path.c_str(), family.c_str(), 256, pixels, fg, bg, bg, 2);
+	if (fill_only) {
+		result->set_fill_only_shapes(std::move(fill_only));
+	} else {
+		std::cerr << "Unable to generate fill-only conversation glyphs; "
+				  << "using single-pass rendering." << std::endl;
+	}
 	int tracking_halves = 0;
 	config->value("config/gameplay/conversation_font/tighter_spacing", tracking_halves, 0);
 	result->set_extra_tracking_halves(std::clamp(tracking_halves, 0, 2));
