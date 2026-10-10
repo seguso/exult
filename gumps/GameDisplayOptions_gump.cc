@@ -20,6 +20,9 @@
 #	include <config.h>
 #endif
 #include "istring.h"
+#include <algorithm>
+#include <cmath>
+#include <iterator>
 
 #include <cstring>
 #include <iostream>
