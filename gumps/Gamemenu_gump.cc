@@ -158,9 +158,11 @@ void Gamemenu_gump::video_options() {
 	auto* vid_opts = new VideoOptions_gump();
 	gumpman->do_modal_gump(vid_opts, Mouse::hand);
 
-	// resolution could have changed, so recenter & repaint menu.
+	// Resolution may have changed, so reposition the menu. Preserve the
+	// modern smooth camera's rendered origin while repainting the world:
+	// paint() alone would briefly snap back to the canonical tile scroll.
 	set_pos();
-	gwin->paint();
+	gwin->paint_current_view();
 	gwin->show();
 	delete vid_opts;
 }

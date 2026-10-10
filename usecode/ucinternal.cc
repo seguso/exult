@@ -569,7 +569,10 @@ void Usecode_internal::show_pending_text() {
 		int y;
 		while (book->show_next_page() && Get_click(x, y, Mouse::hand, nullptr, false, book, true))
 			;
-		gwin->paint();
+		// Reading a book/scroll must preserve the rendered smooth-camera origin.
+		// A plain paint() redraws at the canonical logical tile scroll and
+		// visibly snaps the background when the text overlay closes.
+		gwin->paint_current_view();
 	}
 	// Normal conversation:
 	else if (conv->is_npc_text_pending()) {
@@ -716,7 +719,11 @@ void Usecode_internal::show_npc_face(
 		gwin->set_all_dirty();
 		init_conversation();    // jsf-Added 4/20/01 for SI-Lydia.
 	}
-	gwin->paint_dirty();
+	if (gwin->is_modern_movement_enabled()) {
+		gwin->paint_current_view();
+	} else {
+		gwin->paint_dirty();
+	}
 	conv->show_face(shape, frame, slot);
 	//	user_choice = 0;     // Seems like a good idea.
 	// Also seems to create a conversation bug in Test of Love :-(
@@ -754,7 +761,7 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	if (owner != nullptr) {    // Inside something?
 		owner->change_member_shape(item, shape);
 		if (light_changed) {    // Maybe we should repaint all.
-			gwin->paint();      // Repaint finds all lights.
+			gwin->paint_current_view();      // Repaint finds all lights.
 		} else {
 			Gump* gump = gumpman->find_gump(item);
 			if (gump) {
@@ -780,7 +787,7 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	//	rect.enlarge(8);
 	//	rect = gwin->clip_to_win(rect);
 	if (light_changed) {
-		gwin->paint();    // Complete repaint refigures lights.
+		gwin->paint_current_view();    // Complete repaint refigures lights.
 	}
 	//	else
 	//		gwin->paint(rect);  // Not sure...

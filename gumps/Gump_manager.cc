@@ -575,7 +575,7 @@ void Gump_manager::add_gump(
 		} else {
 			set_kbd_focus(gump);
 		}
-		gwin->paint();
+		gwin->paint_current_view();
 		return;
 	}
 
@@ -688,7 +688,7 @@ void Gump_manager::add_gump(
 	}
 	const int sfx = Audio::game_sfx(14);
 	Audio::get_ptr()->play_sound_effect(sfx);    // The weird noise.
-	gwin->paint();                               // Show everything.
+	gwin->paint_current_view();                               // Show everything.
 }
 
 /*
@@ -726,7 +726,7 @@ void Gump_manager::close_all_gumps(bool pers) {
 	set_kbd_focus(nullptr);
 	gwin->get_npc_prox()->wait(4);    // Delay "barking" for 4 secs.
 	if (removed) {
-		gwin->paint();
+		gwin->paint_current_view();
 	}
 	if (touchui != nullptr && !modal_gump_count && non_persistent_count == 0 && !gwin->is_in_exult_menu()) {
 		touchui->showGameControls();
@@ -761,7 +761,7 @@ bool Gump_manager::double_clicked(
 		if (!gwin->main_actor_can_act()) {
 			if (gwin->get_double_click_closes_gumps()) {
 				gump->close();
-				gwin->paint();
+				gwin->paint_current_view();
 			}
 			return true;
 		}
@@ -776,7 +776,7 @@ bool Gump_manager::double_clicked(
 				btn->double_clicked(gx, gy);
 			} else if (gwin->get_double_click_closes_gumps()) {
 				gump->close();
-				gwin->paint();
+				gwin->paint_current_view();
 			}
 		}
 		return true;
@@ -1078,7 +1078,7 @@ bool Gump_manager::do_modal_gump(
 	}
 	add_gump(gump);
 	gump->run();
-	gwin->paint();    // Show everything now.
+	gwin->paint_current_view();    // Show everything now.
 	if (paint) {
 		paint->paint();
 	}
@@ -1105,7 +1105,7 @@ bool Gump_manager::do_modal_gump(
 		// overlay layer stays stale (looking like the click "did nothing").
 		const bool ran = gump->run();
 		if (ran || gwin->is_dirty() || got_event) {
-			gwin->paint();    // Paint each cycle.
+			gwin->paint_current_view();    // Paint each cycle.
 			if (paint) {
 				paint->paint();
 			}
@@ -1121,7 +1121,7 @@ bool Gump_manager::do_modal_gump(
 	remove_gump(gump);
 	Mouse::mouse()->set_shape(saveshape);
 	// Leave mouse off.
-	gwin->paint();
+	gwin->paint_current_view();
 	gwin->show(true);
 	// Resume the game
 	gwin->get_tqueue()->resume(SDL_GetTicks());

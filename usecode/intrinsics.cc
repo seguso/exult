@@ -1387,7 +1387,7 @@ USECODE_INTRINSIC(set_lift) {
 		if (lift >= 0 && lift < 20) {
 			obj->move(t.tx, t.ty, lift);
 		}
-		gwin->paint();
+		gwin->paint_current_view();
 		gwin->show();
 		modified_map = true;
 	}
