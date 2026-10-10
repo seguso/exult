@@ -123,3 +123,9 @@ Direct source inspection of `devmix:exult.cc`:
 **Architecture**: one small header/source or self-contained helper for speed state, with a minimal event integration hunk in `exult.cc`. Feature-specific walking and A* algorithms stay on their own branches. This common module may justify a real dependency for these two branches, but not for CRT, fonts or rotation.
 
 Current status: analysis complete, code extraction/integration not yet implemented or build-tested.
+
+## Integration bug fix already published to devmix
+
+- Commit `64c771f601b68e0b64aa4080043da94fc9f724c4` corrects `exult.cc` so Shift speed toggling is active when either modern keyboard **or** modern mouse target is enabled. This fixes mouse-only mode, without maintaining the old bug.
+- This is the minimal integration hotfix; it is **not** yet the final common-module refactoring. `Modern_movement_speed.h` exists on `feature/common`, but event wiring, focus reset, and integration tests are still outstanding. Do not falsely claim this is completed merely because both branches contain related code.
+- The final extraction should substitute the shared class for the local state and candidate flags in `devmix` and preserve mouse-only behavior. The feature branches must consume that shared class, not each other's code.
