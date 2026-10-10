@@ -99,6 +99,7 @@ static void Gen_shadow(
 #	endif
 #	include <windows.h>
 #	if defined(_MSC_VER)
+#		include <objbase.h>
 #		include <gdiplus.h>
 #		pragma comment(lib, "gdiplus.lib")
 #	endif
