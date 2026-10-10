@@ -84,6 +84,7 @@
 #include "version.h"
 #include "virstone.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
