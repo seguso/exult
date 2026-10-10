@@ -37,6 +37,13 @@
 #	endif
 #endif    // __GNUC__
 #include <SDL3/SDL.h>
+#if defined(SDL_PLATFORM_WINDOWS)
+#	include <windows.h>
+#	include <commdlg.h>
+#	if defined(_MSC_VER)
+#		pragma comment(lib, "Comdlg32.lib")
+#	endif
+#endif
 #ifdef __GNUC__
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
@@ -354,7 +361,7 @@ void GameDisplayOptions_gump::browse_conversation_font(bool installed) {
 	const char* start = nullptr;
 	if (installed) {
 #if defined(SDL_PLATFORM_WINDOWS)
-		start = "C:\\Windows\\Fonts"; // Folder, not a prefilled filename.
+		start = nullptr; // Windows uses the installed-family dialog instead.
 #elif defined(SDL_PLATFORM_MACOS)
 		start = "/System/Library/Fonts/";
 #elif defined(SDL_PLATFORM_LINUX)
@@ -383,7 +390,38 @@ void GameDisplayOptions_gump::choose_conversation_font_file() {
 }
 
 void GameDisplayOptions_gump::choose_installed_conversation_font() {
+#if defined(SDL_PLATFORM_WINDOWS)
+	// The Fonts folder is a virtual Windows shell view, not a reliable
+	// directory for SDL's ordinary file picker. ChooseFont enumerates
+	// installed font families through the OS font subsystem instead.
+	LOGFONTW selected{};
+	selected.lfCharSet = DEFAULT_CHARSET;
+	if (!conversation_font_family.empty()) {
+		const int count = MultiByteToWideChar(CP_UTF8, 0, conversation_font_family.c_str(),
+				-1, selected.lfFaceName, LF_FACESIZE);
+		if (!count) selected.lfFaceName[0] = L'\\0';
+	}
+	CHOOSEFONTW dialog{};
+	dialog.lStructSize = sizeof(dialog);
+	dialog.lpLogFont = &selected;
+	dialog.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_FORCEFONTEXIST;
+	if (ChooseFontW(&dialog)) {
+		char utf8[LF_FACESIZE * 4]{};
+		if (WideCharToMultiByte(CP_UTF8, 0, selected.lfFaceName, -1,
+				utf8, sizeof(utf8), nullptr, nullptr)) {
+			conversation_font_family = utf8;
+			conversation_font_file.clear(); // A newly chosen family overrides the previous file.
+			std::cout << "[FONT-PICKER] Selected installed family: "
+					<< conversation_font_family << std::endl;
+			update_conversation_font_source_buttons();
+		}
+	} else {
+		const DWORD error = CommDlgExtendedError();
+		if (error) std::cerr << "[FONT-PICKER] ChooseFont error: " << error << std::endl;
+	}
+#else
 	browse_conversation_font(true);
+#endif
 }
 
 void GameDisplayOptions_gump::reset_conversation_font() {
