@@ -35,7 +35,8 @@ Mouse target **must remain independent of camera**. Camera on/off must preserve 
 - [x] Verified comparison base -> devmix and identified major feature areas.
 - [x] Created `feature/common` from the requested base.
 - [ ] Isolate and validate actual reusable runtime/UI infrastructure.
-- [ ] Create self-contained, buildable feature branches.
+- [x] Create six feature branch refs from upstream base (code not yet transplanted).
+- [ ] Populate and build-test each feature branch.
 - [ ] Validate patch independence and combinations.
 
 This file tracks the analysis; it is **not** a claim that the common runtime extraction or individual feature branches are ready.
@@ -64,4 +65,4 @@ Inspection of `devmix:gumps/GameDisplayOptions_gump.cc` found:
 4. Confirm original upstream option layout, mouse behavior and settings are unchanged.
 5. Keep `feature/common` analysis-only until this helper has been extracted and validated; no speculative dependency from every feature branch.
 
-Current audit finding: shared visual behavior is real, but its extraction is **not yet implemented or build-tested**.
+Current audit finding: isolated palette compositor header added as `gumps/Option_row_fader.h` (commit `5da48e8749afba0789d47f052d0ce607a20cd59d`). It is **not yet wired into any UI, compile-tested, or verified at runtime**. Feature-specific enablement/disablement is intentionally excluded. Next: add a minimal test/compile harness, then integrate it into one option dialog and verify byte-identical output against devmix for representative palettes.
