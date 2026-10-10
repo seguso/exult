@@ -318,7 +318,7 @@ void GameDisplayOptions_gump::SetAndroidAutoLaunchFPtrs(void (*setter)(bool), bo
 
 bool GameDisplayOptions_gump::is_dependent_option_inactive(button_ids id) const {
 	if (page == Page::display) return modern_smooth && id == id_smooth_scrolling;
-	if (page == Page::movement) return !modern_smooth && (id == id_smooth_avatar_walk || id == id_modern_tau);
+	if (page == Page::movement) return !modern_smooth && (id == id_smooth_avatar_walk || id == id_modern_tau || id == id_modern_mouse_target);
 	if (page == Page::rotation) return !rotate_world && id == id_rotate_sampling_mode;
 	if (page == Page::crt) return !crt_enabled && id >= id_crt_horizontal_strength && id <= id_crt_beam_sigma;
 	if (page == Page::fonts) return !conversation_font && id >= id_conversation_font_size && id <= id_conversation_font_reset;
@@ -579,6 +579,10 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 			this, &GameDisplayOptions_gump::toggle_modern_tau,
 			std::move(tau_text), modern_tau,
 			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
+	buttons[id_modern_mouse_target] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_mouse_target,
+			yesNo, modern_mouse_target,
+			get_button_pos_for_label("Modern mouse target:"), yForRow(++y_index), small_size);
 
 	}
 	if (page == Page::crt) {
@@ -661,7 +665,7 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 	}
 	constexpr int margin = 4;
 	const int footer_row = page == Page::display ? 14 :
-		page == Page::movement ? 5 : page == Page::crt ? 9 : page == Page::fonts ? 7 : 4;
+		page == Page::movement ? 6 : page == Page::crt ? 9 : page == Page::fonts ? 7 : 4;
 	buttons[id_ok]->set_pos(margin, yForRow(footer_row));
 	buttons[id_help]->set_pos(margin + 50, yForRow(footer_row));
 	buttons[id_cancel]->set_pos(margin + 100, yForRow(footer_row));
@@ -968,6 +972,7 @@ void GameDisplayOptions_gump::save_settings() {
 	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
 	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
 	gwin->set_smooth_avatar_walk_enabled(smooth_avatar_walk != 0);
+	gwin->set_modern_mouse_target_enabled(modern_mouse_target != 0);
 
 	}
 	if (page == Page::rotation) {
@@ -1117,6 +1122,7 @@ void GameDisplayOptions_gump::paint() {
 
 
 	draw_label(id_modern_tau, Strings::Smoothcameratau_());
+	draw_label(id_modern_mouse_target, "Modern mouse target:");
 	draw_label(id_rotate_world, Strings::Rotateworld45deg_());
 	draw_label(id_rotate_sampling_mode, Strings::Rotatequality_());
 	draw_label(id_crt_enabled, "CRT filter:");
