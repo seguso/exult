@@ -1432,6 +1432,13 @@ static void Handle_events() {
 			gwin->start_actor(joy_aim_x, joy_aim_y, speed);
 		}
 
+		if (gwin->is_modern_movement_enabled()) {
+			// Preserve slider auto-repeat even while the camera is animating.
+			if (!gwin->main_actor_dont_move())
+				gwin->get_gump_man()->update_gumps();
+			if (!gwin->paint_velocity_camera(ticks) && gwin->is_dirty())
+				gwin->paint_dirty();
+		} else {
 		// Lerping stuff...
 		const int lerp    = gwin->is_lerping_enabled();
 		bool      didlerp = false;
@@ -1507,6 +1514,7 @@ static void Handle_events() {
 			}
 			// Reset it for lerping.
 			last_x = last_y = -1;
+		}
 		}
 		// update mousecursor appearance if needed
 		if (last_speed_cursor + 100 < SDL_GetTicks() && !dragging) {
