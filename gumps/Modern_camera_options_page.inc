@@ -1,5 +1,5 @@
 // Optional movement settings page; included in GameDisplayOptions_gump::build_buttons.
-	if (page == Page::movement) {
+	if (camera_page) {
 
 	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
