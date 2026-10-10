@@ -79,6 +79,13 @@ public:
 		return false;
 	}
 
+	// A* retargeting is opt-in; other actor actions keep the default no-op.
+	virtual bool retarget_smart_path(Actor* actor, const Tile_coord& dest) {
+		ignore_unused_variable_warning(actor);
+		ignore_unused_variable_warning(dest);
+		return false;
+	}
+
 	// Check for Astar.
 	virtual bool following_smart_path() const {
 		return false;
@@ -147,6 +154,7 @@ public:
 			Actor* npc, const Tile_coord& src, const Tile_coord& dest, int dist = 0, bool ignnpc = false) override;
 	// Get destination, or ret. 0.
 	bool get_dest(Tile_coord& dest) const override;
+	bool retarget_smart_path(Actor* actor, const Tile_coord& dest) override;
 	// Check for Astar.
 	bool following_smart_path() const override;
 
