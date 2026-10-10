@@ -2269,7 +2269,7 @@ static void Handle_event(SDL_Event& event) {
 		const bool is_shift  = is_lshift || is_rshift;
 
 		const bool modern_keyboard = gwin->is_modern_keyboard_enabled();
-		if (modern_keyboard) {
+		if (modern_keyboard || gwin->is_modern_mouse_target_enabled()) {
 			if (event.type == SDL_EVENT_KEY_DOWN) {
 				if (is_shift && !event.key.repeat) {
 					if (is_lshift) {
