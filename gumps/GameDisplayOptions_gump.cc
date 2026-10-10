@@ -540,33 +540,9 @@ void GameDisplayOptions_gump::load_settings() {
 	modern_mouse_target = gwin->is_modern_mouse_target_enabled() ? 1 : 0;
 	rotate_world         = gwin->is_rotate_world_enabled() ? 1 : 0;
 	rotate_sampling_mode = gwin->get_rotate_sampling_mode();
-	crt_enabled = gwin->is_crt_filter_enabled() ? 1 : 0;
-
-	const auto nearest_index = [](int value, const int* values, size_t count) {
-		size_t best = 0;
-		for (size_t i = 1; i < count; ++i) {
-			if (std::abs(values[i] - value) < std::abs(values[best] - value)) {
-				best = i;
-			}
-		}
-		return static_cast<int>(best);
-	};
-	crt_horizontal_strength = std::clamp(gwin->get_crt_horizontal_strength(), 0, 20);
-	crt_vertical_strength = std::clamp(gwin->get_crt_vertical_strength(), 0, 40);
-	crt_brightness_compensation = std::clamp(gwin->get_crt_horizontal_compensation(), 50, 150);
-	crt_beam_sigma = std::clamp(gwin->get_crt_beam_sigma(), 10, 100);
-	crt_horizontal_width = nearest_index(
-			gwin->get_crt_horizontal_width(), crt_width_values, std::size(crt_width_values));
-	crt_vertical_width = nearest_index(
-			gwin->get_crt_vertical_width(), crt_width_values, std::size(crt_width_values));
-
-	const int tau_ms = gwin->get_modern_movement_tau_ms();
-	modern_tau = 0;
-	for (size_t i = 1; i < std::size(modern_tau_values); ++i) {
-		if (std::abs(modern_tau_values[i] - tau_ms) < std::abs(modern_tau_values[modern_tau] - tau_ms)) {
-			modern_tau = static_cast<int>(i);
-		}
-	}
+	// Load each optional feature independently.
+#include "Crt_options_load.inc"
+#include "Modern_camera_options_load.inc"
 
 	android_autolaunch = Android_getAutoLaunch ? Android_getAutoLaunch() : 0;
 	config->value("config/gameplay/language", value, "");
@@ -592,21 +568,8 @@ void GameDisplayOptions_gump::load_settings() {
 	} else {
 		fonts = 0;    // original
 	}
-	bool conversation_font_enabled = false;
-	config->value("config/gameplay/conversation_font/enabled", conversation_font_enabled, false);
-	config->value("config/gameplay/conversation_font/file", conversation_font_file, "");
-	config->value("config/gameplay/conversation_font/family", conversation_font_family, "");
-	font_dialog_result = std::make_shared<ConversationFontDialogResult>();
-	conversation_font = conversation_font_enabled ? 1 : 0;
 	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
-
-	conversation_font_default_size = 17;
-	conversation_font_size = conversation_font_default_size;
-	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
-	config->value("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, 0);
-	// Old half-pixel values become Normal; the former +1 value remains +1.
-	conversation_font_tracking = conversation_font_tracking >= 2 ? 1 : 0;
-	conversation_font_size = std::clamp(conversation_font_size, 5, 32);
+#include "Readable_font_options_load.inc"
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump(Page section) : Modal_gump(nullptr, -1), page(section) {
