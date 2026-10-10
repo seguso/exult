@@ -287,10 +287,13 @@ static void SDLCALL conversation_font_picked(
 			(*state)->selected_path = files[0];
 			(*state)->pending = true;
 		}
+		std::cout << "[FONT-PICKER] Accepted font file: " << files[0] << std::endl;
 		// Wake the Exult event loop even when the cursor doesn't move.
 		SDL_Event wake{};
 		wake.type = SDL_EVENT_USER;
 		SDL_PushEvent(&wake);
+	} else {
+		std::cerr << "[FONT-PICKER] " << (files ? "Canceled" : SDL_GetError()) << std::endl;
 	}
 }
 
@@ -351,14 +354,22 @@ void GameDisplayOptions_gump::browse_conversation_font(bool installed) {
 	const char* start = nullptr;
 	if (installed) {
 #if defined(SDL_PLATFORM_WINDOWS)
-		start = "C:\\Windows\\Fonts\\";
+		start = nullptr; // Windows Fonts is a special shell folder; start normally.
 #elif defined(SDL_PLATFORM_MACOS)
 		start = "/System/Library/Fonts/";
 #elif defined(SDL_PLATFORM_LINUX)
 		start = "/usr/share/fonts/";
 #endif
 	} else if (!conversation_font_file.empty()) {
-		start = conversation_font_file.c_str();
+		// SDL's default_location may be a file, but the native Windows
+		// picker can pre-fill an absolute filename while remaining in the
+		// Documents folder (and refuse the Open action). Open its parent
+		// directory instead; the user can select the file normally.
+		static thread_local std::string last_directory;
+		const size_t separator = conversation_font_file.find_last_of("/\\\\");
+		last_directory = separator == std::string::npos ? std::string()
+				: conversation_font_file.substr(0, separator + 1);
+		if (!last_directory.empty()) start = last_directory.c_str();
 	}
 	// A system-font browse starts at the OS font directory; a custom browse
 	// starts at the previously selected file, when present.
