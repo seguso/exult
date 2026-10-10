@@ -384,6 +384,8 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	config->value("config/gameplay/modern_mouse_target", modern_mouse_target_enabled, false);
+	config->set("config/gameplay/modern_mouse_target", modern_mouse_target_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
@@ -627,6 +629,11 @@ void Game_window::init_files(bool cycle) {
 /*
  *  Read any map. (This is for "multimap" games, not U7.)
  */
+
+void Game_window::set_modern_mouse_target_enabled(bool enabled) {
+	modern_mouse_target_enabled = enabled;
+	config->set("config/gameplay/modern_mouse_target", enabled ? "yes" : "no", true);
+}
 
 Game_map* Game_window::get_map(int num    // Should be > 0.
 ) {
@@ -1744,7 +1751,8 @@ Gump* Game_window::get_dragging_gump() {
  */
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	// Avatar can move, don't sync the barge anymore.
 	landing_barge = nullptr;
@@ -1766,6 +1774,7 @@ void Game_window::start_actor_alt(
 	}
 
 	dir = Get_direction_NoWrap(ay - winy, winx - ax);
+	const bool modern_mouse_steering = mouse_steering && modern_mouse_target_enabled;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1787,6 +1796,9 @@ void Game_window::start_actor_alt(
 			return;
 		}
 	}
+
+	// A* retargeting owns only the optional mouse movement branch.
+#include "Modern_mouse_path.inc"
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.
@@ -1859,7 +1871,8 @@ void Game_window::start_actor_alt(
 
 void Game_window::start_actor(
 		int winx, int winy,    // Mouse position to aim for.
-		int speed              // Msecs. between frames.
+		int speed,             // Msecs. between frames.
+		bool mouse_steering
 ) {
 	if (main_actor->Actor::get_flag(Obj_flags::asleep)) {
 		return;    // Zzzzz....
@@ -1907,7 +1920,7 @@ void Game_window::start_actor(
 			}
 		}
 		// Going to use the alternative function for this at the moment
-		start_actor_alt(winx, winy, speed);
+		start_actor_alt(winx, winy, speed, mouse_steering);
 	}
 }
 
