@@ -399,7 +399,7 @@ void GameDisplayOptions_gump::choose_installed_conversation_font() {
 	if (!conversation_font_family.empty()) {
 		const int count = MultiByteToWideChar(CP_UTF8, 0, conversation_font_family.c_str(),
 				-1, selected.lfFaceName, LF_FACESIZE);
-		if (!count) selected.lfFaceName[0] = L'\\0';
+		if (!count) selected.lfFaceName[0] = 0;
 	}
 	CHOOSEFONTW dialog{};
 	dialog.lStructSize = sizeof(dialog);
