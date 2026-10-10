@@ -156,7 +156,12 @@ class Game_window {
 	// 5 = Forward weighted diagonal triplets with continuous colour
 	// 6 = Forward weighted diagonal pairs with continuous colour
 	// 7 = Forward weighted diagonal quadruplets with continuous colour
-	int rotate_sampling_mode = 0;
+	int rotate_sampling_mode =
+#ifdef USE_HQ3X_SCALER
+		6;
+#else
+		0;
+#endif
 	// Mouse steering may use a mixture of cardinal/diagonal tile steps to
 	// approximate an arbitrary angle. Keep the Avatar's walking artwork facing
 	// the dominant requested direction instead of visibly snapping toward each

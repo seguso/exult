@@ -890,7 +890,7 @@ void GameDisplayOptions_gump::load_settings() {
 	conversation_font = conversation_font_enabled ? 1 : 0;
 	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
 
-	conversation_font_default_size = std::max(5, sman->get_text_height(0) - 4);
+	conversation_font_default_size = 17;
 	conversation_font_size = conversation_font_default_size;
 	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
 	config->value("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, 0);
