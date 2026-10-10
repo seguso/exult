@@ -52,6 +52,7 @@
 #include "Enabled_button.h"
 #include "Face_stats.h"
 #include "GameDisplayOptions_gump.h"
+#include "Option_row_fader.h"
 #include "Gump_ToggleButton.h"
 #include "Gump_button.h"
 #include "Gump_manager.h"
@@ -1052,51 +1053,20 @@ void GameDisplayOptions_gump::paint() {
 	Modal_gump::paint();
 	Image_window8* iwin = gwin->get_win();
 	Image_buffer8* framebuffer = iwin->get_ib8();
-	// Save the actual background under disabled dependent controls. Fade the
-	// finished label AND button against it, without changing label lengths,
-	// layout, or the stored Yes/No/tau values.
-	struct FadedRow {
-		int x, y, width, height;
-		std::vector<unsigned char> backdrop;
-	};
-	std::vector<FadedRow> faded_rows;
-	{
-		for (size_t index = id_first_setting; index < buttons.size(); ++index) {
-			const button_ids id = static_cast<button_ids>(index);
-			if (!is_dependent_option_inactive(id)) continue;
-			if (!buttons[id]) continue;
-			const int row_y = y + buttons[id]->get_y();
-			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
-			const int right = std::clamp<int>(x + get_rect().w - 4, 0, static_cast<int>(framebuffer->get_width()));
-			const int top = std::clamp<int>(row_y, 0, static_cast<int>(framebuffer->get_height()));
-			// Rows here are 12 px apart: a 16 px fade rectangle overlaps
-			// the following row and applies the 50% blend twice there.
-			const int row_height = yForRow(1) - yForRow(0);
-			const int bottom = std::clamp<int>(row_y + row_height, 0, static_cast<int>(framebuffer->get_height()));
-			if (right <= left || bottom <= top) continue;
-			FadedRow row{left, top, right - left, bottom - top, {}};
-			row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
-			for (int yy = top; yy < bottom; ++yy)
-				for (int xx = left; xx < right; ++xx)
-					row.backdrop.push_back(framebuffer->get_pixel8(xx, yy));
-			faded_rows.push_back(std::move(row));
-		}
-		// The selected font family/file summary is a separate text row.
-		// Include it in the same one-time half-opacity compositing pass.
-		if (page == Page::fonts && !conversation_font) {
-			const int top = std::clamp<int>(y + yForRow(6), 0, static_cast<int>(framebuffer->get_height()));
-			const int bottom = std::clamp<int>(top + yForRow(1) - yForRow(0), 0, static_cast<int>(framebuffer->get_height()));
-			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
-			const int right = std::clamp<int>(x + get_rect().w - 4, 0, static_cast<int>(framebuffer->get_width()));
-			if (left < right && top < bottom) {
-				FadedRow row{left, top, right - left, bottom - top, {}};
-				row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
-				for (int yy = top; yy < bottom; ++yy)
-					for (int xx = left; xx < right; ++xx)
-						row.backdrop.push_back(framebuffer->get_pixel8(xx, yy));
-				faded_rows.push_back(std::move(row));
-			}
-		}
+	// Capture the indexed framebuffer under the controls before rendering them.
+	// The shared compositor handles palette blending; this gump alone decides
+	// which setting depends on which feature.
+	std::vector<Option_row_fader> faded_rows;
+	const int row_height = yForRow(1) - yForRow(0);
+	const int left = x + label_margin;
+	const int width = get_rect().w - label_margin - 4;
+	for (size_t index = id_first_setting; index < buttons.size(); ++index) {
+		const button_ids id = static_cast<button_ids>(index);
+		if (!is_dependent_option_inactive(id) || !buttons[id]) continue;
+		faded_rows.emplace_back(*framebuffer, left, y + buttons[id]->get_y(), width, row_height);
+	}
+	if (page == Page::fonts && !conversation_font) {
+		faded_rows.emplace_back(*framebuffer, left, y + yForRow(6), width, row_height);
 	}
 	for (auto& btn : buttons) {
 		if (btn) btn->paint();
@@ -1154,33 +1124,10 @@ void GameDisplayOptions_gump::paint() {
 		font->paint_text(iwin->get_ib8(), chosen.c_str(),
 				x + label_margin, y + yForRow(6) + 1);
 	}
-	// Composite the disabled controls at half opacity onto the already
-	// painted gump background. All other options retain normal rendering.
-	if (!faded_rows.empty()) {
-		const Palette* palette = gwin->get_pal();
-		if (palette) {
-			std::array<int, 65536> blend_cache;
-			blend_cache.fill(-1);
-			for (const auto& row : faded_rows) {
-				for (int yy = 0; yy < row.height; ++yy) {
-					for (int xx = 0; xx < row.width; ++xx) {
-						const unsigned char bg = row.backdrop[static_cast<size_t>(yy) * row.width + xx];
-						const unsigned char fg = framebuffer->get_pixel8(row.x + xx, row.y + yy);
-						if (bg == fg) continue;
-						const unsigned int key = (static_cast<unsigned int>(fg) << 8) | bg;
-						int color = blend_cache[key];
-						if (color < 0) {
-							color = palette->find_color(
-									(palette->get_red(fg) + palette->get_red(bg) + 1) / 2,
-									(palette->get_green(fg) + palette->get_green(bg) + 1) / 2,
-									(palette->get_blue(fg) + palette->get_blue(bg) + 1) / 2);
-							blend_cache[key] = color;
-						}
-						framebuffer->put_pixel8(static_cast<unsigned char>(color), row.x + xx, row.y + yy);
-					}
-				}
-			}
-		}
+	// Render labels and controls normally first, then composite inactive rows
+	// onto their captured backgrounds at half opacity.
+	if (const Palette* palette = gwin->get_pal()) {
+		for (auto& row : faded_rows) row.fade_after_paint(*palette);
 	}
 
 	gwin->set_painted();
