@@ -44,9 +44,19 @@
 #include "combat_opts.h"
 #include "fnames.h"
 #include "gamewin.h"
+#include "ibuf8.h"
 #include "mouse.h"
+#include "palette.h"
 #include "schedule.h" /* To get Schedule::combat */
 #include "ucsched.h"
+
+#include <algorithm>
+#include <array>
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 #ifndef max
 using std::max;
@@ -211,6 +221,9 @@ bool Mouse::ensure_mouse_layer() {
 	return true;
 }
 
+// Dedicated rotated mouse arrow painter.
+#include "Modern_mouse_arrow.inc"
+
 void Mouse::draw_cursor_to_layer(unsigned char* trans) {
 	if (mouse_layer < 0 || !cur) {
 		return;
@@ -219,15 +232,23 @@ void Mouse::draw_cursor_to_layer(unsigned char* trans) {
 	if (!lb) {
 		return;
 	}
-	lb->fill8(255);    // Clear to transparent.
-	if (trans) {
-		cur->paint_rle_remapped(lb, hot_x, hot_y, trans);
+	if (smooth_arrow_active) {
+		draw_rotated_arrow_to_layer(lb, trans);
 	} else {
-		cur->paint_rle(lb, hot_x, hot_y);
+		// Restore the normal live-palette path for hands, targeting cursors,
+		// editor pointers, etc.
+		gwin->layer_set_index_argb(mouse_layer, nullptr);
+		lb->fill8(255);    // Clear to transparent.
+		if (trans) {
+			cur->paint_rle_remapped(lb, hot_x, hot_y, trans);
+		} else {
+			cur->paint_rle(lb, hot_x, hot_y);
+		}
 	}
 	gwin->layer_set_dirty(mouse_layer);
 	last_layer_frame = cur_framenum;
 	last_layer_trans = trans;
+	last_layer_angle_bucket = smooth_arrow_active ? smooth_arrow_angle_bucket : -1;
 }
 
 void Mouse::get_pointer_scale(float& sx, float& sy) const {
@@ -403,6 +424,9 @@ void Mouse::set_speed_cursor() {
 	Game_window*  gwin     = Game_window::get_instance();
 	Gump_manager* gump_man = gwin->get_gump_man();
 
+	// Most pointer shapes are not directional steering arrows. The normal
+	// movement branch below re-enables continuous rotation when appropriate.
+	smooth_arrow_active = false;
 	int cursor = dontchange;
 
 	// Check if we are in dont_move mode, in this case display the hand cursor
@@ -458,10 +482,27 @@ void Mouse::set_speed_cursor() {
 		} else {
 			gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
 		}
+		// Mouse coordinates are display-relative. In rotated-world mode the
+		// object's normal shape location is still in the unrotated scene, so
+		// transform the anchor before measuring the visible mouse<->Avatar
+		// vector. This also keeps the short/medium/long speed zones visually
+		// centred on the Avatar.
+		// Convert the Avatar anchor into the actual displayed position. This
+		// handles both the optional 45-degree world rotation and the lagging
+		// velocity camera; in the ordinary aligned view it is a no-op.
+		gwin->world_to_display(ax, ay);
 
 		const int       dy  = ay - mousey;
 		const int       dx  = mousex - ax;
 		const Direction dir = Get_direction_NoWrap(dy, dx);
+
+		// Keep the original 8-direction artwork (and therefore all three
+		// short/medium/long arrow designs), but remember the exact angle. The
+		// renderer rotates the selected frame only by the small residual from its
+		// nearest 45-degree direction, preserving the original art while making
+		// the pointer line up with mouse -> Avatar continuously.
+		// Optional angle interpolation from the modern movement cursor module.
+#include "Modern_mouse_arrow_angle.inc"
 
 		// Create a speed rectangle that's half of the game window dimensions
 		// but with a minimum size of 200x200
@@ -537,6 +578,21 @@ void Mouse::set_speed_cursor() {
 	}
 
 	if (cursor != dontchange) {
+		// set_shape() deliberately clears software rotation for every explicit
+		// cursor change. Preserve/restore it only for the steering arrow selected
+		// by this routine.
+		const bool rotate_arrow = smooth_arrow_active;
+		const double residual = smooth_arrow_residual_rad;
+		const int bucket = smooth_arrow_angle_bucket;
+		const bool angle_changed = rotate_arrow && bucket != last_layer_angle_bucket;
 		set_shape(cursor);
+		if (rotate_arrow) {
+			smooth_arrow_active = true;
+			smooth_arrow_residual_rad = residual;
+			smooth_arrow_angle_bucket = bucket;
+		}
+		if (angle_changed) {
+			last_layer_frame = -1;
+		}
 	}
 }

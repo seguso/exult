@@ -1012,6 +1012,7 @@ public:
 	bool update_smooth_avatar_walk(uint32 ticks);
 	void reset_velocity_camera();
 	bool is_modern_movement_enabled() const { return modern_movement_enabled; }
+	void world_to_display(int& x, int& y) const;
 	bool is_smooth_avatar_walk_enabled() const { return smooth_avatar_walk_enabled; }
 	void set_smooth_avatar_walk_enabled(bool enabled);
 	void set_smooth_scrolling_enabled(bool enabled);

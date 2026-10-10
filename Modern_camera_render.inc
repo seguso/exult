@@ -307,3 +307,23 @@ void Game_window::reset_velocity_camera() {
 	// Keep avatar offsets for out-of-band smooth-view repaints.
 	return true;
 }
+
+// Translate logical scene pixels to the displayed velocity-camera origin.
+// Rotation is independent and intentionally absent from this feature branch.
+void Game_window::world_to_display(int& x, int& y) const {
+	if (!modern_movement_enabled || !smooth_cam_valid) return;
+	const int world_pixels = c_num_tiles * c_tilesize;
+	const auto wrapped_delta = [&](int visual, int logical) {
+		int d = visual - logical;
+		const int half = world_pixels / 2;
+		while (d > half) d -= world_pixels;
+		while (d < -half) d += world_pixels;
+		return d;
+	};
+	const int visual_x = static_cast<int>(std::lround(smooth_cam_x));
+	const int visual_y = static_cast<int>(std::lround(smooth_cam_y));
+	const int logical_x = scrolltx * c_tilesize + scrolltx_lo;
+	const int logical_y = scrollty * c_tilesize + scrollty_lo;
+	x -= wrapped_delta(visual_x, logical_x);
+	y -= wrapped_delta(visual_y, logical_y);
+}

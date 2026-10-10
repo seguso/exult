@@ -52,6 +52,13 @@ protected:
 	int            hot_y            = 0;
 	int            last_layer_frame = -1;         // Frame currently drawn in the layer.
 	unsigned char* last_layer_trans = nullptr;    // Remap currently drawn.
+	// Continuous steering-arrow rotation. The nearest of the existing 8
+	// direction/length frames remains the source artwork; only the residual
+	// angle (at most 22.5 degrees) is generated in software.
+	bool   smooth_arrow_active       = false;
+	double smooth_arrow_residual_rad = 0.0;
+	int    smooth_arrow_angle_bucket = -1;
+	int    last_layer_angle_bucket   = -1;
 	static short   short_arrows[8];               // Frame #'s of short arrows, indexed
 	//   by direction (0-7, 0=east).
 	static short med_arrows[8];               // Medium arrows.
@@ -70,6 +77,7 @@ protected:
 	// Overlay-layer helpers.
 	bool ensure_mouse_layer();                          // Lazily create the layer.
 	void draw_cursor_to_layer(unsigned char* trans);    // Paint cur into the layer.
+	void draw_rotated_arrow_to_layer(Image_buffer8* lb, unsigned char* trans);
 	void position_mouse_layer();                        // Place the layer at the cursor.
 
 public:
@@ -147,8 +155,19 @@ public:
 	void hide();    // Stop showing the cursor.
 
 	void set_shape(int framenum) {    // Set to desired shape.
+		// Continuous rotation belongs only to the normal steering arrows chosen
+		// by set_speed_cursor(). Any explicit cursor change (hand, too-heavy,
+		// blocked, targeting, etc.) must immediately return to its original
+		// unrotated artwork.
+		const bool was_rotated = smooth_arrow_active;
+		smooth_arrow_active = false;
+		smooth_arrow_angle_bucket = -1;
 		if (framenum != cur_framenum) {
 			set_shape0(framenum);
+		} else if (was_rotated) {
+			// Same frame can still need a redraw because the previous layer image
+			// was the software-rotated version.
+			last_layer_frame = -1;
 		}
 	}
 

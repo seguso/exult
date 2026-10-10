@@ -41,6 +41,7 @@
 #include "perf.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 /*
