@@ -1080,6 +1080,22 @@ void GameDisplayOptions_gump::paint() {
 					row.backdrop.push_back(framebuffer->get_pixel8(xx, yy));
 			faded_rows.push_back(std::move(row));
 		}
+		// The selected font family/file summary is a separate text row.
+		// Include it in the same one-time half-opacity compositing pass.
+		if (page == Page::fonts && !conversation_font) {
+			const int top = std::clamp<int>(y + yForRow(6), 0, static_cast<int>(framebuffer->get_height()));
+			const int bottom = std::clamp<int>(top + yForRow(1) - yForRow(0), 0, static_cast<int>(framebuffer->get_height()));
+			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
+			const int right = std::clamp<int>(x + get_rect().w - 4, 0, static_cast<int>(framebuffer->get_width()));
+			if (left < right && top < bottom) {
+				FadedRow row{left, top, right - left, bottom - top, {}};
+				row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
+				for (int yy = top; yy < bottom; ++yy)
+					for (int xx = left; xx < right; ++xx)
+						row.backdrop.push_back(framebuffer->get_pixel8(xx, yy));
+				faded_rows.push_back(std::move(row));
+			}
+		}
 	}
 	for (auto& btn : buttons) {
 		if (btn) btn->paint();
@@ -1124,6 +1140,19 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_conversation_font_file, "TTF / OTF file:");
 	draw_label(id_conversation_system_font, "Installed fonts:");
 	draw_label(id_conversation_font_reset, "Font selection:");
+	if (page == Page::fonts) {
+		std::string chosen = "Automatic system font";
+		if (!conversation_font_file.empty()) {
+			auto last = conversation_font_file.find_last_of("/\\\\");
+			chosen = "Selected: " + conversation_font_file.substr(last == std::string::npos ? 0 : last + 1);
+		} else if (!conversation_font_family.empty()) {
+			chosen = "Family: " + conversation_font_family;
+		}
+		// Long absolute paths should not enlarge the dialog or overlap the footer.
+		if (chosen.size() > 42) chosen = chosen.substr(0, 39) + "...";
+		font->paint_text(iwin->get_ib8(), chosen.c_str(),
+				x + label_margin, y + yForRow(6) + 1);
+	}
 	// Composite the disabled controls at half opacity onto the already
 	// painted gump background. All other options retain normal rendering.
 	if (!faded_rows.empty()) {
@@ -1153,18 +1182,5 @@ void GameDisplayOptions_gump::paint() {
 		}
 	}
 
-	if (page == Page::fonts) {
-		std::string chosen = "Automatic system font";
-		if (!conversation_font_file.empty()) {
-			auto last = conversation_font_file.find_last_of("/\\\\");
-			chosen = "Selected: " + conversation_font_file.substr(last == std::string::npos ? 0 : last + 1);
-		} else if (!conversation_font_family.empty()) {
-			chosen = "Family: " + conversation_font_family;
-		}
-		// Long absolute paths should not enlarge the dialog or overlap the footer.
-		if (chosen.size() > 42) chosen = chosen.substr(0, 39) + "...";
-		font->paint_text(iwin->get_ib8(), chosen.c_str(),
-				x + label_margin, y + yForRow(6) + 1);
-	}
 	gwin->set_painted();
 }
