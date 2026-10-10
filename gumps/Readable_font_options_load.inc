@@ -5,7 +5,6 @@
 	config->value("config/gameplay/conversation_font/family", conversation_font_family, "");
 	font_dialog_result = std::make_shared<ConversationFontDialogResult>();
 	conversation_font = conversation_font_enabled ? 1 : 0;
-	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
 
 	conversation_font_default_size = 17;
 	conversation_font_size = conversation_font_default_size;
