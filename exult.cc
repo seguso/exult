@@ -1491,7 +1491,7 @@ static void Handle_events() {
 			int       y  = Mouse::mouse()->get_mousey();
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
-				if (!gwin->is_modern_movement_enabled() || !gwin->is_modern_mouse_target_enabled()
+				if (!gwin->is_modern_mouse_target_enabled()
 					|| ticks - last_modern_mouse_target >= 500) {
 					gwin->start_actor_from_display(x, y,
 							gwin->is_modern_mouse_target_enabled()
@@ -2100,8 +2100,7 @@ static void Handle_event(SDL_Event& event) {
 					gump          = nullptr;
 					right_on_gump = false;
 				}
-			} else if (avatar_can_act && gwin->is_modern_movement_enabled()
-					   && gwin->is_modern_mouse_target_enabled()) {
+			} else if (gwin->is_modern_mouse_target_enabled()) {
 				// Releasing the right button freezes the most recently
 				// calculated A* destination; the actor continues walking.
 				// No double-right-click detection in this optional mode.
