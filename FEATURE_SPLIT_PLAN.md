@@ -66,3 +66,24 @@ Inspection of `devmix:gumps/GameDisplayOptions_gump.cc` found:
 5. Keep `feature/common` analysis-only until this helper has been extracted and validated; no speculative dependency from every feature branch.
 
 Current audit finding: isolated palette compositor header added as `gumps/Option_row_fader.h` (commit `5da48e8749afba0789d47f052d0ce607a20cd59d`). It is **not yet wired into any UI, compile-tested, or verified at runtime**. Feature-specific enablement/disablement is intentionally excluded. Next: add a minimal test/compile harness, then integrate it into one option dialog and verify byte-identical output against devmix for representative palettes.
+
+
+## Upstream hygiene and instrumentation audit (2026-10-10)
+
+**Hard exclusion rule for all curated feature branches:** Do not transplant personal `.cfg` files, launch configurations, workstation paths, ad-hoc scripts, log output files, temporary reference copies, or debugging/diagnostic console/file logging introduced during feature development. Do not strip existing upstream diagnostic/error reporting: distinguish new instrumentation from upstream behavior by comparing against base `0e3cd67bc751223b24e41d4bc6ef9aebd8830ac4`.
+
+**Concrete non-upstream artifacts found in `base..devmix` (exclude by default):**
+- `.vscode/exult-launch.cfg`, `.vscode/launch.json`, `.vscode/tasks.json`
+- `baseline-exult.cfg`
+- `verify2-stdout.txt`, `verify2-stderr.txt`
+- `_reference/exult-rotate/exult-1.5-rotate-v0.3.patch` and `_reference/exult-rotate/exult-1.5-rotate-v0.3-1.patch`
+- `Avvia-Ultima6.bat` (personal launcher; exclude unless separately justified)
+
+**Identified instrumentation requiring removal during extraction:**
+- `gamerend.cc`: one-time `std::cout` instrumentation beginning `Forward quadruplets ALGO=WEIGHTED-QUADRUPLETS-V1`, `Forward pairs ALGO=WEIGHTED-PAIRS-V1`, and `Forward triplets ALGO=WEIGHTED-TRIPLETS-V1`; remove counters and caches too if they serve only those logs.
+- `gumps/GameDisplayOptions_gump.cc`: `[FONT-PICKER]` acceptance/cancel/error and installed-font chooser logs, plus `Readable conversation font selected:` console print. Keep actual user-facing error handling/behavior, not the console trace.
+- Review other touched files for newly introduced `std::cout`, `std::cerr`, `printf`, `fprintf`, `ofstream`, `fopen`, temporary `DEBUG` traces, and emitted log files. **Do not automatically delete** upstream error handling, player-facing diagnostics, or code that is actually part of a supported product feature.
+
+**Transplant gate (required for every feature branch):** (1) list changed paths vs upstream; (2) scan added diff lines for debug/logging and personal paths; (3) verify no forbidden paths in branch diff; (4) compile + functional verification; (5) compare settings UX, especially disabled controls, to integration branch. Git clean/conflict-free alone does not satisfy this gate.
+
+The six feature branches currently point to the clean upstream base, so their diffs contain none of these artifacts. `devmix` is preserved untouched as a reference.
