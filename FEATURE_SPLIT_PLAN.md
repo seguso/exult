@@ -155,3 +155,10 @@ Published on `devmix`:
 - `devmix` `675d1ae4f3c1980b1ea2e0cca1bb6cdbcc662039` switches `GameDisplayOptions_gump.cc` to `std::vector<Option_row_fader>` snapshots of only inactive setting rows and a final post-paint compositing pass. Retains the original row pitch and extra disabled font-summary row.
 - `is_dependent_option_inactive` and `on_button` remain feature/UI-owned, not coupled to the graphics helper. No personal config, file logging or debug trace was added.
 - The refactor removes the inline duplicated palette blend implementation in the dialog. **Build and visual regression tests remain pending**; verify 8-bit palette match, text+button fade, clipping, 12-pixel row spacing, disabled hit testing, enabled visual parity and palette changes. Only then mark the shared UI infrastructure as accepted.
+
+## First independent feature code on feature/input (2026-10-10)
+
+- `feature/input` `26c6ac7fabfbbedec192002e62600be561471225`: added standalone `Modern_keyboard_direction.h` to isolate eight-key WASD/arrow direction resolution from SDL and camera/mouse systems.
+- `feature/input` `e34d6813a0f56a9f8f9f6670623a83c3964c742f`: added `tests/modern_keyboard_direction_test.cc` covering cardinal/diagonal, conflicting axes, modifier suppression and arrow keys.
+- Not yet wired into `exult.cc`, options, config, or movement runtime: this branch is **not ready for upstream**. No personal config/logging was transplanted.
+- Next: port only the keyboard runtime integration, config and Game Input toggle; depend on the common Shift helper without importing mouse A* logic, then compile/test.
