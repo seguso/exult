@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 
 class Gump_button;
+struct ConversationFontDialogResult;
 
 class GameDisplayOptions_gump : public Modal_gump {
 private:
@@ -36,6 +37,14 @@ private:
 	std::vector<std::string> sc_outline_txt;
 	int                      text_bg;
 	int                      smooth_scrolling;
+	int conversation_font = 0;
+	int conversation_font_size = 17;
+	int conversation_font_tracking = 0;
+	int conversation_font_default_size = 17;
+	std::string conversation_font_file;
+	std::string conversation_font_family;
+	std::shared_ptr<ConversationFontDialogResult> font_dialog_result;
+	bool fonts_page = false;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -55,6 +64,14 @@ private:
 		id_sb_hide_missing,
 		id_text_bg,
 		id_smooth_scrolling,
+		id_readable_fonts_page,
+		id_readable_fonts_back,
+		id_conversation_font,
+		id_conversation_font_size,
+		id_conversation_font_tracking,
+		id_conversation_font_file,
+		id_conversation_system_font,
+		id_conversation_font_reset,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -76,6 +93,18 @@ public:
 	void close() override;
 
 	void build_buttons();
+	void open_readable_fonts_page();
+	void close_readable_fonts_page();
+	void toggle_conversation_font(int state) { conversation_font = state; }
+	void toggle_conversation_font_tracking(int state) { conversation_font_tracking = state; }
+	void choose_conversation_font_size();
+	void update_conversation_font_size_button();
+	void browse_conversation_font(bool installed);
+	void choose_conversation_font_file();
+	void choose_installed_conversation_font();
+	void reset_conversation_font();
+	void update_conversation_font_source_buttons();
+
 
 	void load_settings();
 	void save_settings();
