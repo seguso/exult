@@ -915,20 +915,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		static bool printed_quad_stats = false;
-		if (!printed_quad_stats) {
-			std::cout << "Forward quadruplets ALGO=WEIGHTED-QUADRUPLETS-V1"
-					 << ", nodes=" << node_contributions
-					 << ", quadruplets=" << quadruplets
-					 << ", segment_cells=" << segment_cells
-					 << ", cohesion=[high:" << high_cohesion
-					 << " medium:" << medium_cohesion
-					 << " low:" << low_cohesion << "]"
-					 << ", avg_confidence="
-					 << (quadruplets > 0 ? confidence_sum / quadruplets : 0.0)
-					 << ", holes=" << holes << std::endl;
-			printed_quad_stats = true;
-		}
 	} else if (rotate_sampling_mode == 6) {
 		// Forward weighted-pair experiment.
 		//
@@ -1122,20 +1108,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		static bool printed_pair_stats = false;
-		if (!printed_pair_stats) {
-			std::cout << "Forward pairs ALGO=WEIGHTED-PAIRS-V1"
-					 << ", nodes=" << node_contributions
-					 << ", pairs=" << pairs
-					 << ", segment_cells=" << segment_cells
-					 << ", cohesion=[high:" << high_cohesion
-					 << " medium:" << medium_cohesion
-					 << " low:" << low_cohesion << "]"
-					 << ", avg_confidence="
-					 << (pairs > 0 ? confidence_sum / pairs : 0.0)
-					 << ", holes=" << holes << std::endl;
-			printed_pair_stats = true;
-		}
 	} else if (rotate_sampling_mode == 5) {
 		// Forward weighted-triplet experiment.
 		//
@@ -1367,20 +1339,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 			}
 		}
 
-		static bool printed_triplet_stats = false;
-		if (!printed_triplet_stats) {
-			std::cout << "Forward triplets ALGO=WEIGHTED-TRIPLETS-V1"
-					 << ", nodes=" << node_contributions
-					 << ", triplets=" << triplets
-					 << ", segment_cells=" << segment_cells
-					 << ", cohesion=[high:" << high_cohesion
-					 << " medium:" << medium_cohesion
-					 << " low:" << low_cohesion << "]"
-					 << ", avg_confidence="
-					 << (triplets > 0 ? confidence_sum / triplets : 0.0)
-					 << ", holes=" << holes << std::endl;
-			printed_triplet_stats = true;
-		}
 
 	} else if (rotate_sampling_mode == 0 || rotate_sampling_mode == 1 || rotate_sampling_mode == 4) {
 		// Four-subpixel integration is independent of the nine-sample path.
