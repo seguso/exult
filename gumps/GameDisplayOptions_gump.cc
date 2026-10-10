@@ -632,6 +632,11 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::choose_conversation_font_size,
 			std::to_string(conversation_font_size) + " px",
 			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
+	buttons[id_conversation_font_tracking] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_conversation_font_tracking,
+			std::vector<std::string>{"Original", "-0.5 px", "-1 px"},
+			conversation_font_tracking, get_button_pos_for_label("Character spacing:"),
+			yForRow(++y_index), small_size);
 	buttons[id_conversation_font_file] = std::make_unique<GameDisplayOptions_button>(
 			this, &GameDisplayOptions_gump::choose_conversation_font_file,
 			"Browse...", get_button_pos_for_label("TTF / OTF file:"), yForRow(++y_index), 65);
@@ -640,11 +645,11 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			"Browse...", get_button_pos_for_label("Installed fonts:"), yForRow(++y_index), 65);
 	buttons[id_conversation_font_reset] = std::make_unique<GameDisplayOptions_button>(
 			this, &GameDisplayOptions_gump::reset_conversation_font,
-			"Default", get_button_pos_for_label("Font selection:"), yForRow(++y_index), 65);
+			"Reset", get_button_pos_for_label("Restore automatic font:"), yForRow(++y_index), 65);
 	}
 	constexpr int margin = 4;
 	const int footer_row = page == Page::display ? 14 :
-		page == Page::movement ? 5 : page == Page::crt ? 9 : page == Page::fonts ? 6 : 4;
+		page == Page::movement ? 5 : page == Page::crt ? 9 : page == Page::fonts ? 7 : 4;
 	buttons[id_ok]->set_pos(margin, yForRow(footer_row));
 	buttons[id_help]->set_pos(margin + 50, yForRow(footer_row));
 	buttons[id_cancel]->set_pos(margin + 100, yForRow(footer_row));
@@ -888,6 +893,8 @@ void GameDisplayOptions_gump::load_settings() {
 	conversation_font_default_size = std::max(5, sman->get_text_height(0) - 4);
 	conversation_font_size = conversation_font_default_size;
 	config->value("config/gameplay/conversation_font/pixels", conversation_font_size, conversation_font_default_size);
+	config->value("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, 0);
+	conversation_font_tracking = std::clamp(conversation_font_tracking, 0, 2);
 	conversation_font_size = std::clamp(conversation_font_size, 5, conversation_font_default_size);
 }
 
@@ -1004,6 +1011,7 @@ void GameDisplayOptions_gump::save_settings() {
 
 	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
 	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
+	config->set("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, false);
 	config->set("config/gameplay/conversation_font/file", conversation_font_file, false);
 	config->set("config/gameplay/conversation_font/family", conversation_font_family, false);
 	// Reload fonts after both font-related settings have been stored.
@@ -1073,6 +1081,7 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_nav_fonts, "Readable fonts:");
 	draw_label(id_conversation_font, Strings::Readableconversationfont_());
 	draw_label(id_conversation_font_size, Strings::Conversationfontsize_());
+	draw_label(id_conversation_font_tracking, "Character spacing:");
 	draw_label(id_conversation_font_file, "TTF / OTF file:");
 	draw_label(id_conversation_system_font, "Installed fonts:");
 	draw_label(id_conversation_font_reset, "Font selection:");
@@ -1087,7 +1096,7 @@ void GameDisplayOptions_gump::paint() {
 		// Long absolute paths should not enlarge the dialog or overlap the footer.
 		if (chosen.size() > 42) chosen = chosen.substr(0, 39) + "...";
 		font->paint_text(iwin->get_ib8(), chosen.c_str(),
-				x + label_margin, y + yForRow(5) + 1);
+				x + label_margin, y + yForRow(6) + 1);
 	}
 	gwin->set_painted();
 }

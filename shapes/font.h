@@ -52,6 +52,7 @@ class Font {
 private:
 	int                         hor_lead = 0;
 	int                         ver_lead = 0;
+	int                         extra_tracking_halves = 0;
 	std::unique_ptr<Shape_file> font_shapes;
 	int                         highest = 0, lowest = 0;
 
@@ -60,6 +61,9 @@ private:
 	int  load_internal(IDataSource& data, int hlead, int vlead);
 
 public:
+	// 0 = normal, 1 = half-pixel tighter (alternating integer advances),
+	// 2 = one pixel tighter. Only applied to generated conversation fonts.
+	void set_extra_tracking_halves(int halves) { extra_tracking_halves = halves; }
 	Font();
 	Font(const File_spec& fname0, int index, int hlead = 0, int vlead = 1);
 	Font(const File_spec& fname0, const File_spec& fname1, int index, int hlead = 0, int vlead = 1);

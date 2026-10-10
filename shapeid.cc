@@ -153,6 +153,9 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	}
 
 	auto result = std::make_shared<Font>(std::move(generated), hlead, vlead);
+	int tracking_halves = 0;
+	config->value("config/gameplay/conversation_font/tighter_spacing", tracking_halves, 0);
+	result->set_extra_tracking_halves(std::clamp(tracking_halves, 0, 2));
 	std::cout << "Using custom conversation font";
 	if (!family.empty()) {
 		std::cout << " '" << family << "'";

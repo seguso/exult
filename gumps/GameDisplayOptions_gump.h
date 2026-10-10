@@ -58,6 +58,7 @@ private:
 	int                      fonts;
 	int                      conversation_font;
 	int                      conversation_font_size;
+	int                      conversation_font_tracking = 0;
 	int                      conversation_font_default_size;
 	std::string              conversation_font_file;
 	std::string              conversation_font_family;
@@ -98,6 +99,7 @@ private:
 		id_fonts,
 		id_conversation_font,
 		id_conversation_font_size,
+		id_conversation_font_tracking,
 		id_conversation_font_file,
 		id_conversation_system_font,
 		id_conversation_font_reset,
@@ -166,6 +168,7 @@ public:
 	}
 
 	void choose_conversation_font_size();
+	void toggle_conversation_font_tracking(int value) { conversation_font_tracking = value; }
 	void choose_conversation_font_file();
 	void choose_installed_conversation_font();
 	void reset_conversation_font();
