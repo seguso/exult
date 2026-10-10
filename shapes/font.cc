@@ -22,6 +22,8 @@
 
 #include "font.h"
 
+#include <cstring>
+
 #include "U7file.h"
 #include "databuf.h"
 #include "exceptions.h"
@@ -65,7 +67,11 @@ static const char* Pass_space(const char* text) {
  */
 
 static const char* Pass_word(const char* text) {
-	while (*text && (*text != '^') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
+	// '*' is Exult's in-band page-break marker. Stop the current word before
+	// it even when it follows punctuation with no intervening space, so the
+	// main text-box loop can consume it as control syntax instead of painting
+	// the replacement TTF's visible asterisk glyph.
+	while (*text && (*text != '^') && (*text != '*') && (!Is_space(*text) || (*text == '\f') || (*text == '\v'))) {
 		text++;
 	}
 	return text;
@@ -252,76 +258,8 @@ int Font::paint_text_box(
  *  Output: Width in pixels of what was drawn.
  */
 
-int Font::paint_text(
-		Image_buffer8* win,     // Buffer to paint in.
-		const char*    text,    // What to draw, 0-delimited.
-		int xoff, int yoff,     // Upper-left corner of where to start.
-		unsigned char* trans) {
-	ignore_unused_variable_warning(win);
-	int x = xoff;
-	yoff += get_text_baseline();
-	if (font_shapes) {
-		int chr;
-		while ((chr = *text++) != 0) {
-			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr));
-			if (!shape || !shape->is_rle()) {
-				auto oldflags = std::cerr.flags();
-
-				std::cerr << " unable to find rle frame for character '" << char(chr) << "' 0x" << std::hex << chr << " in font"
-						  << std::endl;
-				std::cerr.flags(oldflags);
-
-				continue;
-			}
-			if (trans) {
-				shape->paint_rle_remapped(x, yoff, trans);
-			} else {
-				shape->paint_rle(x, yoff);
-			}
-			x += shape->get_width() + hor_lead;
-		}
-	}
-	return x - xoff;
-}
-
-/*
- *  Paint text using font from "fonts.vga".
- *
- *  Output: Width in pixels of what was painted.
- */
-
-int Font::paint_text(
-		Image_buffer8* win,        // Buffer to paint in.
-		const char*    text,       // What to draw.
-		int            textlen,    // Length of text.
-		int xoff, int yoff,        // Upper-left corner of where to start.
-		unsigned char* trans) {
-	ignore_unused_variable_warning(win);
-	int x = xoff;
-	yoff += get_text_baseline();
-	if (font_shapes) {
-		while (textlen--) {
-			int          chr;
-			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr = *text++));
-			if (!shape || !shape->is_rle()) {
-				auto oldflags = std::cerr.flags();
-
-				std::cerr << " unable to find rle frame for character '" << char(chr) << "' 0x" << std::hex << chr << " in font"
-						  << std::endl;
-				std::cerr.flags(oldflags);
-
-				continue;
-			}
-			if (trans) {
-				shape->paint_rle_remapped(x, yoff, trans);
-			} else {
-				shape->paint_rle(x, yoff);
-			}
-			x += shape->get_width() + hor_lead;
-		}
-	}
-	return x - xoff;
-}
+// Custom glyph painting implementation kept with this translation unit.
+#include "Readable_font_paint.inc"
 
 /*
  *
@@ -548,12 +486,14 @@ int Font::paint_text_fixedwidth(
 
 int Font::get_text_width(const char* text) {
 	int width = 0;
+	int glyph_count = 0;
 	if (font_shapes) {
 		short chr;
 		while ((chr = *text++) != 0) {
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr));
 			if (shape && shape->is_rle()) {
 				width += shape->get_width() + hor_lead;
+				width += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 			}
 		}
 	}
@@ -569,11 +509,13 @@ int Font::get_text_width(
 		int         textlen    // Length of text.
 ) {
 	int width = 0;
+	int glyph_count = 0;
 	if (font_shapes) {
 		while (textlen--) {
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(*text++));
 			if (shape && shape->is_rle()) {
 				width += shape->get_width() + hor_lead;
+				width += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 			}
 		}
 	}
@@ -584,6 +526,7 @@ void Font::get_text_box_dims(const char* text, int& width, int& height, int vert
 	width         = 0;
 	height        = 0;
 	int cur_width = 0;
+	int line_glyphs = 0;
 
 	int num_lines = 1;
 	if (font_shapes) {
@@ -593,10 +536,12 @@ void Font::get_text_box_dims(const char* text, int& width, int& height, int vert
 				num_lines++;
 				width     = std::max(width, cur_width);
 				cur_width = 0;
+				line_glyphs = 0;
 			}
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr));
 			if (shape && shape->is_rle()) {
 				cur_width += shape->get_width() + hor_lead;
+				cur_width += ((++line_glyphs * extra_tracking_halves) / 2) - (((line_glyphs - 1) * extra_tracking_halves) / 2);
 			}
 		}
 		width  = std::max(width, cur_width);
@@ -760,6 +705,11 @@ Font::Font(const File_spec& fname0, int index, int hlead, int vlead) {
 
 Font::Font(const File_spec& fname0, const File_spec& fname1, int index, int hlead, int vlead) {
 	load(fname0, fname1, index, hlead, vlead);
+}
+
+Font::Font(std::unique_ptr<Shape_file> shapes, int hlead, int vlead)
+		: hor_lead(hlead), ver_lead(vlead), font_shapes(std::move(shapes)) {
+	calc_highlow();
 }
 
 void Font::clean_up() {
