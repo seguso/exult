@@ -3,7 +3,7 @@
 
 	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
-			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
+			get_button_pos_for_label("Modern smooth scrolling:"), yForRow(++y_index), small_size);
 	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
 			yesNo, smooth_avatar_walk,
@@ -16,7 +16,7 @@
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_tau,
 			std::move(tau_text), modern_tau,
-			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
+			get_button_pos_for_label("Camera smoothing time:"), yForRow(++y_index), small_size);
 
 
 	}
