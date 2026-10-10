@@ -101,3 +101,25 @@ Comparison against the original upstream file tree found that `gumps/InputOption
 **Observed change sizes (devmix vs upstream baseline):** `InputOptions_gump.cc` 289 -> 311 lines; `InputOptions_gump.h` 116 -> 126 lines; `keyactions.cc` 987 -> 1025 lines; `keys.cc` 775 -> 777 lines. Line counts alone do not establish ownership; inspect hunks when transplanting.
 
 **Implementation order:** validate the common helper; then start with the smaller WASD input feature, then mouse target, then independent video/font modules. Preserve `devmix` for parity/regression tests and do not copy debug logging or personal files.
+
+
+## Shared Shift-toggled movement speed: verified dependency (2026-10-10)
+
+**New discovery:** the speed mode is *shared runtime behavior*, not merely two independent reads of SDL Shift. This requires its own small common component. The previous feature boundary audit missed this dependency.
+
+Direct source inspection of `devmix:exult.cc`:
+- Lines ~229-244: `keyboard_medium_speed` defaults to false (fast); `modern_mouse_walk_speed()` reads it, and left/right Shift candidate flags track standalone key taps.
+- Line ~1547: modern WASD passes `keyboard_medium_speed ? 1 : 0` into the keyboard walk actions.
+- Lines ~1498 and ~2022: modern mouse A* speed uses `modern_mouse_walk_speed()`.
+- Lines ~2271-2301: Shift keydown/up toggle detection is wrongly nested under `if (modern_keyboard)`. When the modern keyboard feature is disabled and mouse target is enabled, Shift cannot toggle the shared speed. **This is a real pre-existing devmix behavioral dependency/bug**, not just a patch split concern.
+- The upstream base already contains normal `SDL_KMOD_SHIFT` handling and keybinding modifiers; do not replace or change those semantics when both modern features are off.
+
+**Required common feature**: reusable standalone-Shift-tap speed state machine, with no WASD or A* references. Inputs: key-down/up scancode, repeat and intervening non-Shift key activity; state: fast/medium, left/right Shift tap candidates; output: whether speed toggled. Keep the speed popup/feedback separately optional so core shared state is not coupled to layers/UI and so both features may request it. Handle focus loss and/or feature deactivation without stale candidates; distinguish physical Shift hold from completed standalone taps. Do not accidentally intercept Shift+Q, Shift+W/A/S/D, or pre-existing upstream key bindings.
+
+**Integration rule**: process the common speed toggle only when `modern_keyboard_enabled || modern_mouse_target_enabled`. Keyboard walking reads speed mode if enabled; mouse A* speed calculation reads it if enabled. Neither feature must test the other's enable flag. Preserve default fast and user-visible speed behavior from devmix whenever both are enabled.
+
+**Acceptance matrix:** keyboard only (on/off speed), mouse target only (on/off speed), both enabled (same shared mode), neither (no added Shift semantics); standalone LShift/RShift, held Shift, Shift+letter, key repeat, loss of focus, toggling feature flags while pressed, and clicks during walking. Verify the mouse-only case explicitly (regression against devmix). Ensure no custom log messages and no personal cfg artifacts.
+
+**Architecture**: one small header/source or self-contained helper for speed state, with a minimal event integration hunk in `exult.cc`. Feature-specific walking and A* algorithms stay on their own branches. This common module may justify a real dependency for these two branches, but not for CRT, fonts or rotation.
+
+Current status: analysis complete, code extraction/integration not yet implemented or build-tested.
