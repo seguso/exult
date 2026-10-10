@@ -66,6 +66,7 @@
 #include "keyactions.h"
 #include "keys.h"
 #include "mouse.h"
+#include "Modern_movement_speed.h"
 #include "palette.h"
 #include "party.h"
 #include "sdlrwopsistream.h"
@@ -230,16 +231,14 @@ static Uint32               last_speed_cursor = 0;    // When we last updated th
 // Exult's fast speed, and a standalone tap of either Shift key toggles between
 // fast and medium. Shift used as a modifier for another key (e.g. Shift+Q or
 // the displaced Shift+W/A/S/D bindings) does not toggle the speed.
-static bool   keyboard_medium_speed         = false;
+static Modern_movement_speed modern_movement_speed;
 
 // Modern mouse A* uses the same Shift-toggled fast/medium speed mode as
 // modern WASD, rather than the cursor-distance-dependent mouse speed.
 static int modern_mouse_walk_speed() {
-	const int factor = keyboard_medium_speed ? Mouse::medium_speed_factor : Mouse::fast_speed_factor;
+	const int factor = modern_movement_speed.is_medium() ? Mouse::medium_speed_factor : Mouse::fast_speed_factor;
 	return 200 * gwin->get_std_delay() / factor;
 }
-static bool   lshift_speed_toggle_candidate = false;
-static bool   rshift_speed_toggle_candidate = false;
 static int    keyboard_speed_layer          = -1;
 static Uint32 keyboard_speed_feedback_until = 0;
 
@@ -257,7 +256,7 @@ static void show_keyboard_speed_feedback() {
 	}
 	hide_keyboard_speed_feedback();
 
-	const char* text = keyboard_medium_speed ? "Speed: medium" : "Speed: fast";
+	const char* text = modern_movement_speed.is_medium() ? "Speed: medium" : "Speed: fast";
 	Shape_manager* sman = Shape_manager::get_instance();
 	if (!sman) {
 		return;
@@ -1544,7 +1543,7 @@ static void Handle_events() {
 
 			if (keyboard_dx != 0 || keyboard_dy != 0) {
 				if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
-					const int keyboard_speed_params[] = {keyboard_medium_speed ? 1 : 0};
+					const int keyboard_speed_params[] = {modern_movement_speed.is_medium() ? 1 : 0};
 					if (keyboard_dy < 0 && keyboard_dx < 0) {
 						ActionWalkNorthWest(keyboard_speed_params);
 					} else if (keyboard_dy < 0 && keyboard_dx > 0) {
@@ -2257,6 +2256,7 @@ static void Handle_event(SDL_Event& event) {
 		gwin->get_focus();
 		break;
 	case SDL_EVENT_WINDOW_FOCUS_LOST:
+		modern_movement_speed.cancel_pending_taps();
 		gwin->lose_focus();
 		break;
 	case SDL_EVENT_QUIT:
@@ -2270,34 +2270,16 @@ static void Handle_event(SDL_Event& event) {
 
 		const bool modern_keyboard = gwin->is_modern_keyboard_enabled();
 		if (modern_keyboard || gwin->is_modern_mouse_target_enabled()) {
+			const auto key = is_lshift ? Modern_movement_speed::Key::left_shift
+							: is_rshift ? Modern_movement_speed::Key::right_shift
+									: Modern_movement_speed::Key::other;
 			if (event.type == SDL_EVENT_KEY_DOWN) {
-				if (is_shift && !event.key.repeat) {
-					if (is_lshift) {
-						lshift_speed_toggle_candidate = true;
-					} else {
-						rshift_speed_toggle_candidate = true;
-					}
-				} else if (!is_shift) {
-					// Shift is being used as a modifier for another key, not as the
-					// standalone speed toggle.
-					lshift_speed_toggle_candidate = false;
-					rshift_speed_toggle_candidate = false;
-				}
-			} else if (is_shift) {
-				const bool toggle_speed = is_lshift ? lshift_speed_toggle_candidate : rshift_speed_toggle_candidate;
-				if (is_lshift) {
-					lshift_speed_toggle_candidate = false;
-				} else {
-					rshift_speed_toggle_candidate = false;
-				}
-				if (toggle_speed) {
-					keyboard_medium_speed = !keyboard_medium_speed;
-					show_keyboard_speed_feedback();
-				}
+				modern_movement_speed.key_down(key, event.key.repeat);
+			} else if (modern_movement_speed.key_up(key)) {
+				show_keyboard_speed_feedback();
 			}
 		} else {
-			lshift_speed_toggle_candidate = false;
-			rshift_speed_toggle_candidate = false;
+			modern_movement_speed.cancel_pending_taps();
 		}
 
 		const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
