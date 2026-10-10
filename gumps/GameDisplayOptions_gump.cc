@@ -25,6 +25,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <iterator>
 
 #ifdef __GNUC__
@@ -268,6 +269,31 @@ static constexpr int crt_width_values[] = {1, 2, 3, 4, 5, 6};
 
 // Android stuff
 
+// SDL3 native file dialogs are asynchronous. Keep their result separately
+// from the modal gump, so closing a dialog while the picker is open is safe.
+struct ConversationFontDialogResult {
+	std::mutex mutex;
+	std::string selected_path;
+	bool pending = false;
+};
+
+static void SDLCALL conversation_font_picked(
+		void* userdata, const char* const* files, int /*filter*/) {
+	std::unique_ptr<std::shared_ptr<ConversationFontDialogResult>> state(
+			static_cast<std::shared_ptr<ConversationFontDialogResult>*>(userdata));
+	if (files && files[0] && files[0][0]) {
+		{
+			std::lock_guard<std::mutex> lock((*state)->mutex);
+			(*state)->selected_path = files[0];
+			(*state)->pending = true;
+		}
+		// Wake the Exult event loop even when the cursor doesn't move.
+		SDL_Event wake{};
+		wake.type = SDL_EVENT_USER;
+		SDL_PushEvent(&wake);
+	}
+}
+
 bool (*GameDisplayOptions_gump::Android_getAutoLaunch)()     = nullptr;
 void (*GameDisplayOptions_gump::Android_setAutoLaunch)(bool) = nullptr;
 
@@ -315,6 +341,49 @@ void GameDisplayOptions_gump::toggle_modern_smooth(int state) {
 void GameDisplayOptions_gump::open_modern_scrolling() {
 	GameDisplayOptions_gump child(Page::movement);
 	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	gwin->set_all_dirty();
+}
+
+void GameDisplayOptions_gump::browse_conversation_font(bool installed) {
+	static const SDL_DialogFileFilter filters[] = {
+			{"Fonts (TTF, OTF, TTC)", "ttf;otf;ttc"},
+			{"All files", "*"}};
+	const char* start = nullptr;
+	if (installed) {
+#if defined(SDL_PLATFORM_WINDOWS)
+		start = "C:\\Windows\\Fonts\\";
+#elif defined(SDL_PLATFORM_MACOS)
+		start = "/System/Library/Fonts/";
+#elif defined(SDL_PLATFORM_LINUX)
+		start = "/usr/share/fonts/";
+#endif
+	} else if (!conversation_font_file.empty()) {
+		start = conversation_font_file.c_str();
+	}
+	// A system-font browse starts at the OS font directory; a custom browse
+	// starts at the previously selected file, when present.
+	auto* state = new std::shared_ptr<ConversationFontDialogResult>(font_dialog_result);
+	SDL_ShowOpenFileDialog(conversation_font_picked, state,
+			gwin->get_win()->get_screen_window(), filters, SDL_arraysize(filters), start, false);
+}
+
+void GameDisplayOptions_gump::choose_conversation_font_file() {
+	browse_conversation_font(false);
+}
+
+void GameDisplayOptions_gump::choose_installed_conversation_font() {
+	browse_conversation_font(true);
+}
+
+void GameDisplayOptions_gump::reset_conversation_font() {
+	conversation_font_file.clear();
+	conversation_font_family.clear();
+	update_conversation_font_source_buttons();
+}
+
+void GameDisplayOptions_gump::update_conversation_font_source_buttons() {
+	// Keep source buttons stable: their function is explicit, while the
+	// currently chosen path is logged once at selection time.
 	gwin->set_all_dirty();
 }
 
@@ -514,10 +583,19 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::choose_conversation_font_size,
 			std::to_string(conversation_font_size) + " px",
 			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
+	buttons[id_conversation_font_file] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_conversation_font_file,
+			"Browse...", get_button_pos_for_label("TTF / OTF file:"), yForRow(++y_index), 65);
+	buttons[id_conversation_system_font] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::choose_installed_conversation_font,
+			"Browse...", get_button_pos_for_label("Installed fonts:"), yForRow(++y_index), 65);
+	buttons[id_conversation_font_reset] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::reset_conversation_font,
+			"Default", get_button_pos_for_label("Font selection:"), yForRow(++y_index), 65);
 	}
 	constexpr int margin = 4;
 	const int footer_row = page == Page::display ? 14 :
-		page == Page::movement ? 5 : page == Page::crt ? 9 : 4;
+		page == Page::movement ? 5 : page == Page::crt ? 9 : page == Page::fonts ? 6 : 4;
 	buttons[id_ok]->set_pos(margin, yForRow(footer_row));
 	buttons[id_help]->set_pos(margin + 50, yForRow(footer_row));
 	buttons[id_cancel]->set_pos(margin + 100, yForRow(footer_row));
@@ -752,6 +830,9 @@ void GameDisplayOptions_gump::load_settings() {
 	}
 	bool conversation_font_enabled = false;
 	config->value("config/gameplay/conversation_font/enabled", conversation_font_enabled, false);
+	config->value("config/gameplay/conversation_font/file", conversation_font_file, "");
+	config->value("config/gameplay/conversation_font/family", conversation_font_family, "");
+	font_dialog_result = std::make_shared<ConversationFontDialogResult>();
 	conversation_font = conversation_font_enabled ? 1 : 0;
 	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
 
@@ -874,6 +955,8 @@ void GameDisplayOptions_gump::save_settings() {
 
 	config->set("config/gameplay/conversation_font/enabled", conversation_font ? "yes" : "no", false);
 	config->set("config/gameplay/conversation_font/pixels", conversation_font_size, false);
+	config->set("config/gameplay/conversation_font/file", conversation_font_file, false);
+	config->set("config/gameplay/conversation_font/family", conversation_font_family, false);
 	// Reload fonts after both font-related settings have been stored.
 	Game::setup_fonts();
 	// Re-translate text messages with the correct UTF-8 map.
@@ -884,6 +967,22 @@ void GameDisplayOptions_gump::save_settings() {
 }
 
 void GameDisplayOptions_gump::paint() {
+	if (page == Page::fonts && font_dialog_result) {
+		std::string selection;
+		{
+			std::lock_guard<std::mutex> lock(font_dialog_result->mutex);
+			if (font_dialog_result->pending) {
+				selection = std::move(font_dialog_result->selected_path);
+				font_dialog_result->pending = false;
+			}
+		}
+		if (!selection.empty()) {
+			conversation_font_file = selection;
+			conversation_font_family.clear(); // Explicit file always wins.
+			std::cout << "Readable conversation font selected: " << selection << std::endl;
+			update_conversation_font_source_buttons();
+		}
+	}
 	Modal_gump::paint();
 	for (auto& btn : buttons) {
 		if (btn) btn->paint();
@@ -925,5 +1024,8 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_nav_fonts, "Readable fonts:");
 	draw_label(id_conversation_font, Strings::Readableconversationfont_());
 	draw_label(id_conversation_font_size, Strings::Conversationfontsize_());
+	draw_label(id_conversation_font_file, "TTF / OTF file:");
+	draw_label(id_conversation_system_font, "Installed fonts:");
+	draw_label(id_conversation_font_reset, "Font selection:");
 	gwin->set_painted();
 }

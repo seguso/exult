@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 
 class Gump_button;
+struct ConversationFontDialogResult;
 
 class GameDisplayOptions_gump : public Modal_gump {
 private:
@@ -58,6 +59,9 @@ private:
 	int                      conversation_font;
 	int                      conversation_font_size;
 	int                      conversation_font_default_size;
+	std::string              conversation_font_file;
+	std::string              conversation_font_family;
+	std::shared_ptr<ConversationFontDialogResult> font_dialog_result;
 
 	enum button_ids {
 		id_first = 0,
@@ -94,6 +98,9 @@ private:
 		id_fonts,
 		id_conversation_font,
 		id_conversation_font_size,
+		id_conversation_font_file,
+		id_conversation_system_font,
+		id_conversation_font_reset,
 
 		id_nav_movement,
 		id_nav_crt,
@@ -159,6 +166,11 @@ public:
 	}
 
 	void choose_conversation_font_size();
+	void choose_conversation_font_file();
+	void choose_installed_conversation_font();
+	void reset_conversation_font();
+	void browse_conversation_font(bool installed);
+	void update_conversation_font_source_buttons();
 
 	void toggle_sb_hide_missing(int state) {
 		sb_hide_missing = state;
