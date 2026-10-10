@@ -628,7 +628,10 @@ void Conversation::show_npc_message(const char* msg) {
 			lbuf->fill8(conv_transparent);
 			paint_faces(true);
 		}
-		height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, info->large_face, -1);
+		if (info->large_face)
+			height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, true, -1);
+		else
+			height = sman->paint_conversation_text_box(msg, box.x, box.y, box.w, box.h, -1, true, false, -1);
 		if (lbuf) {
 			lbuf->clear_clip();
 			gwin->pop_render_target(prev);
@@ -926,7 +929,10 @@ void Conversation::paint_faces(bool text) {
 			const TileRect& box = finfo->text_rect;
 			// Use red for Guardian, snake.
 			const int font = finfo->large_face ? 7 : 0;
-			sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, -1);
+			if (finfo->large_face)
+				sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, true, -1);
+			else
+				sman->paint_conversation_text_box(finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, false, -1);
 		}
 	}
 }
