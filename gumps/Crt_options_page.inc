@@ -1,5 +1,5 @@
 // Optional crt settings page; included in GameDisplayOptions_gump::build_buttons.
-	if (page == Page::crt) {
+	if (crt_page) {
 buttons[id_crt_enabled] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_crt_enabled, yesNo, crt_enabled,
 			get_button_pos_for_label("CRT filter:"), yForRow(++y_index), small_size);
