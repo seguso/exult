@@ -634,7 +634,7 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
 	buttons[id_conversation_font_tracking] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_conversation_font_tracking,
-			std::vector<std::string>{"Original", "-0.5 px", "-1 px"},
+			std::vector<std::string>{"Normal", "+0.5 px", "+1 px"},
 			conversation_font_tracking, get_button_pos_for_label("Character spacing:"),
 			yForRow(++y_index), small_size);
 	buttons[id_conversation_font_file] = std::make_unique<GameDisplayOptions_button>(
