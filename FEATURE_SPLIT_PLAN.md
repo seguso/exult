@@ -87,3 +87,17 @@ Current audit finding: isolated palette compositor header added as `gumps/Option
 **Transplant gate (required for every feature branch):** (1) list changed paths vs upstream; (2) scan added diff lines for debug/logging and personal paths; (3) verify no forbidden paths in branch diff; (4) compile + functional verification; (5) compare settings UX, especially disabled controls, to integration branch. Git clean/conflict-free alone does not satisfy this gate.
 
 The six feature branches currently point to the clean upstream base, so their diffs contain none of these artifacts. `devmix` is preserved untouched as a reference.
+
+
+## First implementation boundary review (2026-10-10)
+
+Comparison against the original upstream file tree found that `gumps/InputOptions_gump.cc` grows from 289 to 311 lines and `gumps/InputOptions_gump.h` from 116 to 126 in `devmix`. Both input features touch this menu; their presentation must be independently transplantable even when the other feature is omitted.
+
+- WASD/diagonal keyboard movement: keep keyboard dispatch/options and the true input-state behavior in `feature/input`. Do not incorporate A* mouse target or camera state into the keyboard patch.
+- Mouse target: `feature/mouse-target` owns its path retargeting/right-click timing and arrow behavior. Its Game Input toggle must be optional and cannot require `feature/input`.
+- Menu co-location does not imply a runtime feature dependency. At shared call sites prefer a small isolated conditional integration hunk per feature over a generalized dispatcher that would be costly to upstream reviewers.
+- UI helper is a shared *rendering mechanism* only: it cannot be the authoritative source for whether a control is enabled. Inactive controls must also be excluded from hit testing, including mouse hold/release paths.
+
+**Observed change sizes (devmix vs upstream baseline):** `InputOptions_gump.cc` 289 -> 311 lines; `InputOptions_gump.h` 116 -> 126 lines; `keyactions.cc` 987 -> 1025 lines; `keys.cc` 775 -> 777 lines. Line counts alone do not establish ownership; inspect hunks when transplanting.
+
+**Implementation order:** validate the common helper; then start with the smaller WASD input feature, then mouse target, then independent video/font modules. Preserve `devmix` for parity/regression tests and do not copy debug logging or personal files.
