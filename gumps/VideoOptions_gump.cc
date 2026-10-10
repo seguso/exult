@@ -304,6 +304,7 @@ void VideoOptions_gump::rebuild_buttons() {
 			this, &VideoOptions_gump::open_crt_settings, "Set...", get_button_pos_for_label("CRT:"), yForRow(5), 74);
 	buttons[id_rotation_settings] = std::make_unique<VideoOptions_button>(
 			this, &VideoOptions_gump::open_rotation_settings, "Set...", get_button_pos_for_label("Rotation:"), yForRow(6), 74);
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 	set_pos();
 }
