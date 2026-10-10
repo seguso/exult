@@ -39,3 +39,29 @@ Mouse target **must remain independent of camera**. Camera on/off must preserve 
 - [ ] Validate patch independence and combinations.
 
 This file tracks the analysis; it is **not** a claim that the common runtime extraction or individual feature branches are ready.
+
+
+## Shared disabled-option rendering and interaction audit (2026-10-10)
+
+**Decision: candidate for actual common infrastructure, independent of the feature-specific dependency rules.**
+
+Inspection of `devmix:gumps/GameDisplayOptions_gump.cc` found:
+
+- `is_dependent_option_inactive(button_ids)` computes feature-specific dependencies: original smooth scrolling when modern mode is active; smooth-avatar-walk and camera tau when modern mode is off; rotation sampling when rotation is off; CRT parameters when CRT is off; font source/size controls when readable fonts are off.
+- `on_button(int,int)` skips inactive controls, independently of their visual presentation.
+- `paint()` snapshots the indexed 8-bit framebuffer underneath each disabled row, paints labels and buttons normally, then alpha-blends the completed row at 50% via `Palette::find_color` and a 65,536-entry cache.
+- Rows must not overlap (the implementation deliberately uses row pitch, rather than a larger fixed rectangle). Entire rows include both label and control; a separate font-summary row is handled specially.
+
+**Extraction boundary**: move reusable 8-bit palette-aware blending/backdrop logic to a small general-purpose gump/UI helper. It should accept explicit bounded rectangles and an alpha parameter (default 50%), with no reference to camera/CRT/rotation/fonts and no direct dependence on `GameDisplayOptions_gump`. Feature-owned callers decide which controls are inactive; the existing gump/event mechanism prevents activation. Do not introduce global feature switches or rewrite original Exult controls. Keep paint ordering deterministic and do not alter layout or saved settings.
+
+**Caution**: the current drawing path is a post-paint framebuffer effect, *not* real opacity on a widget. Copying it blindly into a generic `Gump_button::paint()` would fade the button without its label and could break palette/modal semantics. Prefer explicit backdrop capture before control-and-label paint and blend after paint; alternatively use a composited row helper if the existing UI architecture supports that cleanly.
+
+**Validation gates before declaring common runtime commit complete**:
+
+1. Build with only the upstream base plus the shared helper: no feature-specific references.
+2. Test 50% blend on indexed 8-bit palette, clipping, overlapping rows, and palette selection; ensure enabled rows are unchanged.
+3. Verify hit-test/activation suppression and state preservation in each eventual feature branch.
+4. Confirm original upstream option layout, mouse behavior and settings are unchanged.
+5. Keep `feature/common` analysis-only until this helper has been extracted and validated; no speculative dependency from every feature branch.
+
+Current audit finding: shared visual behavior is real, but its extraction is **not yet implemented or build-tested**.
