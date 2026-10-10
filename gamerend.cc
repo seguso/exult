@@ -39,13 +39,24 @@
 #include "ignore_unused_variable_warning.h"
 #include "objiter.h"
 #include "perf.h"
+#include "palette.h"
+#include "party.h"
+#ifdef USE_HQ3X_SCALER
+#	include "scale_hq3x.h"
+#	include "Rotate_hq3x_rgb_manip.h"
+#endif
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdio>
+#include <utility>
 
 /*
  *  Paint just the map with given top-left-corner tile.
  */
+
+#include "Rotate_world_render.inc"
 
 void Game_window::paint_map_at_tile(
 		int x, int y, int w, int h,    // Clip to this area.
@@ -328,6 +339,10 @@ void Game_render::increment_bbox_index() {
 void Game_window::paint(
 		int x, int y, int w, int h    // Rectangle to cover.
 ) {
+	if (rotate_world) {
+		paint_rotated(x, y, w, h);
+		return;
+	}
 	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 
 	if (!win->ready()) {
