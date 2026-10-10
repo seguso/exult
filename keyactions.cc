@@ -582,60 +582,62 @@ int get_walking_speed(const int* params) {
 	return 200 * gwin->get_std_delay() / speed;
 }
 
+#include "Modern_keyboard_actions.inc"
+
 //  { ActionWalkWest, 0, "Walk west", normal_keys, NONE },
 void ActionWalkWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2, speed);
+	start_modern_keyboard_walk(gwin, -1, 0, speed);
 }
 
 //  { ActionWalkEast, 0, "Walk east", normal_keys, NONE },
 void ActionWalkEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2, speed);
+	start_modern_keyboard_walk(gwin, 1, 0, speed);
 }
 
 //  { ActionWalkNorth, 0, "Walk north", normal_keys, NONE },
 void ActionWalkNorth(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 - 50, speed);
+	start_modern_keyboard_walk(gwin, 0, -1, speed);
 }
 
 //  { ActionWalkSouth, 0, "Walk south", normal_keys, NONE },
 void ActionWalkSouth(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 + 50, speed);
+	start_modern_keyboard_walk(gwin, 0, 1, speed);
 }
 
 //  { ActionWalkNorthEast, 0, "Walk north-east", normal_keys, NONE },
 void ActionWalkNorthEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 - 50, speed);
+	start_modern_keyboard_walk(gwin, 1, -1, speed);
 }
 
 //  { ActionWalkSouthEast, 0, "Walk south-east", normal_keys, NONE },
 void ActionWalkSouthEast(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 + 50, speed);
+	start_modern_keyboard_walk(gwin, 1, 1, speed);
 }
 
 //  { ActionWalkNorthWest, 0, "Walk north-west", normal_keys, NONE },
 void ActionWalkNorthWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 - 50, speed);
+	start_modern_keyboard_walk(gwin, -1, -1, speed);
 }
 
 //  { ActionWalkSouthWest, 0, "Walk south-west", normal_keys, NONE },
 void ActionWalkSouthWest(const int* params) {
 	Game_window* gwin  = Game_window::get_instance();
 	const int    speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 + 50, speed);
+	start_modern_keyboard_walk(gwin, -1, 1, speed);
 }
 
 //  { ActionStopWalking, 0, "Stop Walking", cheat_keys, NONE },
