@@ -200,7 +200,7 @@ void InputOptions_gump::build_buttons() {
 
 	buttons[id_modern_movement_settings] = std::make_unique<InputOptions_button>(
 			this, &InputOptions_gump::open_modern_movement_settings,
-			"Modern Movement / Camera...", 8, yForRow(++y_index), 170);
+			"Set...", get_button_pos_for_label("Modern Movement / Camera:"), yForRow(++y_index), 44);
 
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
@@ -302,6 +302,7 @@ void InputOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Itemhelpermenu_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::DPadscreenlocation_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::PathfindwithLongTouch_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Modern Movement / Camera:", x + label_margin, y + yForRow(++y_index) + 1);
 
 
 	gwin->set_painted();
