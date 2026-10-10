@@ -981,8 +981,13 @@ private:
 	int avposx_ld, avposy_ld;
 	// Is lerping enabled
 	int lerping_enabled;
+	// Optional continuous WASD, diagonals and held-arrow keyboard movement.
+	bool modern_keyboard_enabled = false;
 
 public:
+	bool is_modern_keyboard_enabled() const { return modern_keyboard_enabled; }
+	void set_modern_keyboard_enabled(bool enabled);
+
 	// Reset (well update really) saved lerp scroll positions
 	void lerp_reset();
 
