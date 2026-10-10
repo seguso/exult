@@ -560,7 +560,7 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
 	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
-			modern_smooth ? yesNo : std::vector<std::string>{"Disabled"}, modern_smooth ? smooth_avatar_walk : 0,
+			yesNo, smooth_avatar_walk,
 			get_button_pos_for_label("Smooth avatar walk:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> tau_text;
@@ -569,7 +569,7 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 	}
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_tau,
-			modern_smooth ? std::move(tau_text) : std::vector<std::string>{"Disabled"}, modern_smooth ? modern_tau : 0,
+			std::move(tau_text), modern_tau,
 			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
 
 	}
