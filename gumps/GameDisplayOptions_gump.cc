@@ -22,14 +22,6 @@
 #include "istring.h"
 #include <algorithm>
 #include <mutex>
-#if defined(SDL_PLATFORM_WINDOWS)
-#	include <windows.h>
-#	include <commdlg.h>
-#	if defined(_MSC_VER)
-#		pragma comment(lib, "Comdlg32.lib")
-#	endif
-#endif
-
 #include <cstring>
 #include <iostream>
 
@@ -42,6 +34,14 @@
 #	endif
 #endif    // __GNUC__
 #include <SDL3/SDL.h>
+#if defined(SDL_PLATFORM_WINDOWS)
+#	include <windows.h>
+#	include <commdlg.h>
+#	if defined(_MSC_VER)
+#		pragma comment(lib, "Comdlg32.lib")
+#	endif
+#endif
+
 #ifdef __GNUC__
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
