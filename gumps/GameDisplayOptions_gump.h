@@ -39,7 +39,6 @@ private:
 	int                      smooth_scrolling;
 	int                      modern_smooth;
 	int                      smooth_avatar_walk;
-	int                      modern_mouse_target;
 	int                      modern_tau;
 	int                      rotate_world;
 	int                      rotate_sampling_mode;
@@ -78,8 +77,6 @@ private:
 		id_smooth_scrolling,
 		id_modern_smooth,
 		id_smooth_avatar_walk,
-		id_modern_mouse_target,
-		id_modern_keyboard,
 		id_modern_tau,
 		id_rotate_world,
 		id_rotate_sampling_mode,
@@ -117,7 +114,6 @@ private:
 	enum class Page { display, movement, crt, rotation, fonts };
 private:
 	Page page = Page::display;
-	int modern_keyboard = 0;
 	void open_readable_fonts();
 	void open_modern_scrolling();
 
@@ -188,8 +184,6 @@ public:
 		smooth_scrolling = state;
 	}
 
-	void toggle_modern_mouse_target(int state) { modern_mouse_target = state; }
-	void toggle_modern_keyboard(int state) { modern_keyboard = state; }
 
 	void toggle_smooth_avatar_walk(int state) { smooth_avatar_walk = state; }
 
