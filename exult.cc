@@ -67,7 +67,7 @@
 #include "keys.h"
 #include "mouse.h"
 #include "Modern_movement_speed.h"
-#include "Modern_keyboard_direction.h"
+#include "Modern_keyboard_movement.h"
 #include "palette.h"
 #include "party.h"
 #include "sdlrwopsistream.h"
@@ -1522,65 +1522,8 @@ static void Handle_events() {
 			show_items_clicked = false;
 		}
 
-		// Optional modern keyboard movement. When disabled, do not inspect or
-		// consume WASD/arrow state here: the original Exult keybinder remains the
-		// sole owner of those keys and keeps its historical bindings/semantics.
-		static int keyboard_walk_dx = 0;
-		static int keyboard_walk_dy = 0;
-		if (gwin->is_modern_keyboard_enabled()) {
-			const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
-			const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
-			const bool* key_state = SDL_GetKeyboardState(nullptr);
-			const Modern_keyboard_keys keys{
-				key_state[SDL_SCANCODE_W] != 0,
-				key_state[SDL_SCANCODE_A] != 0,
-				key_state[SDL_SCANCODE_S] != 0,
-				key_state[SDL_SCANCODE_D] != 0,
-				key_state[SDL_SCANCODE_UP] != 0,
-				key_state[SDL_SCANCODE_LEFT] != 0,
-				key_state[SDL_SCANCODE_DOWN] != 0,
-				key_state[SDL_SCANCODE_RIGHT] != 0
-			};
-			const auto direction = modern_keyboard_direction(keys, plain_movement_keys);
-			const int keyboard_dx = direction.dx;
-			const int keyboard_dy = direction.dy;
-			if (keyboard_dx != 0 || keyboard_dy != 0) {
-				if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
-					const int keyboard_speed_params[] = {modern_movement_speed.is_medium() ? 1 : 0};
-					if (keyboard_dy < 0 && keyboard_dx < 0) {
-						ActionWalkNorthWest(keyboard_speed_params);
-					} else if (keyboard_dy < 0 && keyboard_dx > 0) {
-						ActionWalkNorthEast(keyboard_speed_params);
-					} else if (keyboard_dy > 0 && keyboard_dx < 0) {
-						ActionWalkSouthWest(keyboard_speed_params);
-					} else if (keyboard_dy > 0 && keyboard_dx > 0) {
-						ActionWalkSouthEast(keyboard_speed_params);
-					} else if (keyboard_dy < 0) {
-						ActionWalkNorth(keyboard_speed_params);
-					} else if (keyboard_dy > 0) {
-						ActionWalkSouth(keyboard_speed_params);
-					} else if (keyboard_dx < 0) {
-						ActionWalkWest(keyboard_speed_params);
-					} else {
-						ActionWalkEast(keyboard_speed_params);
-					}
-				}
-			} else if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
-					   && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
-				gwin->stop_actor();
-			}
-			keyboard_walk_dx = keyboard_dx;
-			keyboard_walk_dy = keyboard_dy;
-		} else {
-			// The option may be switched off at runtime from the Input Options
-			// gump. Clear any state owned by the modern keyboard path immediately.
-			if ((keyboard_walk_dx != 0 || keyboard_walk_dy != 0)
-				&& !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK)) {
-				gwin->stop_actor();
-			}
-			keyboard_walk_dx = 0;
-			keyboard_walk_dy = 0;
-		}
+		// Optional modern keyboard movement (isolated from mouse A* and camera).
+		update_modern_keyboard_movement(*gwin, modern_movement_speed.is_medium());
 
 		if (joy_aim_x != 0 || joy_aim_y != 0) {
 			// Calculate the player speed
