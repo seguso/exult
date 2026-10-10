@@ -304,6 +304,8 @@ void VideoOptions_gump::rebuild_buttons() {
 			this, &VideoOptions_gump::open_crt_settings, "CRT...", 8, yForRow(5), 88);
 	buttons[id_rotation_settings] = std::make_unique<VideoOptions_button>(
 			this, &VideoOptions_gump::open_rotation_settings, "Rotation...", 108, yForRow(5), 88);
+	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
+	set_pos();
 }
 
 void VideoOptions_gump::rebuild_dynamic_buttons() {
@@ -386,7 +388,10 @@ void VideoOptions_gump::rebuild_dynamic_buttons() {
 	HorizontalArrangeWidgets(tcb::span(buttons.data() + id_apply, 3));
 
 	// Right align other setting buttons
-	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+	// The CRT and Rotation buttons deliberately share the otherwise empty
+	// row 5. Keep their horizontal placement when scaler changes rebuild
+	// the ordinary video controls.
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_crt_settings - id_first_setting));
 
 	set_pos();
 }
