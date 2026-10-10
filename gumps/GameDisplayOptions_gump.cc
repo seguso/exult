@@ -537,7 +537,6 @@ void GameDisplayOptions_gump::load_settings() {
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
 	modern_smooth    = gwin->is_modern_movement_enabled() ? 1 : 0;
 	smooth_avatar_walk = gwin->is_smooth_avatar_walk_enabled() ? 1 : 0;
-	modern_mouse_target = gwin->is_modern_mouse_target_enabled() ? 1 : 0;
 	rotate_world         = gwin->is_rotate_world_enabled() ? 1 : 0;
 	rotate_sampling_mode = gwin->get_rotate_sampling_mode();
 	// Load each optional feature independently.
@@ -568,7 +567,6 @@ void GameDisplayOptions_gump::load_settings() {
 	} else {
 		fonts = 0;    // original
 	}
-	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
 #include "Readable_font_options_load.inc"
 }
 
