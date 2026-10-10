@@ -878,6 +878,7 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_modern_smooth, Strings::Modernsmoothscrolling_());
 	draw_label(id_smooth_avatar_walk, "Smooth avatar walk:");
 	draw_label(id_modern_mouse_target, "Modern mouse target:");
+	draw_label(id_modern_keyboard, "WASD / diagonal movement:");
 	draw_label(id_modern_tau, Strings::Smoothcameratau_());
 	draw_label(id_rotate_world, Strings::Rotateworld45deg_());
 	draw_label(id_rotate_sampling_mode, Strings::Rotatequality_());
