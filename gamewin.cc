@@ -84,6 +84,7 @@
 #include "version.h"
 #include "virstone.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -384,6 +385,20 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	config->value("config/gameplay/rotate_world", rotate_world, false);
+#ifdef USE_HQ3X_SCALER
+	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 6);
+	if (rotate_sampling_mode >= 8 && rotate_sampling_mode <= 10)
+		rotate_sampling_mode -= 3;
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 7);
+#else
+	config->value("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, 0);
+	rotate_sampling_mode = std::clamp(rotate_sampling_mode, 0, 2);
+#endif
+	world_view.set_enabled(rotate_world);
+	resize_rotate_scene();
+	config->set("config/gameplay/rotate_world", rotate_world ? "yes" : "no", false);
+	config->set("config/gameplay/rotate_sampling_mode", rotate_sampling_mode, false);
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
@@ -627,6 +642,9 @@ void Game_window::init_files(bool cycle) {
 /*
  *  Read any map. (This is for "multimap" games, not U7.)
  */
+
+#include "Rotate_world_state.inc"
+#include "Rotate_view_coordinates.inc"
 
 Game_map* Game_window::get_map(int num    // Should be > 0.
 ) {
@@ -917,6 +935,7 @@ void Game_window::resized(
 		unsigned int neww, unsigned int newh, bool newfs, unsigned int newgw, unsigned int newgh, unsigned int newsc,
 		unsigned int newsclr, Image_window::FillMode newfill, unsigned int newfillsclr) {
 	win->resized(neww, newh, newfs, newgw, newgh, newsc, newsclr, newfill, newfillsclr);
+	resize_rotate_scene();
 	pal->apply(false);
 	Shape_frame::set_to_render(win->get_ib8());
 	if (!main_actor) {    // In case we're before start.
