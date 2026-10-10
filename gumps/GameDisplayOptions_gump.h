@@ -74,6 +74,7 @@ private:
 		id_modern_smooth,
 		id_smooth_avatar_walk,
 		id_modern_mouse_target,
+		id_modern_keyboard,
 		id_modern_tau,
 		id_rotate_world,
 		id_rotate_sampling_mode,
@@ -103,22 +104,20 @@ private:
 	};
 
 	std::array<std::unique_ptr<Gump_button>, id_count> buttons;
-	enum class Page { home, movement, crt, fonts, gameplay };
-	Page page = Page::home;
-	Page pending_page = Page::home;
-	void open_movement() { pending_page = Page::movement; }
-	void open_crt() { pending_page = Page::crt; }
-	void open_fonts() { pending_page = Page::fonts; }
-	void open_gameplay() { pending_page = Page::gameplay; }
-	void back_to_home() { pending_page = Page::home; }
+	public:
+	enum class Page { display, movement, crt, rotation, fonts };
+private:
+	Page page = Page::display;
+	int modern_keyboard = 0;
+	void open_readable_fonts();
 
 public:
-	GameDisplayOptions_gump();
+	explicit GameDisplayOptions_gump(Page section = Page::display);
 
 	// Paint it and its contents.
 	void paint() override;
 	void close() override;
-	bool mouse_up(int mx, int my, MouseButton button) override;
+	
 
 	void build_buttons();
 	void update_legacy_smooth_button();
@@ -173,6 +172,7 @@ public:
 	}
 
 	void toggle_modern_mouse_target(int state) { modern_mouse_target = state; }
+	void toggle_modern_keyboard(int state) { modern_keyboard = state; }
 
 	void toggle_smooth_avatar_walk(int state) { smooth_avatar_walk = state; }
 

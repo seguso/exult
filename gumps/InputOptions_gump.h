@@ -57,6 +57,7 @@ private:
 		id_dpad_location,
 		id_touch_pathfind,
 		id_modern_keyboard,
+		id_modern_movement_settings,
 		id_count
 	};
 
@@ -75,6 +76,7 @@ public:
 	void save_settings();
 	void cancel();
 	void help();
+	void open_modern_movement_settings();
 
 	void toggle_doubleclick(int state) {
 		doubleclick = state;

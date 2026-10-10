@@ -39,6 +39,8 @@
 #include "Gump_button.h"
 #include "Gump_manager.h"
 #include "InputOptions_gump.h"
+#include "GameDisplayOptions_gump.h"
+#include "Gump_manager.h"
 #include "Text_button.h"
 #include "exult.h"
 #include "font.h"
@@ -127,6 +129,12 @@ void InputOptions_gump::cancel() {
 	done = true;
 }
 
+void InputOptions_gump::open_modern_movement_settings() {
+	GameDisplayOptions_gump child(GameDisplayOptions_gump::Page::movement);
+	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	modern_keyboard = gwin->is_modern_keyboard_enabled() ? 1 : 0;
+	gwin->set_all_dirty();
+}
 void InputOptions_gump::help() {
 	SDL_OpenURL("https://exult.info/docs.html#game_input_gump");
 }
@@ -190,9 +198,9 @@ void InputOptions_gump::build_buttons() {
 			this, &InputOptions_gump::toggle_touch_pathfind, yesNo, touch_pathfind,
 			get_button_pos_for_label(Strings::PathfindwithLongTouch_()), yForRow(++y_index), 44);
 
-	buttons[id_modern_keyboard] = std::make_unique<InputTextToggle>(
-			this, &InputOptions_gump::toggle_modern_keyboard, yesNo, modern_keyboard,
-			get_button_pos_for_label(Strings::Modernkeyboardmovement_()), yForRow(++y_index), 44);
+	buttons[id_modern_movement_settings] = std::make_unique<InputOptions_button>(
+			this, &InputOptions_gump::open_modern_movement_settings,
+			"Modern Movement / Camera...", 8, yForRow(++y_index), 170);
 
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
@@ -294,7 +302,7 @@ void InputOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Itemhelpermenu_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::DPadscreenlocation_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::PathfindwithLongTouch_(), x + label_margin, y + yForRow(++y_index) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::Modernkeyboardmovement_(), x + label_margin, y + yForRow(++y_index) + 1);
+
 
 	gwin->set_painted();
 }

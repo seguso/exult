@@ -74,6 +74,8 @@ private:
 		id_fill_scaler,
 		id_fill_mode,
 		id_has_ac,
+		id_crt_settings,
+		id_rotation_settings,
 		id_count
 	};
 
@@ -99,6 +101,8 @@ public:
 	void save_settings();
 	void cancel();
 	void help();
+	void open_crt_settings();
+	void open_rotation_settings();
 
 	void set_scaling(int scaleVal) {
 		scaling = scaleVal;

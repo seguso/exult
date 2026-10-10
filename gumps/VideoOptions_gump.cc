@@ -38,6 +38,8 @@
 #include "Gump_button.h"
 #include "Text_button.h"
 #include "VideoOptions_gump.h"
+#include "GameDisplayOptions_gump.h"
+#include "Gump_manager.h"
 #include "Yesno_gump.h"
 #include "exult.h"
 #include "font.h"
@@ -197,6 +199,16 @@ void VideoOptions_gump::cancel() {
 	done = true;
 }
 
+void VideoOptions_gump::open_crt_settings() {
+	GameDisplayOptions_gump child(GameDisplayOptions_gump::Page::crt);
+	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	gwin->set_all_dirty();
+}
+void VideoOptions_gump::open_rotation_settings() {
+	GameDisplayOptions_gump child(GameDisplayOptions_gump::Page::rotation);
+	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	gwin->set_all_dirty();
+}
 void VideoOptions_gump::help() {
 	SDL_OpenURL("https://exult.info/docs.html#video_gump");
 }
@@ -287,6 +299,11 @@ void VideoOptions_gump::rebuild_buttons() {
 			get_button_pos_for_label(Strings::FillMode_()), yForRow(8), 74);
 
 	rebuild_dynamic_buttons();
+	// Additional renderer controls occupy Exult's unused fifth options row.
+	buttons[id_crt_settings] = std::make_unique<VideoOptions_button>(
+			this, &VideoOptions_gump::open_crt_settings, "CRT...", 8, yForRow(5), 88);
+	buttons[id_rotation_settings] = std::make_unique<VideoOptions_button>(
+			this, &VideoOptions_gump::open_rotation_settings, "Rotation...", 108, yForRow(5), 88);
 }
 
 void VideoOptions_gump::rebuild_dynamic_buttons() {
