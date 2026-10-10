@@ -256,7 +256,7 @@ void VideoOptions_gump::rebuild_buttons() {
 
 	buttons[id_game_resolution] = std::make_unique<VideoTextToggle>(
 			this, &VideoOptions_gump::toggle_game_resolution, std::move(game_restext), selected_game_resolution,
-			get_button_pos_for_label(Strings::GameArea_()), yForRow(6), 74);
+			get_button_pos_for_label(Strings::GameArea_()), yForRow(8), 74);
 
 	std::vector<std::string> fill_scaler_text
 			= {Image_window::get_displayname_for_scaler(Image_window::point),
@@ -269,7 +269,7 @@ void VideoOptions_gump::rebuild_buttons() {
 	}
 	buttons[id_fill_scaler] = std::make_unique<VideoTextToggle>(
 			this, &VideoOptions_gump::toggle_fill_scaler, std::move(fill_scaler_text), fill_scaler,
-			get_button_pos_for_label(Strings::FillQuality_()), yForRow(7), 74);
+			get_button_pos_for_label(Strings::FillQuality_()), yForRow(9), 74);
 
 	int sel_fill_mode;
 	has_ac = false;
@@ -296,14 +296,14 @@ void VideoOptions_gump::rebuild_buttons() {
 
 	buttons[id_fill_mode] = std::make_unique<VideoTextToggle>(
 			this, &VideoOptions_gump::toggle_fill_mode, std::move(fill_mode_text), sel_fill_mode,
-			get_button_pos_for_label(Strings::FillMode_()), yForRow(8), 74);
+			get_button_pos_for_label(Strings::FillMode_()), yForRow(10), 74);
 
 	rebuild_dynamic_buttons();
 	// Additional renderer controls occupy Exult's unused fifth options row.
 	buttons[id_crt_settings] = std::make_unique<VideoOptions_button>(
-			this, &VideoOptions_gump::open_crt_settings, "CRT...", 8, yForRow(5), 88);
+			this, &VideoOptions_gump::open_crt_settings, "Set...", get_button_pos_for_label("CRT:"), yForRow(5), 74);
 	buttons[id_rotation_settings] = std::make_unique<VideoOptions_button>(
-			this, &VideoOptions_gump::open_rotation_settings, "Rotation...", 108, yForRow(5), 88);
+			this, &VideoOptions_gump::open_rotation_settings, "Set...", get_button_pos_for_label("Rotation:"), yForRow(6), 74);
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 	set_pos();
 }
@@ -372,7 +372,7 @@ void VideoOptions_gump::rebuild_dynamic_buttons() {
 		std::vector<std::string> ac_text = {Strings::Disabled(), Strings::Enabled()};
 		buttons[id_has_ac]               = std::make_unique<VideoTextToggle>(
                 this, &VideoOptions_gump::toggle_aspect_correction, std::move(ac_text), has_ac ? 1 : 0,
-                get_button_pos_for_label(Strings::ARCorrection_()), yForRow(9), 62);
+                get_button_pos_for_label(Strings::ARCorrection_()), yForRow(11), 62);
 	}
 
 	// Risize to fit all
@@ -391,7 +391,7 @@ void VideoOptions_gump::rebuild_dynamic_buttons() {
 	// The CRT and Rotation buttons deliberately share the otherwise empty
 	// row 5. Keep their horizontal placement when scaler changes rebuild
 	// the ordinary video controls.
-	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_crt_settings - id_first_setting));
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 
 	set_pos();
 }
@@ -508,7 +508,7 @@ void VideoOptions_gump::load_settings(bool Fullscreen) {
 }
 
 VideoOptions_gump::VideoOptions_gump() : Modal_gump(nullptr, -1), startup_fill_mode(static_cast<Image_window::FillMode>(0)) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(15)), -1);
 	video_options_gump = this;
 
 	if (gwin->get_ui_layer_palette_mode(Image_window::UiLayerModalGumps) == Image_window::UiPaletteDisabled) {
@@ -532,18 +532,18 @@ VideoOptions_gump::VideoOptions_gump() : Modal_gump(nullptr, -1), startup_fill_m
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID)
 	buttons[id_share_settings] = std::make_unique<VideoTextToggle>(
 			this, &VideoOptions_gump::toggle_share_settings, std::move(yesNO), share_settings,
-			get_button_pos_for_label(Strings::andfullscreen_()), yForRow(11), 40);
+			get_button_pos_for_label(Strings::andfullscreen_()), yForRow(13), 40);
 #endif
 	o_share_settings = share_settings;
 
 	// Apply
 	buttons[id_apply]
-			= std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::save_settings, Strings::APPLY(), 25, yForRow(12), 50);
+			= std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::save_settings, Strings::APPLY(), 25, yForRow(14), 50);
 	// Help
-	buttons[id_help] = std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::help, Strings::HELP(), 53, yForRow(12), 50);
+	buttons[id_help] = std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::help, Strings::HELP(), 53, yForRow(14), 50);
 	// Cancel
 	buttons[id_cancel]
-			= std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			= std::make_unique<VideoOptions_button>(this, &VideoOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(14), 50);
 	load_settings(fullscreen);
 
 	rebuild_buttons();
@@ -692,15 +692,17 @@ void VideoOptions_gump::paint() {
 	if (buttons[id_scaling] != nullptr) {
 		font->paint_text(iwin->get_ib8(), Strings::Scaling_(), x + label_margin, y + yForRow(4) + 1);
 	}
-	font->paint_text(iwin->get_ib8(), Strings::GameArea_(), x + label_margin, y + yForRow(6) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::FillQuality_(), x + label_margin, y + yForRow(7) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::FillMode_(), x + label_margin, y + yForRow(8) + 1);
+	font->paint_text(iwin->get_ib8(), "CRT:", x + label_margin, y + yForRow(5) + 1);
+	font->paint_text(iwin->get_ib8(), "Rotation:", x + label_margin, y + yForRow(6) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::GameArea_(), x + label_margin, y + yForRow(8) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::FillQuality_(), x + label_margin, y + yForRow(9) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::FillMode_(), x + label_margin, y + yForRow(10) + 1);
 	if (buttons[id_has_ac] != nullptr) {
-		font->paint_text(iwin->get_ib8(), Strings::ARCorrection_(), x + label_margin, y + yForRow(9) + 1);
+		font->paint_text(iwin->get_ib8(), Strings::ARCorrection_(), x + label_margin, y + yForRow(11) + 1);
 	}
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID)
-	font->paint_text(iwin->get_ib8(), Strings::Samesettingsforwindow(), x + label_margin, y + yForRow(10) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::andfullscreen_(), x + label_margin, y + yForRow(11) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Samesettingsforwindow(), x + label_margin, y + yForRow(12) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::andfullscreen_(), x + label_margin, y + yForRow(13) + 1);
 #endif
 	gwin->set_painted();
 }
