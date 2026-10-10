@@ -105,9 +105,13 @@ static std::shared_ptr<Font> make_custom_conversation_font(Fonts_vga_file* fonts
 	config->value("config/gameplay/conversation_font/pixels", pixels, pixels);
 	pixels = std::clamp(pixels, 5, 32);
 
-	int hlead = -2;
+	// Each generated glyph reserves two pixels of outline on BOTH sides.
+	// Its bounding-box width therefore contains four non-advance pixels.
+	// Compensate those four pixels in tracking, independently of the extra
+	// user-selected 0 / -0.5 / -1 px adjustment.
+	int hlead = -4;
 	int vlead = 0;
-	config->value("config/gameplay/conversation_font/hlead", hlead, -2);
+	config->value("config/gameplay/conversation_font/hlead", hlead, -4);
 	config->value("config/gameplay/conversation_font/vlead", vlead, 0);
 
 	// Match the classic conversation colour scheme: bright yellow glyphs and
