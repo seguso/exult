@@ -139,3 +139,11 @@ Published on `devmix`:
 - Static comparison from `64c771f` to current `devmix`: exactly the new header and `exult.cc` changed, in two commits. Old speed state and candidate variables no longer occur.
 
 **Important**: no build or live gameplay run has been completed. Validate Debug/Release compilation and the complete state matrix (WASD only, mouse target only, both, neither; standalone left/right Shift, modifiers, focus loss, repeat). The common header still requires explicit test coverage. Do not make the mouse feature depend on the keyboard feature.
+
+
+## Shared Shift regression test tranche (2026-10-10)
+
+- `feature/common` commit `ac63255b88c8caf1aabf97e738476de6f087c017` added standalone C++17 assertions in `tests/modern_movement_speed_test.cc`.
+- `devmix` commit `d211e37080b8bdc25fa41a481d0c18e1cbc724e0` copied the same test without adding personal files or diagnostic logging.
+- An equivalent standalone C++17 harness was compiled and executed locally with `g++ -std=c++17 -Wall -Wextra -Werror`, status PASS. This is **not** an Exult project build, and the checked-in exact repository files were not directly compiled in that harness.
+- Still required: compile the checked-in test against its actual include paths, full Exult builds, and manual tests in all four optional-feature combinations. No standalone feature branch is ready for upstream review yet.
