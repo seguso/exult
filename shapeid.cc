@@ -76,6 +76,8 @@ static void override_vleads() {
 	}
 }
 
+#include "Readable_conversation_font.inc"
+
 /*
  *  Singletons:
  */
@@ -302,6 +304,7 @@ void Shape_manager::load() {
 	fonts = make_unique<Fonts_vga_file>();
 	override_vleads();
 	fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+	conversation_font = make_custom_conversation_font(fonts.get(), pal);
 
 	// Get translucency tables.
 	unique_ptr<unsigned char[]> ptr;    // We will delete THIS at the end, not blends!
@@ -474,6 +477,7 @@ void Shape_manager::reload_fonts(const File_spec& font_source, const File_spec& 
 	if (fonts) {
 		override_vleads();
 		fonts->init(font_source, font_patch, vlead_override, num_vlead_overrides);
+		conversation_font = make_custom_conversation_font(fonts.get(), pal);
 	}
 }
 
@@ -547,6 +551,26 @@ int Shape_manager::find_cursor(int fontnum, const char* text, int x, int y, int 
 
 std::shared_ptr<Font> Shape_manager::get_font(int fontnum) {
 	return fonts->get_font(fontnum);
+}
+
+std::shared_ptr<Font> Shape_manager::get_conversation_font() {
+	return conversation_font ? conversation_font : fonts->get_font(0);
+}
+
+int Shape_manager::paint_conversation_text_box(
+		const char* text, int x, int y, int w, int h, int vert_lead,
+		bool pbreak, bool center, int shading, Cursor_info* cursor) {
+	if (shading >= 0)
+		gwin->get_win()->fill_translucent8(0, w, h, x, y, xforms[shading]);
+	auto font = get_conversation_font();
+	if (!font) return 0;
+	int effective_vert_lead = vert_lead;
+	if (conversation_font && vert_lead == -1) {
+		const int target_line_height = fonts->get_text_line_height(0);
+		effective_vert_lead = target_line_height - font->get_text_height() - font->get_ver_lead();
+	}
+	return font->paint_text_box(
+		gwin->get_win()->get_ib8(), text, x, y, w, h, effective_vert_lead, pbreak, center, cursor);
 }
 
 Shape_manager::Cached_shape Shape_manager::cache_shape(int shape_kind, int shapenum, int framenum) {
