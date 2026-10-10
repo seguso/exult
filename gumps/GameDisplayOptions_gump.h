@@ -118,6 +118,7 @@ public:
 	// Paint it and its contents.
 	void paint() override;
 	void close() override;
+	bool mouse_up(int mx, int my, MouseButton button) override;
 
 	void build_buttons();
 	void update_legacy_smooth_button();

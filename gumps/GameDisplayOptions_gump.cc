@@ -292,6 +292,15 @@ Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 	return Modal_gump::on_button(mx, my);
 }
 
+bool GameDisplayOptions_gump::mouse_up(int mx, int my, MouseButton button) {
+	if (button == MouseButton::Right && page != Page::home) {
+		pending_page = Page::home;
+		gwin->set_all_dirty();
+		return true;
+	}
+	return Modal_gump::mouse_up(mx, my, button);
+}
+
 void GameDisplayOptions_gump::close() {
 	save_settings();
 	done = true;
@@ -324,16 +333,16 @@ void GameDisplayOptions_gump::build_buttons() {
 	int large_size = 85;
 	if (page == Page::home) {
 		buttons[id_nav_movement] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_movement, "Movement / Camera...", 20, yForRow(1), 200);
+				this, &GameDisplayOptions_gump::open_movement, "Movement / Camera...", 20, yForRow(0), 200);
 		buttons[id_nav_crt] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_crt, "CRT...", 20, yForRow(3), 200);
+				this, &GameDisplayOptions_gump::open_crt, "CRT...", 20, yForRow(1), 200);
 		buttons[id_nav_fonts] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_fonts, "Fonts...", 20, yForRow(5), 200);
+				this, &GameDisplayOptions_gump::open_fonts, "Fonts...", 20, yForRow(2), 200);
 		buttons[id_nav_gameplay] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::open_gameplay, "Gameplay...", 20, yForRow(7), 200);
+				this, &GameDisplayOptions_gump::open_gameplay, "Gameplay...", 20, yForRow(3), 200);
 	} else {
 		buttons[id_back] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::back_to_home, "Back", 20, yForRow(10), 70);
+				this, &GameDisplayOptions_gump::back_to_home, "Back", 20, yForRow(9), 70);
 	}
 	if (page == Page::gameplay) {
 	// Status Bar Positions
@@ -499,7 +508,16 @@ void GameDisplayOptions_gump::build_buttons() {
 
 
 	}
-	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
+	// Recompute the procedural backdrop for each page. The former backdrop
+	// retained the home page width, clipping long gameplay labels/controls.
+	// Keep button rows close together, as in Exult's stock options dialogs.
+	const int bottom_row = page == Page::home ? 6 : 11;
+	const int width = page == Page::home ? 250 : 310;
+	SetProceduralBackground(TileRect(0, 0, width, yForRow(bottom_row + 1)), -1);
+	buttons[id_ok]->set_pos(15, yForRow(bottom_row));
+	buttons[id_help]->set_pos(80, yForRow(bottom_row));
+	buttons[id_cancel]->set_pos(145, yForRow(bottom_row));
+		ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 	HorizontalArrangeWidgets(tcb::span(buttons.data() + id_ok, 3));
 	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
 }
@@ -737,7 +755,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(12)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -842,6 +860,7 @@ void GameDisplayOptions_gump::paint() {
 	if (page != pending_page) {
 		page = pending_page;
 		build_buttons();
+		gwin->set_all_dirty();
 	}
 	Modal_gump::paint();
 	for (auto& btn : buttons) {
