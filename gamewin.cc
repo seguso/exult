@@ -384,6 +384,30 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	// Optional CRT effect is disabled by default and can be configured
+	// independently of the other modern display features.
+	config->value("config/video/crt/enabled", crt_filter_enabled, false);
+	config->value("config/video/crt/horizontal_strength", crt_horizontal_strength, 8);
+	int legacy_crt_vertical_strength = 4;
+	config->value("config/video/crt/vertical_strength", legacy_crt_vertical_strength, 4);
+	crt_vertical_strength = 2 * legacy_crt_vertical_strength;
+	config->value("config/video/crt/vertical_strength_half", crt_vertical_strength, crt_vertical_strength);
+	config->value("config/video/crt/horizontal_compensation", crt_horizontal_compensation, 100);
+	config->value("config/video/crt/vertical_compensation", crt_vertical_compensation, 100);
+	config->value("config/video/crt/horizontal_width", crt_horizontal_width, 2);
+	config->value("config/video/crt/vertical_width", crt_vertical_width, 2);
+	config->value("config/video/crt/beam_sigma", crt_beam_sigma, 30);
+	crt_horizontal_strength = std::clamp(crt_horizontal_strength, 0, 20);
+	crt_vertical_strength = std::clamp(crt_vertical_strength, 0, 40);
+	crt_horizontal_compensation = std::clamp(crt_horizontal_compensation, 0, 200);
+	crt_vertical_compensation = std::clamp(crt_vertical_compensation, 0, 200);
+	crt_horizontal_width = std::clamp(crt_horizontal_width, 1, 6);
+	crt_vertical_width = std::clamp(crt_vertical_width, 1, 6);
+	crt_beam_sigma = std::clamp(crt_beam_sigma, 10, 100);
+	win->set_crt_filter(crt_filter_enabled, crt_horizontal_strength, crt_vertical_strength,
+		crt_horizontal_compensation, crt_vertical_compensation, crt_horizontal_width,
+		crt_vertical_width, crt_beam_sigma);
+
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
@@ -627,6 +651,8 @@ void Game_window::init_files(bool cycle) {
 /*
  *  Read any map. (This is for "multimap" games, not U7.)
  */
+
+#include "Crt_filter_state.inc"
 
 Game_map* Game_window::get_map(int num    // Should be > 0.
 ) {
