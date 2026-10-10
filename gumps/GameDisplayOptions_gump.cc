@@ -399,8 +399,8 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts, get_button_pos_for_label(Strings::Fonts_()),
 			yForRow(++y_index), large_size);
 	buttons[id_nav_fonts] = std::make_unique<GameDisplayOptions_button>(
-		this, &GameDisplayOptions_gump::open_readable_fonts, "Readable fonts...",
-		get_button_pos_for_label("Readable font settings:"), yForRow(++y_index), 100);
+		this, &GameDisplayOptions_gump::open_readable_fonts, "Set...",
+		get_button_pos_for_label("Readable fonts:"), yForRow(++y_index), small_size);
 	}
 	if (page == Page::movement) {
 
@@ -895,6 +895,7 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_android_autolaunch, Strings::Androidautolaunch_());
 	draw_label(id_language, Strings::Language_());
 	draw_label(id_fonts, Strings::Fonts_());
+	draw_label(id_nav_fonts, "Readable fonts:");
 	draw_label(id_conversation_font, Strings::Readableconversationfont_());
 	draw_label(id_conversation_font_size, Strings::Conversationfontsize_());
 	gwin->set_painted();
