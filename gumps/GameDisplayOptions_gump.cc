@@ -333,7 +333,7 @@ void GameDisplayOptions_gump::build_buttons() {
 				this, &GameDisplayOptions_gump::open_gameplay, "Gameplay...", 20, yForRow(7), 200);
 	} else {
 		buttons[id_back] = std::make_unique<GameDisplayOptions_button>(
-				this, &GameDisplayOptions_gump::back_to_home, "Back", 20, yForRow(9), 70);
+				this, &GameDisplayOptions_gump::back_to_home, "Back", 20, yForRow(10), 70);
 	}
 	if (page == Page::gameplay) {
 	// Status Bar Positions
