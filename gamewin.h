@@ -144,6 +144,7 @@ class Game_window {
 	bool fastmouse;
 	bool double_click_closes_gumps;
 	int  text_bg;                 // draw a dark background behind text
+	bool modern_mouse_target_enabled = false; // Optional A* target on held right mouse
 	int  step_tile_delta;         // multiplier for the delta in start_actor_alt
 	int  allow_right_pathfind;    // If moving with right click is allowed
 	bool scroll_with_mouse;       // scroll game view with mousewheel
@@ -904,10 +905,13 @@ public:
 	void view_down();     // Move view down.
 	void view_up();       // Move view up.
 	// Start moving actor.
-	void start_actor_alt(int winx, int winy, int speed);
-	void start_actor(int winx, int winy, int speed = 125);
+	void start_actor_alt(int winx, int winy, int speed, bool mouse_steering = false);
+	void start_actor(int winx, int winy, int speed = 125, bool mouse_steering = false);
 	void start_actor_along_path(int winx, int winy, int speed = 125);
 	void stop_actor();    // Stop main actor.
+
+	bool is_modern_mouse_target_enabled() const { return modern_mouse_target_enabled; }
+	void set_modern_mouse_target_enabled(bool enabled);
 
 	inline void set_step_tile_delta(int size) {
 		step_tile_delta = size;
