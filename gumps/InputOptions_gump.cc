@@ -196,6 +196,9 @@ void InputOptions_gump::build_buttons() {
 	buttons[id_modern_keyboard] = std::make_unique<InputTextToggle>(
 			this, &InputOptions_gump::toggle_modern_keyboard, yesNo, modern_keyboard,
 			get_button_pos_for_label(Strings::Modernkeyboardmovement_()), yForRow(++y_index), 44);
+	buttons[id_modern_mouse_target] = std::make_unique<InputTextToggle>(
+			this, &InputOptions_gump::toggle_modern_mouse_target, yesNo, modern_mouse_target,
+			get_button_pos_for_label("Modern mouse target:"), yForRow(++y_index), 44);
 
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
@@ -218,6 +221,7 @@ void InputOptions_gump::load_settings() {
 	dpad_location    = gwin->get_dpad_location();
 	touch_pathfind   = gwin->get_touch_pathfind();
 	modern_keyboard = gwin->is_modern_keyboard_enabled();
+	modern_mouse_target = gwin->is_modern_mouse_target_enabled();
 }
 
 InputOptions_gump::InputOptions_gump() : Modal_gump(nullptr, -1) {
@@ -267,6 +271,7 @@ void InputOptions_gump::save_settings() {
 	config->set("config/touch/touch_pathfind", touch_pathfind ? "yes" : "no", false);
 
 	gwin->set_modern_keyboard_enabled(modern_keyboard);
+	gwin->set_modern_mouse_target_enabled(modern_mouse_target);
 
 	config->write_back();
 
@@ -298,6 +303,7 @@ void InputOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::DPadscreenlocation_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::PathfindwithLongTouch_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Modernkeyboardmovement_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "Modern mouse target:", x + label_margin, y + yForRow(++y_index) + 1);
 
 
 	gwin->set_painted();

@@ -856,7 +856,7 @@ void Game_window::get_world_scene_bounds(int& x, int& y, int& w, int& h) const {
 
 void Game_window::start_actor_from_display(int x, int y, int speed) {
 	display_to_world(x, y);
-	start_actor(x, y, speed, modern_movement_enabled);
+	start_actor(x, y, speed, modern_movement_enabled || modern_mouse_target_enabled);
 }
 
 void Game_window::start_actor_along_path_from_display(int x, int y, int speed) {
@@ -2138,7 +2138,10 @@ void Game_window::start_actor_alt(
 	// principal facings. During continuous mouse steering, derive that facing
 	// from the exact requested vector and keep it stable while Bresenham-like
 	// correction steps alternate underneath.
-	const bool modern_mouse_steering = mouse_steering && modern_movement_enabled;
+	// Mouse-target A* does not require camera interpolation. Preserve the
+	// pre-existing modern-camera path exactly, but allow this steering input
+	// when using classic camera scrolling (with or without legacy lerping).
+	const bool modern_mouse_steering = mouse_steering && (modern_movement_enabled || modern_mouse_target_enabled);
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
