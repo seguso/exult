@@ -1063,7 +1063,10 @@ void GameDisplayOptions_gump::paint() {
 			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));
 			const int right = std::clamp<int>(x + get_rect().w - 4, 0, static_cast<int>(framebuffer->get_width()));
 			const int top = std::clamp<int>(row_y, 0, static_cast<int>(framebuffer->get_height()));
-			const int bottom = std::clamp<int>(row_y + 16, 0, static_cast<int>(framebuffer->get_height()));
+			// Rows here are 12 px apart: a 16 px fade rectangle overlaps
+			// the following row and applies the 50% blend twice there.
+			const int row_height = yForRow(1) - yForRow(0);
+			const int bottom = std::clamp<int>(row_y + row_height, 0, static_cast<int>(framebuffer->get_height()));
 			if (right <= left || bottom <= top) continue;
 			FadedRow row{left, top, right - left, bottom - top, {}};
 			row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
