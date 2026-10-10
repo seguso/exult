@@ -2211,6 +2211,7 @@ void Game_window::show_items(
 	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;
+	int world_x = x, world_y = y;
 	if (gump) {
 		obj           = gump->find_object(gx, gy);
 		found_in_gump = (obj != nullptr);
@@ -2218,12 +2219,13 @@ void Game_window::show_items(
 			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
-		obj = find_object(x, y);
+		display_to_world(world_x, world_y);
+		obj = find_object(world_x, world_y);
 	}
 
 	if (item_menu) {
 		Game_object_map_xy mobjxy;
-		find_nearby_objects(mobjxy, x, y, gump);
+		find_nearby_objects(mobjxy, gump ? x : world_x, gump ? y : world_y, gump);
 		if (!mobjxy.empty() && Notebook_gump::get_instance() == nullptr) {
 			// Make sure menu is visible on the screen
 			Itemmenu_gump itemgump(&mobjxy, x, y);
@@ -2371,6 +2373,7 @@ void Game_window::paused_combat_select(
 	if (gump) {
 		return;    // Ignore if clicked on gump.
 	}
+	display_to_world(x, y);
 	Game_object* obj = find_object(x, y);
 	Actor*       npc = obj ? obj->as_actor() : nullptr;
 	if (!npc || !npc->is_in_party() || npc->get_flag(Obj_flags::asleep) || npc->is_dead() || npc->get_flag(Obj_flags::paralyzed)
@@ -2387,6 +2390,7 @@ void Game_window::paused_combat_select(
 	if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
 		return;
 	}
+	display_to_world(x, y);
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {                 // Nothing?  Walk there.
 		// Needs work if lift > 0.
@@ -2456,6 +2460,7 @@ void Game_window::double_clicked(
 
 	// If gump manager didn't handle it, we search the world for an object
 	if (!gump) {
+		display_to_world(x, y);
 		obj = find_object(x, y);
 		if (!avatar_can_act && obj && obj->as_actor() && obj->as_actor() == main_actor->as_actor()) {
 			ActionFileGump(nullptr);
