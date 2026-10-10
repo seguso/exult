@@ -765,7 +765,7 @@ void GameDisplayOptions_gump::update_crt_strength_buttons() {
 void GameDisplayOptions_gump::choose_conversation_font_size() {
 	bool escaped = false;
 	const int value = gwin->get_gump_man()->prompt_for_number(
-			5, conversation_font_default_size, 1, conversation_font_size, this, &escaped);
+			5, 32, 1, conversation_font_size, this, &escaped);
 	if (!escaped) {
 		conversation_font_size = value;
 		update_conversation_font_size_button();
@@ -896,7 +896,7 @@ void GameDisplayOptions_gump::load_settings() {
 	config->value("config/gameplay/conversation_font/tighter_spacing", conversation_font_tracking, 0);
 	// Old half-pixel values become Normal; the former +1 value remains +1.
 	conversation_font_tracking = conversation_font_tracking >= 2 ? 1 : 0;
-	conversation_font_size = std::clamp(conversation_font_size, 5, conversation_font_default_size);
+	conversation_font_size = std::clamp(conversation_font_size, 5, 32);
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump(Page section) : Modal_gump(nullptr, -1), page(section) {
