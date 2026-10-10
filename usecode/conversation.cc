@@ -788,12 +788,6 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	delete[] conv_choices;    // Set up new list of choices.
 	conv_choices             = new TileRect[num_choices + 1];
 	const int      text_bg   = gwin->get_text_bg();
-	// A previous conversation/page may have displayed the translucent text
-	// background. When disabled, clear its visibility here as well: choices
-	// can be repainted without rebuilding the entire conversation layer.
-	if (text_bg < 0 && conv_bg_layer >= 0) {
-		gwin->layer_set_visible(conv_bg_layer, false);
-	}
 	const int      bg_offset = (sman->get_text_height(0) - line_height) / 2;
 	Image_buffer8* prev_bg   = nullptr;
 	if (text_bg >= 0) {
