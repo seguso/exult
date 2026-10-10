@@ -459,6 +459,8 @@ void Mouse::set_speed_cursor() {
 			gwin->get_shape_location(gwin->get_main_actor(), ax, ay);
 		}
 
+		// Mouse is screen-relative; the Avatar anchor must share that space.
+		gwin->world_to_display(ax, ay);
 		const int       dy  = ay - mousey;
 		const int       dx  = mousex - ax;
 		const Direction dir = Get_direction_NoWrap(dy, dx);
