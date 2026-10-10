@@ -35,8 +35,8 @@ Slider_gump::Slider_gump(
 		int mival, int mxval,    // Value range.
 		int  step,               // Amt. to change by.
 		int  defval,             // Default value.
-		bool allow_escape)
-		: Modal_gump(nullptr, game->get_shape("gumps/slider")), allow_escape(allow_escape) {
+		bool allow_escape, std::function<void(int)> on_change)
+		: Modal_gump(nullptr, game->get_shape("gumps/slider")), allow_escape(allow_escape), value_changed(std::move(on_change)) {
 	widget = std::make_unique<Slider_widget>(
 			this, 24, 6, ShapeID(game->get_shape("gumps/slider_left"), 0, SF_GUMPS_VGA),
 			ShapeID(game->get_shape("gumps/slider_right"), 0, SF_GUMPS_VGA),
@@ -46,7 +46,10 @@ Slider_gump::Slider_gump(
 }
 
 void Slider_gump::OnSliderValueChanged(Slider_widget* sender, int newvalue) {
-	ignore_unused_variable_warning(sender, newvalue);
+	ignore_unused_variable_warning(sender);
+	if (value_changed) {
+		value_changed(newvalue);
+	}
 	gwin->add_dirty(get_rect());
 }
 

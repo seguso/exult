@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "Modal_gump.h"
 #include "Slider_widget.h"
+#include <functional>
 
 class Slider_button;
 
@@ -32,9 +33,10 @@ class Slider_gump : public Modal_gump, Slider_widget::ICallback {
 protected:
 	std::unique_ptr<Slider_widget> widget;
 	bool                           allow_escape = false;
+	std::function<void(int)>       value_changed;
 
 public:
-	Slider_gump(int mival, int mxval, int step, int defval, bool allow_escape);
+	Slider_gump(int mival, int mxval, int step, int defval, bool allow_escape, std::function<void(int)> on_change = {});
 
 	int get_val() {    // Get last value set.
 		return widget->getselection();
