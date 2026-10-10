@@ -397,7 +397,7 @@ Game_window::Game_window(
 
 	config->value("config/gameplay/modern_movement", modern_movement_enabled, false);
 	config->set("config/gameplay/modern_movement", modern_movement_enabled ? "yes" : "no", false);
-	config->value("config/gameplay/modern_mouse_target", modern_mouse_target_enabled, false);
+	config->value("config/gameplay/modern_mouse_target", modern_mouse_target_enabled, true);
 	config->set("config/gameplay/modern_mouse_target", modern_mouse_target_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled, true);
 	config->set("config/gameplay/smooth_avatar_walk", smooth_avatar_walk_enabled ? "yes" : "no", false);
