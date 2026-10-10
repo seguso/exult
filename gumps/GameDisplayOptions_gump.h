@@ -110,6 +110,7 @@ private:
 	Page page = Page::display;
 	int modern_keyboard = 0;
 	void open_readable_fonts();
+	void open_modern_scrolling();
 
 public:
 	explicit GameDisplayOptions_gump(Page section = Page::display);

@@ -292,6 +292,12 @@ Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 	return Modal_gump::on_button(mx, my);
 }
 
+void GameDisplayOptions_gump::open_modern_scrolling() {
+	GameDisplayOptions_gump child(Page::movement);
+	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
+	gwin->set_all_dirty();
+}
+
 void GameDisplayOptions_gump::open_readable_fonts() {
 	GameDisplayOptions_gump child(Page::fonts);
 	gwin->get_gump_man()->do_modal_gump(&child, Mouse::hand);
@@ -361,6 +367,9 @@ void GameDisplayOptions_gump::build_buttons() {
 
 	update_legacy_smooth_button();
 	++y_index;  // Keep the original Smooth scrolling row in Game Display.
+	buttons[id_nav_movement] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::open_modern_scrolling,
+			"Set...", get_button_pos_for_label("Modern smooth scrolling:"), yForRow(++y_index), small_size);
 
 	buttons[id_menu_intro] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_menu_intro, yesNo, menu_intro, get_button_pos_for_label(Strings::Skipintro_()),
@@ -410,9 +419,6 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk, yesNo, smooth_avatar_walk,
 			get_button_pos_for_label("Smooth avatar walk:"), yForRow(++y_index), small_size);
-	buttons[id_modern_mouse_target] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_modern_mouse_target, yesNo, modern_mouse_target,
-			get_button_pos_for_label("Modern mouse target:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> tau_text;
 	for (int value : modern_tau_values) {
@@ -421,9 +427,7 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_tau, std::move(tau_text), modern_tau,
 			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
-	buttons[id_modern_keyboard] = std::make_unique<GameDisplayTextToggle>(
-		this, &GameDisplayOptions_gump::toggle_modern_keyboard, yesNo, modern_keyboard,
-		get_button_pos_for_label("WASD / diagonal movement:"), yForRow(++y_index), small_size);
+
 	}
 	if (page == Page::crt) {
 buttons[id_crt_enabled] = std::make_unique<GameDisplayTextToggle>(
@@ -490,8 +494,8 @@ buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
 			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
 	}
 	constexpr int margin = 4;
-	const int footer_row = page == Page::display ? 13 :
-		page == Page::movement ? 7 : page == Page::crt ? 9 : 4;
+	const int footer_row = page == Page::display ? 14 :
+		page == Page::movement ? 5 : page == Page::crt ? 9 : 4;
 	buttons[id_ok]->set_pos(margin, yForRow(footer_row));
 	buttons[id_help]->set_pos(margin + 50, yForRow(footer_row));
 	buttons[id_cancel]->set_pos(margin + 100, yForRow(footer_row));
@@ -797,8 +801,7 @@ void GameDisplayOptions_gump::save_settings() {
 	gwin->set_modern_movement_tau_ms(modern_tau_values[std::clamp(modern_tau, 0, static_cast<int>(std::size(modern_tau_values)) - 1)]);
 	gwin->set_smooth_scrolling_enabled(modern_smooth != 0);
 	gwin->set_smooth_avatar_walk_enabled(smooth_avatar_walk != 0);
-	gwin->set_modern_mouse_target_enabled(modern_mouse_target != 0);
-		gwin->set_modern_keyboard_enabled(modern_keyboard != 0);
+
 	}
 	if (page == Page::rotation) {
 
@@ -875,10 +878,11 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_sb_hide_missing, Strings::Hidemissingitems_());
 	draw_label(id_text_bg, Strings::TextBackground_());
 	draw_label(id_smooth_scrolling, Strings::Smoothscrolling_());
+	draw_label(id_nav_movement, "Modern smooth scrolling:");
 	draw_label(id_modern_smooth, Strings::Modernsmoothscrolling_());
 	draw_label(id_smooth_avatar_walk, "Smooth avatar walk:");
-	draw_label(id_modern_mouse_target, "Modern mouse target:");
-	draw_label(id_modern_keyboard, "WASD / diagonal movement:");
+
+
 	draw_label(id_modern_tau, Strings::Smoothcameratau_());
 	draw_label(id_rotate_world, Strings::Rotateworld45deg_());
 	draw_label(id_rotate_sampling_mode, Strings::Rotatequality_());
