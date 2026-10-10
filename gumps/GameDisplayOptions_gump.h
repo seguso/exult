@@ -36,6 +36,9 @@ private:
 	std::vector<std::string> sc_outline_txt;
 	int                      text_bg;
 	int                      smooth_scrolling;
+	int rotate_world = 0;
+	int rotate_sampling_mode = 0;
+	bool rotation_page = false;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -55,6 +58,10 @@ private:
 		id_sb_hide_missing,
 		id_text_bg,
 		id_smooth_scrolling,
+		id_rotation_settings,
+		id_rotation_back,
+		id_rotate_world,
+		id_rotate_sampling_mode,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -76,6 +83,10 @@ public:
 	void close() override;
 
 	void build_buttons();
+	void open_rotation_page();
+	void close_rotation_page();
+	void toggle_rotate_world(int state) { rotate_world = state; }
+	void toggle_rotate_sampling_mode(int state) { rotate_sampling_mode = state; }
 
 	void load_settings();
 	void save_settings();
