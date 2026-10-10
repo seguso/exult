@@ -1027,5 +1027,18 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_conversation_font_file, "TTF / OTF file:");
 	draw_label(id_conversation_system_font, "Installed fonts:");
 	draw_label(id_conversation_font_reset, "Font selection:");
+	if (page == Page::fonts) {
+		std::string chosen = "Automatic system font";
+		if (!conversation_font_file.empty()) {
+			auto last = conversation_font_file.find_last_of("/\\\\");
+			chosen = "Selected: " + conversation_font_file.substr(last == std::string::npos ? 0 : last + 1);
+		} else if (!conversation_font_family.empty()) {
+			chosen = "Family: " + conversation_font_family;
+		}
+		// Long absolute paths should not enlarge the dialog or overlap the footer.
+		if (chosen.size() > 42) chosen = chosen.substr(0, 39) + "...";
+		font->paint_text(iwin->get_ib8(), chosen.c_str(),
+				x + label_margin, y + yForRow(5) + 1);
+	}
 	gwin->set_painted();
 }
