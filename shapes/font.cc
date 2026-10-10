@@ -21,6 +21,12 @@
 #endif
 
 #include "font.h"
+#include "gamewin.h"
+#include "palette.h"
+
+#include <array>
+#include <algorithm>
+#include <vector>
 
 #include <cstring>
 
@@ -276,6 +282,85 @@ int Font::paint_text(
 	ignore_unused_variable_warning(win);
 	if (!font_shapes) return 0;
 	const int baseline_y = yoff + get_text_baseline();
+	// Half-pixel tracking must actually blend neighboring pixel placements.
+	// Alternating 0/1 pixel advances produces irregular pairs of letters.
+	// Preserve the existing two-pass outline/fill order, and blend only
+	// glyphs whose fractional origin is one half pixel.
+	if (extra_tracking_halves == 1 && fill_only_shapes && textlen > 0 && win) {
+		auto* game = Game_window::get_instance();
+		const Palette* pal = game ? game->get_pal() : nullptr;
+		if (pal) {
+			std::array<unsigned char, 65536> blend_cache;
+			blend_cache.fill(255);
+			auto half_color = [&](unsigned char a, unsigned char b) -> unsigned char {
+				if (a == b) return a;
+				const unsigned int key = (static_cast<unsigned int>(a) << 8) | b;
+				if (blend_cache[key] != 255) return blend_cache[key];
+				return blend_cache[key] = static_cast<unsigned char>(pal->find_color(
+					(pal->get_red(a) + pal->get_red(b) + 1) / 2,
+					(pal->get_green(a) + pal->get_green(b) + 1) / 2,
+					(pal->get_blue(a) + pal->get_blue(b) + 1) / 2));
+			};
+			for (int pass = 0; pass < 2; ++pass) {
+				int x_twice = xoff * 2;
+				for (int i = 0; i < textlen; ++i) {
+					const unsigned char chr = static_cast<unsigned char>(text[i]);
+					auto* outlined = font_shapes->get_frame(chr);
+					if (!outlined || !outlined->is_rle()) continue;
+					auto* glyph = pass == 0 ? outlined : fill_only_shapes->get_frame(chr);
+					const int x = x_twice / 2;
+					if (glyph && glyph->is_rle()) {
+						auto paint = [&](int xpos) {
+							if (trans) glyph->paint_rle_remapped(xpos, baseline_y, trans);
+							else glyph->paint_rle(xpos, baseline_y);
+						};
+						if ((x_twice & 1) == 0) {
+							paint(x);
+						} else {
+							// Glyph frame offsets can extend to either side of
+							// its origin. Clamp reads to the framebuffer, and
+							// leave the ordinary shape painter to handle clip.
+							const int margin = 8;
+							const int left = std::max(0, x - glyph->get_width() - margin);
+							const int top = std::max(0, baseline_y - glyph->get_height() - margin);
+							const int right = std::min(win->get_width(), x + glyph->get_width() + margin + 2);
+							const int bottom = std::min(win->get_height(), baseline_y + glyph->get_height() + margin);
+							if (left < right && top < bottom) {
+								const int w = right - left, h = bottom - top;
+								std::vector<unsigned char> before(static_cast<size_t>(w) * h);
+								std::vector<unsigned char> left_pixels(before.size());
+								auto save = [&](std::vector<unsigned char>& dst) {
+									for (int yy = 0; yy < h; ++yy)
+										for (int xx = 0; xx < w; ++xx)
+											dst[static_cast<size_t>(yy) * w + xx] = win->get_pixel8(left + xx, top + yy);
+								};
+								auto restore = [&]() {
+									for (int yy = 0; yy < h; ++yy)
+										for (int xx = 0; xx < w; ++xx)
+											win->put_pixel8(before[static_cast<size_t>(yy) * w + xx], left + xx, top + yy);
+								};
+								save(before);
+								paint(x);
+								save(left_pixels);
+								restore();
+								paint(x + 1);
+								for (int yy = 0; yy < h; ++yy) {
+									for (int xx = 0; xx < w; ++xx) {
+										const size_t k = static_cast<size_t>(yy) * w + xx;
+										win->put_pixel8(half_color(left_pixels[k], win->get_pixel8(left + xx, top + yy)),
+												left + xx, top + yy);
+									}
+								}
+							} else paint(x);
+						}
+					}
+					x_twice += 2 * (outlined->get_width() + hor_lead) + 1;
+				}
+			}
+			return get_text_width(text, textlen);
+		}
+	}
+
 	int total_advance = 0;
 	for (int pass = 0; pass < (fill_only_shapes ? 2 : 1); ++pass) {
 		int x = xoff;
