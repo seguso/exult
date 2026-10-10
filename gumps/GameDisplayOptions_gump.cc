@@ -232,6 +232,7 @@ public:
 using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
 using GameDisplayTextToggle     = CallbackToggleTextButton<GameDisplayOptions_gump>;
 using GameDisplayEnabledToggle  = CallbackEnabledButton<GameDisplayOptions_gump>;
+static constexpr int crt_width_values[] = {1, 2, 3, 4, 5, 6};
 
 // Android stuff
 
@@ -259,6 +260,11 @@ void GameDisplayOptions_gump::close() {
 }
 
 void GameDisplayOptions_gump::cancel() {
+	// Restore the committed filter after any temporary preview.
+	gwin->preview_crt_filter_settings(gwin->is_crt_filter_enabled(),
+		gwin->get_crt_horizontal_strength(), gwin->get_crt_vertical_strength(),
+		gwin->get_crt_horizontal_compensation(), gwin->get_crt_horizontal_width(),
+		gwin->get_crt_vertical_width(), gwin->get_crt_beam_sigma());
 	done = true;
 }
 
@@ -266,13 +272,30 @@ void GameDisplayOptions_gump::help() {
 	SDL_OpenURL("https://exult.info/docs.html#game_display_gump");
 }
 
+void GameDisplayOptions_gump::open_crt_settings() {
+	crt_page = true;
+	build_buttons();
+	gwin->set_all_dirty();
+}
+
+void GameDisplayOptions_gump::close_crt_settings() {
+	crt_page = false;
+	build_buttons();
+	gwin->set_all_dirty();
+}
+
+#include "Crt_options_controls.inc"
+
 void GameDisplayOptions_gump::build_buttons() {
+	for (size_t i = id_first_setting; i < buttons.size(); ++i)
+		buttons[i].reset();
 	const std::vector<std::string> yesNo = {Strings::No(), Strings::Yes()};
 
-	int y_index    = 0;
+	int y_index    = crt_page ? -1 : 0;
 	int small_size = 44;
 	int large_size = 85;
 
+	if (!crt_page) {
 	// Status Bar Positions
 	std::vector<std::string> stats
 			= {Strings::Disabled(), Strings::Left(), Strings::Middle(), Strings::Right(), Strings::Vertical()};
@@ -349,6 +372,16 @@ void GameDisplayOptions_gump::build_buttons() {
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts, get_button_pos_for_label(Strings::Fonts_()),
 			yForRow(++y_index), large_size);
 
+	buttons[id_crt_settings] = std::make_unique<GameDisplayOptions_button>(
+		this, &GameDisplayOptions_gump::open_crt_settings, "CRT settings...",
+		get_button_pos_for_label("CRT filter settings:"), yForRow(++y_index), large_size);
+	} else {
+#include "Crt_options_page.inc"
+		buttons[id_crt_back] = std::make_unique<GameDisplayOptions_button>(
+			this, &GameDisplayOptions_gump::close_crt_settings, "Back",
+			get_button_pos_for_label("Return to display:"), yForRow(8), large_size);
+	}
+
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 
@@ -380,6 +413,7 @@ void GameDisplayOptions_gump::load_settings() {
 	paperdolls       = sman->are_paperdolls_enabled();
 	text_bg          = gwin->get_text_bg() + 1;
 	smooth_scrolling = gwin->is_lerping_enabled() / 25;
+#include "Crt_options_load.inc"
 
 	android_autolaunch = Android_getAutoLaunch ? Android_getAutoLaunch() : 0;
 	config->value("config/gameplay/language", value, "");
@@ -408,7 +442,7 @@ void GameDisplayOptions_gump::load_settings() {
 }
 
 GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(15)), -1);
 
 	for (auto& btn : buttons) {
 		btn.reset();
@@ -416,13 +450,13 @@ GameDisplayOptions_gump::GameDisplayOptions_gump() : Modal_gump(nullptr, -1) {
 
 	// Ok
 	buttons[id_ok] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::close, Strings::OK(), 15, yForRow(14), 50);
 	// Help
 	buttons[id_help] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::help, Strings::HELP(), 50, yForRow(14), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			this, &GameDisplayOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(14), 50);
 
 	load_settings();
 	build_buttons();
@@ -490,6 +524,9 @@ void GameDisplayOptions_gump::save_settings() {
 		Game::setup_text();
 	}
 
+	// Save the CRT settings independently of which page is currently shown.
+#include "Crt_persistence.inc"
+
 	config->write_back();
 }
 
@@ -503,6 +540,7 @@ void GameDisplayOptions_gump::paint() {
 
 	Image_window8* iwin    = gwin->get_win();
 	int            y_index = 0;
+	if (!crt_page) {
 	font->paint_text(iwin->get_ib8(), Strings::StatusBars_(), x + label_margin, y + yForRow(y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::UseShortcutBar_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Useoutlinecolor_(), x + label_margin, y + yForRow(++y_index) + 1);
@@ -527,6 +565,16 @@ void GameDisplayOptions_gump::paint() {
 	}
 	if (buttons[id_fonts]) {
 		font->paint_text(iwin->get_ib8(), Strings::Fonts_(), x + label_margin, y + yForRow(++y_index) + 1);
+	}
+		font->paint_text(iwin->get_ib8(), "CRT filter settings:", x + label_margin, y + yForRow(++y_index) + 1);
+	} else {
+		int row = 0;
+		const char* labels[] = {"CRT filter:", "CRT horizontal scanlines:",
+			"CRT vertical mask:", "CRT brightness comp:", "CRT H line width:",
+			"CRT V mask width:", "CRT beam sigma:"};
+		for (const char* label : labels)
+			font->paint_text(iwin->get_ib8(), label, x + label_margin, y + yForRow(row++) + 1);
+		font->paint_text(iwin->get_ib8(), "Return to display:", x + label_margin, y + yForRow(8) + 1);
 	}
 	gwin->set_painted();
 }
