@@ -147,3 +147,11 @@ Published on `devmix`:
 - `devmix` commit `d211e37080b8bdc25fa41a481d0c18e1cbc724e0` copied the same test without adding personal files or diagnostic logging.
 - An equivalent standalone C++17 harness was compiled and executed locally with `g++ -std=c++17 -Wall -Wextra -Werror`, status PASS. This is **not** an Exult project build, and the checked-in exact repository files were not directly compiled in that harness.
 - Still required: compile the checked-in test against its actual include paths, full Exult builds, and manual tests in all four optional-feature combinations. No standalone feature branch is ready for upstream review yet.
+
+
+## Shared disabled-row compositor integration (2026-10-10)
+
+- `devmix` `d16002cf4308c900d24b96a24f94f104f8c836d2` imports `gumps/Option_row_fader.h` from the common branch.
+- `devmix` `675d1ae4f3c1980b1ea2e0cca1bb6cdbcc662039` switches `GameDisplayOptions_gump.cc` to `std::vector<Option_row_fader>` snapshots of only inactive setting rows and a final post-paint compositing pass. Retains the original row pitch and extra disabled font-summary row.
+- `is_dependent_option_inactive` and `on_button` remain feature/UI-owned, not coupled to the graphics helper. No personal config, file logging or debug trace was added.
+- The refactor removes the inline duplicated palette blend implementation in the dialog. **Build and visual regression tests remain pending**; verify 8-bit palette match, text+button fade, clipping, 12-pixel row spacing, disabled hit testing, enabled visual parity and palette changes. Only then mark the shared UI infrastructure as accepted.
