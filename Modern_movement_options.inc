@@ -5,16 +5,6 @@ void Game_window::set_modern_movement_tau_ms(int ms) {
 	reset_velocity_camera();
 }
 
-void Game_window::set_modern_keyboard_enabled(bool enabled) {
-	modern_keyboard_enabled = enabled;
-	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
-}
-
-void Game_window::set_modern_mouse_target_enabled(bool enabled) {
-	modern_mouse_target_enabled = enabled;
-	config->set("config/gameplay/modern_mouse_target", enabled ? "yes" : "no", true);
-}
-
 void Game_window::set_smooth_avatar_walk_enabled(bool enabled) {
 	smooth_avatar_walk_enabled = enabled;
 	config->set("config/gameplay/smooth_avatar_walk", enabled ? "yes" : "no", true);
@@ -29,9 +19,6 @@ void Game_window::set_smooth_avatar_walk_enabled(bool enabled) {
 void Game_window::set_smooth_scrolling_enabled(bool enabled) {
 	modern_movement_enabled = enabled;
 	config->set("config/gameplay/modern_movement", enabled ? "yes" : "no", true);
-	if (!enabled) {
-		mouse_walk_visual_dir = -1;
-	}
 	if (Mouse::mouse()) {
 		Mouse::mouse()->set_speed_cursor();
 	}
