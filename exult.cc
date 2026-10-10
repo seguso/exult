@@ -68,6 +68,7 @@
 #include "mouse.h"
 #include "Modern_movement_speed.h"
 #include "Modern_keyboard_movement.h"
+#include "Modern_mouse_target.h"
 #include "palette.h"
 #include "party.h"
 #include "sdlrwopsistream.h"
@@ -233,12 +234,13 @@ static Uint32               last_speed_cursor = 0;    // When we last updated th
 // fast and medium. Shift used as a modifier for another key (e.g. Shift+Q or
 // the displaced Shift+W/A/S/D bindings) does not toggle the speed.
 static Modern_movement_speed modern_movement_speed;
+static Modern_mouse_target modern_mouse_target;
 
 // Modern mouse A* uses the same Shift-toggled fast/medium speed mode as
 // modern WASD, rather than the cursor-distance-dependent mouse speed.
 static int modern_mouse_walk_speed() {
-	const int factor = modern_movement_speed.is_medium() ? Mouse::medium_speed_factor : Mouse::fast_speed_factor;
-	return 200 * gwin->get_std_delay() / factor;
+	return Modern_mouse_target::walk_speed(modern_movement_speed.is_medium(),
+			gwin->get_std_delay(), Mouse::medium_speed_factor, Mouse::fast_speed_factor);
 }
 static int    keyboard_speed_layer          = -1;
 static Uint32 keyboard_speed_feedback_until = 0;
@@ -1428,7 +1430,6 @@ static void Handle_events() {
 	int  last_y = -1;
 	int  lerp_mswait = 0;
 	bool lerp_stop_anchored = false;
-	uint32 last_modern_mouse_target = 0;
 	/*
 	 *  Main event loop.
 	 */
@@ -1491,12 +1492,11 @@ static void Handle_events() {
 			int       y  = Mouse::mouse()->get_mousey();
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
-				if (!gwin->is_modern_mouse_target_enabled()
-					|| ticks - last_modern_mouse_target >= 500) {
+				if (modern_mouse_target.should_retarget(gwin->is_modern_mouse_target_enabled(), ticks)) {
 					gwin->start_actor_from_display(x, y,
 							gwin->is_modern_mouse_target_enabled()
 								? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
-					last_modern_mouse_target = ticks;
+					modern_mouse_target.retargeted(ticks);
 				}
 			} else if (ticks > last_rest) {
 				const int resttime = ticks - last_rest;
