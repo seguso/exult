@@ -462,7 +462,7 @@ std::unique_ptr<Shape_file> Gen_runtime_font_shape(
 		if (Gdiplus::GdiplusStartup(&token, &startup, nullptr) == Gdiplus::Ok) {
 			int length = MultiByteToWideChar(CP_UTF8, 0, fontfile, -1, nullptr, 0);
 			if (length > 1) {
-				std::wstring wide_path(static_cast<size_t>(length), L'\\0');
+				std::wstring wide_path(static_cast<size_t>(length), L'\0');
 				MultiByteToWideChar(CP_UTF8, 0, fontfile, -1, wide_path.data(), length);
 				Gdiplus::PrivateFontCollection collection;
 				if (collection.AddFontFile(wide_path.c_str()) == Gdiplus::Ok) {
@@ -475,7 +475,7 @@ std::unique_ptr<Shape_file> Gen_runtime_font_shape(
 							if (families[0].GetFamilyName(name) == Gdiplus::Ok) {
 								int bytes = WideCharToMultiByte(CP_UTF8, 0, name, -1, nullptr, 0, nullptr, nullptr);
 								if (bytes > 1) {
-									std::string utf8(static_cast<size_t>(bytes), '\\0');
+									std::string utf8(static_cast<size_t>(bytes), '\0');
 									WideCharToMultiByte(CP_UTF8, 0, name, -1, utf8.data(), bytes, nullptr, nullptr);
 									utf8.resize(static_cast<size_t>(bytes - 1));
 									file_family = std::move(utf8);
