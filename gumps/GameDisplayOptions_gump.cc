@@ -354,7 +354,7 @@ void GameDisplayOptions_gump::browse_conversation_font(bool installed) {
 	const char* start = nullptr;
 	if (installed) {
 #if defined(SDL_PLATFORM_WINDOWS)
-		start = nullptr; // Windows Fonts is a special shell folder; start normally.
+		start = "C:\\Windows\\Fonts"; // Folder, not a prefilled filename.
 #elif defined(SDL_PLATFORM_MACOS)
 		start = "/System/Library/Fonts/";
 #elif defined(SDL_PLATFORM_LINUX)
