@@ -284,7 +284,7 @@ int Font::paint_text(
 				shape->paint_rle(x, yoff);
 			}
 			x += shape->get_width() + hor_lead;
-			x -= ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
+			x += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 		}
 	}
 	return x - xoff;
@@ -325,7 +325,7 @@ int Font::paint_text(
 				shape->paint_rle(x, yoff);
 			}
 			x += shape->get_width() + hor_lead;
-			x -= ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
+			x += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 		}
 	}
 	return x - xoff;
@@ -563,7 +563,7 @@ int Font::get_text_width(const char* text) {
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr));
 			if (shape && shape->is_rle()) {
 				width += shape->get_width() + hor_lead;
-				width -= ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
+				width += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 			}
 		}
 	}
@@ -585,7 +585,7 @@ int Font::get_text_width(
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(*text++));
 			if (shape && shape->is_rle()) {
 				width += shape->get_width() + hor_lead;
-				width -= ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
+				width += ((++glyph_count * extra_tracking_halves) / 2) - (((glyph_count - 1) * extra_tracking_halves) / 2);
 			}
 		}
 	}
@@ -611,7 +611,7 @@ void Font::get_text_box_dims(const char* text, int& width, int& height, int vert
 			Shape_frame* shape = font_shapes->get_frame(static_cast<unsigned char>(chr));
 			if (shape && shape->is_rle()) {
 				cur_width += shape->get_width() + hor_lead;
-				cur_width -= ((++line_glyphs * extra_tracking_halves) / 2) - (((line_glyphs - 1) * extra_tracking_halves) / 2);
+				cur_width += ((++line_glyphs * extra_tracking_halves) / 2) - (((line_glyphs - 1) * extra_tracking_halves) / 2);
 			}
 		}
 		width  = std::max(width, cur_width);
