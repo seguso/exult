@@ -316,13 +316,18 @@ void GameDisplayOptions_gump::SetAndroidAutoLaunchFPtrs(void (*setter)(bool), bo
 	Android_setAutoLaunch = setter;
 }
 
+bool GameDisplayOptions_gump::is_dependent_option_inactive(button_ids id) const {
+	if (page == Page::display) return modern_smooth && id == id_smooth_scrolling;
+	if (page == Page::movement) return !modern_smooth && (id == id_smooth_avatar_walk || id == id_modern_tau);
+	if (page == Page::rotation) return !rotate_world && id == id_rotate_sampling_mode;
+	if (page == Page::crt) return !crt_enabled && id >= id_crt_horizontal_strength && id <= id_crt_beam_sigma;
+	if (page == Page::fonts) return !conversation_font && id >= id_conversation_font_size && id <= id_conversation_font_reset;
+	return false;
+}
+
 Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 	for (size_t i = 0; i < buttons.size(); ++i) {
-		// Legacy smooth scrolling is intentionally unavailable while the modern
-		// camera package is active; its percentage is a different algorithm.
-		if ((modern_smooth && i == id_smooth_scrolling) || (!modern_smooth && (i == id_smooth_avatar_walk || i == id_modern_tau))) {
-			continue;
-		}
+		if (is_dependent_option_inactive(static_cast<button_ids>(i))) continue;
 		auto& btn = buttons[i];
 		auto found = btn ? btn->on_button(mx, my) : nullptr;
 		if (found) {
@@ -1054,11 +1059,10 @@ void GameDisplayOptions_gump::paint() {
 		std::vector<unsigned char> backdrop;
 	};
 	std::vector<FadedRow> faded_rows;
-	if ((page == Page::movement && !modern_smooth) || (page == Page::display && modern_smooth)) {
-		const std::vector<button_ids> inactive_buttons = page == Page::movement
-				? std::vector<button_ids>{id_smooth_avatar_walk, id_modern_tau}
-				: std::vector<button_ids>{id_smooth_scrolling};
-		for (const button_ids id : inactive_buttons) {
+	{
+		for (size_t index = id_first_setting; index < buttons.size(); ++index) {
+			const button_ids id = static_cast<button_ids>(index);
+			if (!is_dependent_option_inactive(id)) continue;
 			if (!buttons[id]) continue;
 			const int row_y = y + buttons[id]->get_y();
 			const int left = std::clamp<int>(x + label_margin, 0, static_cast<int>(framebuffer->get_width()));

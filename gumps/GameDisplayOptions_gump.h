@@ -130,6 +130,7 @@ public:
 	
 
 	void build_buttons();
+	bool is_dependent_option_inactive(button_ids id) const;
 	void update_legacy_smooth_button();
 	void update_conversation_font_size_button();
 	void update_crt_strength_buttons();
