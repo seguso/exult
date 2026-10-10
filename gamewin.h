@@ -28,6 +28,7 @@
 #include "shapeid.h"
 #include "shapeinf.h"
 #include "tiles.h"
+#include "worldview.h"
 #include "vgafile.h"
 
 #include <array>
@@ -137,6 +138,18 @@ class Game_window {
 	int      scrolltx, scrollty;    // Top-left tile of screen.
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
+	bool rotate_world = false;
+	int rotate_sampling_mode =
+#ifdef USE_HQ3X_SCALER
+		6;
+#else
+		0;
+#endif
+	World_view_transform world_view;
+	std::unique_ptr<Image_buffer8> rotate_scene;
+	std::unique_ptr<Image_buffer8> rotate_scene_2x;
+	std::unique_ptr<Image_buffer8> rotate_scene_3x;
+	std::vector<uint32> rotate_scene_hq3x;
 	// Savegames:
 	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
@@ -766,6 +779,18 @@ public:
 	void paint_map_at_tile(int x, int y, int w, int h, int toptx, int topty, int skip_above = 31);
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
+	void paint_rotated(int x, int y, int w, int h);
+	void resize_rotate_scene();
+	bool is_rotate_world_enabled() const { return rotate_world; }
+	void set_rotate_world_enabled(bool enabled);
+	int get_rotate_sampling_mode() const { return rotate_sampling_mode; }
+	void set_rotate_sampling_mode(int mode);
+	void display_to_world(int& x, int& y) const;
+	void world_to_display(int& x, int& y) const;
+	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
+	void start_actor_from_display(int x, int y, int speed = 125);
+	void start_actor_along_path_from_display(int x, int y, int speed = 125);
+	Game_object* find_object_from_display(int x, int y);
 
 	void paint(TileRect& r) {
 		paint(r.x, r.y, r.w, r.h);
