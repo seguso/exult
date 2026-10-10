@@ -39,6 +39,7 @@
 #include "Zombie.h"
 #include "actions.h"
 #include "actors.h"
+#include "exult_horse_collision_diagnostics.h"
 #include "combat.h"
 #include "dir.h"
 #include "frameseq.h"
@@ -3299,8 +3300,17 @@ void Shy_schedule::now_what() {
 	Actor*           av     = gwin->get_main_actor();
 	const Tile_coord avpos  = av->get_tile();
 	const Tile_coord npcpos = npc->get_tile();
+	const bool traceHorse = ExultHorseTraceEnabled(npc);
 	// How far away is Avatar?
 	const int dist = npc->distance(av);
+	if (traceHorse) {
+		const Shape_info& info = npc->get_info();
+		ExultHorseTrace("shy-tick shape=%d tile=(%d,%d,%d) avatar=(%d,%d,%d) dist=%d frame=%d size=(%d,%d,%d)",
+			npc->get_shapenum(), npcpos.tx, npcpos.ty, npcpos.tz,
+			avpos.tx, avpos.ty, avpos.tz, dist, npc->get_framenum(),
+			info.get_3d_xtiles(npc->get_framenum()), info.get_3d_ytiles(npc->get_framenum()),
+			info.get_3d_height());
+	}
 	if (dist > 10) {    // Far enough?
 		// Check again in a few seconds.
 		if (rand() % 3) {    // Just wait.
@@ -3322,12 +3332,43 @@ void Shy_schedule::now_what() {
 	Tile_coord       dest  = npcpos + Tile_coord(dx * factor, dy * factor, 0);
 	const Tile_coord delta = Tile_coord(rand() % 3, rand() % 3, 0);
 	dest                   = dest + delta;
+	if (traceHorse)
+		ExultHorseTrace("shy-search from=(%d,%d,%d) target=(%d,%d,%d) radius=4",
+			npcpos.tx, npcpos.ty, npcpos.tz, dest.tx, dest.ty, dest.tz);
 	Monster_pathfinder_client cost(npc, dest, 4);
 	Actor_action*             pact = Path_walking_actor_action::create_path(npcpos, dest, cost);
 	if (pact) {    // Found path?
+		if (traceHorse)
+			ExultHorseTrace("shy-path-found tile=(%d,%d,%d) target=(%d,%d,%d)",
+				npcpos.tx, npcpos.ty, npcpos.tz, dest.tx, dest.ty, dest.tz);
 		npc->set_action(pact);
 		npc->start(200, 100 + rand() % 200);    // Start walking.
 	} else {                                    // Try again in a couple secs.
+		if (traceHorse) {
+			ExultHorseTrace("shy-path-failed tile=(%d,%d,%d) target=(%d,%d,%d)",
+				npcpos.tx, npcpos.ty, npcpos.tz, dest.tx, dest.ty, dest.tz);
+			// Diagnostic probes use Actor::is_blocked, the same world
+			// movement rules as a real step. They never call step(),
+			// move_aside() or modify the actor's position or schedule.
+			int worldRejected = 0;
+			for (int dy = -1; dy <= 1; ++dy) {
+				for (int dx = -1; dx <= 1; ++dx) {
+					if (dx == 0 && dy == 0)
+						continue;
+					Tile_coord from = npcpos;
+					Tile_coord probe = npcpos + Tile_coord(dx, dy, 0);
+					const bool blocked = npc->is_blocked(probe, &from, 0);
+					if (blocked)
+						++worldRejected;
+					ExultHorseTrace("shy-neighbor from=(%d,%d,%d) delta=(%d,%d) resolved=(%d,%d,%d) worldBlocked=%d",
+						npcpos.tx, npcpos.ty, npcpos.tz, dx, dy,
+						probe.tx, probe.ty, probe.tz, blocked ? 1 : 0);
+				}
+			}
+			if (worldRejected == 8)
+				ExultHorseTrace("shy-stranded tile=(%d,%d,%d) all-eight-world-edges-blocked",
+					npcpos.tx, npcpos.ty, npcpos.tz);
+		}
 		npc->start(250, 500 + rand() % 1000);
 	}
 }
