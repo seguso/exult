@@ -560,9 +560,9 @@ void GameDisplayOptions_gump::paint() {
 	}
 		font->paint_text(iwin->get_ib8(), "Modern smooth scrolling:", x + label_margin, y + yForRow(++y_index) + 1);
 	} else {
-		font->paint_text(iwin->get_ib8(), Strings::Modernsmoothscrolling_(), x + label_margin, y + yForRow(0) + 1);
+		font->paint_text(iwin->get_ib8(), "Modern smooth scrolling:", x + label_margin, y + yForRow(0) + 1);
 		font->paint_text(iwin->get_ib8(), "Smooth avatar walk:", x + label_margin, y + yForRow(1) + 1);
-		font->paint_text(iwin->get_ib8(), Strings::Smoothcameratau_(), x + label_margin, y + yForRow(2) + 1);
+		font->paint_text(iwin->get_ib8(), "Camera smoothing time:", x + label_margin, y + yForRow(2) + 1);
 		font->paint_text(iwin->get_ib8(), "Return to display:", x + label_margin, y + yForRow(5) + 1);
 	}
 	gwin->set_painted();
