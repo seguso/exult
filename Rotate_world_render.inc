@@ -372,13 +372,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		constexpr double quad_extent = 4.2426406871192851464;
 		constexpr double inv_quad_extent = 1.0 / quad_extent;
 		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
-		int node_contributions = 0;
-		int quadruplets = 0;
-		int high_cohesion = 0;
-		int medium_cohesion = 0;
-		int low_cohesion = 0;
-		int segment_cells = 0;
-		double confidence_sum = 0.0;
+
 
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
@@ -398,7 +392,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							static_cast<float>(pal_g[node_color]),
 							static_cast<float>(pal_b[node_color]),
 							node_weight);
-					++node_contributions;
+
 				}
 
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
@@ -422,15 +416,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					const int d3b = pal_b[a] - 3 * pal_b[b] + 3 * pal_b[cc] - pal_b[d];
 					const int third2 = d3r * d3r + d3g * d3g + d3b * d3b;
 					const float confidence = quad_confidence_lut[static_cast<size_t>(third2)];
-					++quadruplets;
-					confidence_sum += confidence;
-					if (confidence >= 0.80f) {
-						++high_cohesion;
-					} else if (confidence >= 0.40f) {
-						++medium_cohesion;
-					} else {
-						++low_cohesion;
-					}
 
 					if (delta.second > 0) {
 						const double lo = p0.y;
@@ -450,7 +435,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							float r, g, blue;
 							average_colour_over(a, b, cc, d, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					} else {
 						const double lo = p0.x;
@@ -470,7 +455,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							float r, g, blue;
 							average_colour_over(a, b, cc, d, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					}
 				}
@@ -478,12 +463,12 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 
 		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
-		int holes = 0;
+
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Quad_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
-					++holes;
+
 					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
@@ -556,13 +541,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		constexpr double pair_extent = 1.4142135623730950488;
 		constexpr double inv_pair_extent = 1.0 / pair_extent;
 		constexpr double half_sqrt_2_fast = 0.7071067811865475244;
-		int node_contributions = 0;
-		int pairs = 0;
-		int high_cohesion = 0;
-		int medium_cohesion = 0;
-		int low_cohesion = 0;
-		int segment_cells = 0;
-		double confidence_sum = 0.0;
+
 
 		for (int sy = 0; sy < scene_size; ++sy) {
 			const int src_y = scene_y + sy;
@@ -582,7 +561,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							static_cast<float>(pal_g[node_color]),
 							static_cast<float>(pal_b[node_color]),
 							node_weight);
-					++node_contributions;
+
 				}
 
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
@@ -600,15 +579,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					const int db = pal_b[a] - pal_b[b];
 					const int distance2 = dr * dr + dg * dg + db * db;
 					const float confidence = pair_confidence_lut[static_cast<size_t>(distance2)];
-					++pairs;
-					confidence_sum += confidence;
-					if (confidence >= 0.80f) {
-						++high_cohesion;
-					} else if (confidence >= 0.40f) {
-						++medium_cohesion;
-					} else {
-						++low_cohesion;
-					}
 
 					// The rasterized cell midpoint is guaranteed to lie on the
 					// A->B segment, so no per-sample clamp/helper is needed.
@@ -640,7 +610,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 									ag + dcg * tmid,
 									ab + dcb * tmid,
 									confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					} else {
 						// Source '/' pair -> horizontal destination segment.
@@ -663,7 +633,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 									ag + dcg * tmid,
 									ab + dcb * tmid,
 									confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					}
 				}
@@ -671,12 +641,12 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 
 		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
-		int holes = 0;
+
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const Pair_accum& src = accum[at(dx, dy)];
 				if (src.w <= 0.0f) {
-					++holes;
+
 					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
@@ -789,14 +759,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		// Low-weight node evidence is emitted from the same source scan as the
 		// triplets below, avoiding a second full traversal of the expanded scene.
 		constexpr float node_weight = 0.10f;
-		int node_contributions = 0;
 
-		int triplets = 0;
-		int high_cohesion = 0;
-		int medium_cohesion = 0;
-		int low_cohesion = 0;
-		int segment_cells = 0;
-		double confidence_sum = 0.0;
 
 		constexpr double triplet_extent = 2.8284271247461900976;
 		constexpr double inv_triplet_extent = 1.0 / triplet_extent;
@@ -819,7 +782,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							static_cast<float>(pal_g[node_color]),
 							static_cast<float>(pal_b[node_color]),
 							node_weight);
-					++node_contributions;
+
 				}
 
 				for (const auto delta : {std::pair<int, int>{1, 1}, std::pair<int, int>{1, -1}}) {
@@ -843,15 +806,6 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 					const int d2b = pal_b[a] - 2 * pal_b[b] + pal_b[cc];
 					const int curvature2 = d2r * d2r + d2g * d2g + d2b * d2b;
 					const float confidence = confidence_lut[static_cast<size_t>(curvature2)];
-					++triplets;
-					confidence_sum += confidence;
-					if (confidence >= 0.80f) {
-						++high_cohesion;
-					} else if (confidence >= 0.40f) {
-						++medium_cohesion;
-					} else {
-						++low_cohesion;
-					}
 
 					if (delta.second > 0) {
 						// Source '\\' run: vertical destination segment.
@@ -872,7 +826,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							float r, g, blue;
 							average_colour_over(a, b, cc, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					} else {
 						// Source '/' run: horizontal destination segment.
@@ -893,7 +847,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 							float r, g, blue;
 							average_colour_over(a, b, cc, t0, t1, r, g, blue);
 							add_rgb(dx, dy, r, g, blue, confidence * static_cast<float>(coverage));
-							++segment_cells;
+
 						}
 					}
 				}
@@ -901,13 +855,13 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		}
 
 		const unsigned char hole_color = static_cast<unsigned char>(pal->get_border_index());
-		int holes = 0;
+
 		for (int dy = 0; dy < display_height; ++dy) {
 			for (int dx = 0; dx < display_width; ++dx) {
 				const size_t pos = at(dx, dy);
 				const Triplet_accum& src = accum[pos];
 				if (src.w <= 0.0f) {
-					++holes;
+
 					win->put_pixel8(hole_color, dx, dy);
 				} else {
 					const float inv = 1.0f / src.w;
