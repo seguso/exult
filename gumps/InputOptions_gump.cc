@@ -134,7 +134,9 @@ void InputOptions_gump::help() {
 }
 
 Gump_button* InputOptions_gump::on_button(int mx, int my) {
-	for (auto& btn : buttons) {
+	for (size_t i = 0; i < buttons.size(); ++i) {
+		if (i == id_modern_mouse_target && !gwin->is_modern_movement_enabled()) continue;
+		auto& btn = buttons[i];
 		auto found = btn ? btn->on_button(mx, my) : nullptr;
 		if (found) {
 			return found;

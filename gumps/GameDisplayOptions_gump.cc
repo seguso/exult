@@ -280,7 +280,7 @@ Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 	for (size_t i = 0; i < buttons.size(); ++i) {
 		// Legacy smooth scrolling is intentionally unavailable while the modern
 		// camera package is active; its percentage is a different algorithm.
-		if (modern_smooth && i == id_smooth_scrolling) {
+		if ((modern_smooth && i == id_smooth_scrolling) || (!modern_smooth && (i == id_smooth_avatar_walk || i == id_modern_tau))) {
 			continue;
 		}
 		auto& btn = buttons[i];
@@ -290,6 +290,26 @@ Gump_button* GameDisplayOptions_gump::on_button(int mx, int my) {
 		}
 	}
 	return Modal_gump::on_button(mx, my);
+}
+
+void GameDisplayOptions_gump::toggle_modern_smooth(int state) {
+	modern_smooth = state;
+	// Refresh dependent widgets without destroying the activated camera button.
+	const std::vector<std::string> yesNo = {Strings::No(), Strings::Yes()};
+	const int avatar_y = buttons[id_smooth_avatar_walk]->get_y();
+	const int tau_y = buttons[id_modern_tau]->get_y();
+	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
+			modern_smooth ? yesNo : std::vector<std::string>{"Disabled"}, modern_smooth ? smooth_avatar_walk : 0,
+			get_button_pos_for_label("Smooth avatar walk:"), avatar_y, 44);
+	std::vector<std::string> tau_text;
+	for (int ms : modern_tau_values) tau_text.emplace_back(std::to_string(ms) + " ms");
+	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
+			this, &GameDisplayOptions_gump::toggle_modern_tau,
+			modern_smooth ? std::move(tau_text) : std::vector<std::string>{"Disabled"}, modern_smooth ? modern_tau : 0,
+			get_button_pos_for_label(Strings::Smoothcameratau_()), tau_y, 44);
+	RightAlignWidgets(tcb::span(buttons.data() + id_first_setting, id_count - id_first_setting));
+	gwin->set_all_dirty();
 }
 
 void GameDisplayOptions_gump::open_modern_scrolling() {
@@ -417,7 +437,8 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
 			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
 	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk, yesNo, smooth_avatar_walk,
+			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
+			modern_smooth ? yesNo : std::vector<std::string>{"Disabled"}, modern_smooth ? smooth_avatar_walk : 0,
 			get_button_pos_for_label("Smooth avatar walk:"), yForRow(++y_index), small_size);
 
 	std::vector<std::string> tau_text;
@@ -425,7 +446,8 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 		tau_text.emplace_back(std::to_string(value) + " ms");
 	}
 	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_modern_tau, std::move(tau_text), modern_tau,
+			this, &GameDisplayOptions_gump::toggle_modern_tau,
+			modern_smooth ? std::move(tau_text) : std::vector<std::string>{"Disabled"}, modern_smooth ? modern_tau : 0,
 			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
 
 	}

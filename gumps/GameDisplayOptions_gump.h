@@ -177,9 +177,7 @@ public:
 
 	void toggle_smooth_avatar_walk(int state) { smooth_avatar_walk = state; }
 
-	void toggle_modern_smooth(int state) {
-		modern_smooth = state;
-	}
+	void toggle_modern_smooth(int state);
 
 	void toggle_modern_tau(int state) {
 		modern_tau = state;
