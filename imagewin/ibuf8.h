@@ -47,9 +47,22 @@ public:
 	}
 
 	~Image_buffer8() {
-		if (!bits_owned) {
+		if (bits_owned) {
+			// bits may point at the logical origin after set_offset().
+			bits -= offset_y * line_width + offset_x;
+		} else {
 			bits = nullptr;
 		}
+	}
+
+	// Move the logical origin inside an owned off-screen buffer.  This keeps
+	// the normal drawing APIs usable while a scene is rendered around a
+	// viewport-sized centre.
+	void set_offset(int x, int y) {
+		bits += (x - offset_x) + (y - offset_y) * line_width;
+		offset_x = x;
+		offset_y = y;
+		clear_clip();
 	}
 
 	/*

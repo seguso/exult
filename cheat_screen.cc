@@ -601,7 +601,7 @@ bool CheatScreen::InputHandlers::GameObject::OnInput(SDL_Keycode key_sym) {
 		bool result = Get_click(x, y, Mouse::greenselect, nullptr, true, nullptr, true);
 		cscreen->pal.apply(false);
 		if (result) {
-			object = gwin->find_object(x, y);
+			object = gwin->find_object_from_display(x, y);
 		} else {
 			throw MenuCommandException{Strings::CANCELLED, false};
 		}

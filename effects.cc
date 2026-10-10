@@ -1007,10 +1007,33 @@ void Homing_projectile::paint() {
  */
 
 TileRect Text_effect::Figure_text_pos() {
+	const auto to_display_rect = [&](TileRect r) {
+		if (!gwin->is_rotate_world_enabled()) {
+			return r;
+		}
+		int x0 = r.x;
+		int y0 = r.y;
+		int x1 = r.x + r.w;
+		int y1 = r.y;
+		int x2 = r.x + r.w;
+		int y2 = r.y + r.h;
+		int x3 = r.x;
+		int y3 = r.y + r.h;
+		gwin->world_to_display(x0, y0);
+		gwin->world_to_display(x1, y1);
+		gwin->world_to_display(x2, y2);
+		gwin->world_to_display(x3, y3);
+		const int left   = std::min({x0, x1, x2, x3});
+		const int top    = std::min({y0, y1, y2, y3});
+		const int right  = std::max({x0, x1, x2, x3});
+		const int bottom = std::max({y0, y1, y2, y3});
+		return TileRect(left, top, right - left, bottom - top);
+	};
+
 	const Game_object_shared item_obj = item.lock();
 	if (item_obj) {
 		Gump_manager* gumpman = gwin->get_gump_man();
-		// See if it's in a gump.
+		// See if it's in a gump. Gumps are UI and must not be world-rotated.
 		Gump* gump = gumpman->find_gump(item_obj.get());
 		if (gump) {
 			return gump->get_shape_rect(item_obj.get());
@@ -1022,13 +1045,13 @@ TileRect Text_effect::Figure_text_pos() {
 			TileRect r = gwin->get_shape_rect(outer);
 			r.x -= gwin->get_scrolltx_lo();
 			r.y -= gwin->get_scrollty_lo();
-			return r;
+			return to_display_rect(r);
 		}
 	} else {
 		int x;
 		int y;
 		gwin->get_shape_location(tpos, x, y);
-		return TileRect(x, y, c_tilesize, c_tilesize);
+		return to_display_rect(TileRect(x, y, c_tilesize, c_tilesize));
 	}
 }
 

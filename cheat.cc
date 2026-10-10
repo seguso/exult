@@ -1423,7 +1423,7 @@ void Cheat::delete_object() {
 	if (gump) {
 		obj = gump->find_object(gx, gy);
 	} else {    // Search rest of world.
-		obj = gwin->find_object(x, y);
+		obj = gwin->find_object_from_display(x, y);
 	}
 
 	if (obj) {
