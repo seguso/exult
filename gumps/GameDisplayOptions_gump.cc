@@ -1061,7 +1061,7 @@ void GameDisplayOptions_gump::paint() {
 			if (!buttons[id]) continue;
 			const int row_y = y + buttons[id]->get_y();
 			const int left = std::clamp(x + label_margin, 0, framebuffer->get_width());
-			const int right = std::clamp(x + get_width() - 4, 0, framebuffer->get_width());
+			const int right = std::clamp(x + get_rect().w - 4, 0, framebuffer->get_width());
 			const int top = std::clamp(row_y, 0, framebuffer->get_height());
 			const int bottom = std::clamp(row_y + 16, 0, framebuffer->get_height());
 			if (right <= left || bottom <= top) continue;
