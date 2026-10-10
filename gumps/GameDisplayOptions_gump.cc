@@ -61,6 +61,10 @@
 #include "font.h"
 #include "game.h"
 #include "gamewin.h"
+#include "palette.h"
+#include "ibuf8.h"
+#include <array>
+#include <vector>
 #include "items.h"
 
 using std::string;
@@ -1042,10 +1046,36 @@ void GameDisplayOptions_gump::paint() {
 		}
 	}
 	Modal_gump::paint();
+	Image_window8* iwin = gwin->get_win();
+	Image_buffer8* framebuffer = iwin->get_ib8();
+	// Save the actual background under disabled dependent controls. Fade the
+	// finished label AND button against it, without changing label lengths,
+	// layout, or the stored Yes/No/tau values.
+	struct FadedRow {
+		int x, y, width, height;
+		std::vector<unsigned char> backdrop;
+	};
+	std::vector<FadedRow> faded_rows;
+	if (page == Page::movement && !modern_smooth) {
+		for (const button_ids id : {id_smooth_avatar_walk, id_modern_tau}) {
+			if (!buttons[id]) continue;
+			const int row_y = y + buttons[id]->get_y();
+			const int left = std::clamp(x + label_margin, 0, framebuffer->get_width());
+			const int right = std::clamp(x + get_width() - 4, 0, framebuffer->get_width());
+			const int top = std::clamp(row_y, 0, framebuffer->get_height());
+			const int bottom = std::clamp(row_y + 16, 0, framebuffer->get_height());
+			if (right <= left || bottom <= top) continue;
+			FadedRow row{left, top, right - left, bottom - top, {}};
+			row.backdrop.reserve(static_cast<size_t>(row.width) * row.height);
+			for (int yy = top; yy < bottom; ++yy)
+				for (int xx = left; xx < right; ++xx)
+					row.backdrop.push_back(framebuffer->get_pixel8(xx, yy));
+			faded_rows.push_back(std::move(row));
+		}
+	}
 	for (auto& btn : buttons) {
 		if (btn) btn->paint();
 	}
-	Image_window8* iwin = gwin->get_win();
 	auto draw_label = [&](button_ids id, const char* label) {
 		if (buttons[id]) {
 			font->paint_text(iwin->get_ib8(), label, x + label_margin, y + buttons[id]->get_y() + 1);
@@ -1059,10 +1089,10 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_smooth_scrolling, Strings::Smoothscrolling_());
 	draw_label(id_nav_movement, "Modern smooth scrolling:");
 	draw_label(id_modern_smooth, Strings::Modernsmoothscrolling_());
-	draw_label(id_smooth_avatar_walk, modern_smooth ? "Smooth avatar walk:" : "Smooth avatar walk (inactive):");
+	draw_label(id_smooth_avatar_walk, "Smooth avatar walk:");
 
 
-	draw_label(id_modern_tau, modern_smooth ? Strings::Smoothcameratau_() : "Smooth camera tau (inactive):");
+	draw_label(id_modern_tau, Strings::Smoothcameratau_());
 	draw_label(id_rotate_world, Strings::Rotateworld45deg_());
 	draw_label(id_rotate_sampling_mode, Strings::Rotatequality_());
 	draw_label(id_crt_enabled, "CRT filter:");
@@ -1086,6 +1116,35 @@ void GameDisplayOptions_gump::paint() {
 	draw_label(id_conversation_font_file, "TTF / OTF file:");
 	draw_label(id_conversation_system_font, "Installed fonts:");
 	draw_label(id_conversation_font_reset, "Font selection:");
+	// Composite the disabled controls at half opacity onto the already
+	// painted gump background. All other options retain normal rendering.
+	if (!faded_rows.empty()) {
+		const Palette* palette = gwin->get_pal();
+		if (palette) {
+			std::array<int, 65536> blend_cache;
+			blend_cache.fill(-1);
+			for (const auto& row : faded_rows) {
+				for (int yy = 0; yy < row.height; ++yy) {
+					for (int xx = 0; xx < row.width; ++xx) {
+						const unsigned char bg = row.backdrop[static_cast<size_t>(yy) * row.width + xx];
+						const unsigned char fg = framebuffer->get_pixel8(row.x + xx, row.y + yy);
+						if (bg == fg) continue;
+						const unsigned int key = (static_cast<unsigned int>(fg) << 8) | bg;
+						int color = blend_cache[key];
+						if (color < 0) {
+							color = palette->find_color(
+									(palette->get_red(fg) + palette->get_red(bg) + 1) / 2,
+									(palette->get_green(fg) + palette->get_green(bg) + 1) / 2,
+									(palette->get_blue(fg) + palette->get_blue(bg) + 1) / 2);
+							blend_cache[key] = color;
+						}
+						framebuffer->put_pixel8(static_cast<unsigned char>(color), row.x + xx, row.y + yy);
+					}
+				}
+			}
+		}
+	}
+
 	if (page == Page::fonts) {
 		std::string chosen = "Automatic system font";
 		if (!conversation_font_file.empty()) {
