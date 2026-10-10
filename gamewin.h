@@ -144,6 +144,14 @@ class Game_window {
 	bool fastmouse;
 	bool double_click_closes_gumps;
 	int  text_bg;                 // draw a dark background behind text
+	bool crt_filter_enabled = false;
+	int  crt_horizontal_strength = 8;
+	int  crt_vertical_strength = 8; // half-percent units (8 = 4%)
+	int  crt_horizontal_compensation = 100;
+	int  crt_vertical_compensation = 100;
+	int  crt_horizontal_width = 2;
+	int  crt_vertical_width = 2;
+	int  crt_beam_sigma = 30;
 	int  step_tile_delta;         // multiplier for the delta in start_actor_alt
 	int  allow_right_pathfind;    // If moving with right click is allowed
 	bool scroll_with_mouse;       // scroll game view with mousewheel
@@ -904,6 +912,35 @@ public:
 	void view_down();     // Move view down.
 	void view_up();       // Move view up.
 	// Start moving actor.
+	bool is_crt_filter_enabled() const {
+		return crt_filter_enabled;
+	}
+	int get_crt_horizontal_strength() const {
+		return crt_horizontal_strength;
+	}
+	int get_crt_vertical_strength() const {
+		return crt_vertical_strength;
+	}
+	int get_crt_horizontal_compensation() const {
+		return crt_horizontal_compensation;
+	}
+	int get_crt_vertical_compensation() const {
+		return crt_vertical_compensation;
+	}
+	int get_crt_horizontal_width() const {
+		return crt_horizontal_width;
+	}
+	int get_crt_beam_sigma() const { return crt_beam_sigma; }
+	int get_crt_vertical_width() const {
+		return crt_vertical_width;
+	}
+	void preview_crt_filter_settings(
+			bool enabled, int horizontal_strength, int vertical_strength,
+			int compensation, int horizontal_width, int vertical_width, int beam_sigma);
+	void set_crt_filter_settings(
+			bool enabled, int horizontal_strength, int vertical_strength,
+			int horizontal_compensation, int vertical_compensation,
+			int horizontal_width, int vertical_width, int beam_sigma);
 	void start_actor_alt(int winx, int winy, int speed);
 	void start_actor(int winx, int winy, int speed = 125);
 	void start_actor_along_path(int winx, int winy, int speed = 125);
