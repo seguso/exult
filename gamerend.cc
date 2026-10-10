@@ -517,6 +517,8 @@ void Game_window::paint_lerped(int factor) {
  *  Paint the flat (non-rle) shapes in a chunk.
  */
 
+#include "Modern_camera_render.inc"
+
 void Game_render::paint_chunk_flats(
 		int cx, int cy,       // Chunk coords (0 - 12*16).
 		int xoff, int yoff    // Pixel offset of top-of-screen.
@@ -622,6 +624,11 @@ void Game_render::paint_object(Game_object* obj) {
  */
 
 void Game_window::paint_dirty() {
+	// Out-of-band repaints use the current visual camera origin.
+	if (modern_movement_enabled && smooth_cam_valid && !painting_smooth_view) {
+		paint_current_view();
+		return;
+	}
 	effects->update_dirty_text();
 
 	TileRect box = clip_to_win(dirty);
