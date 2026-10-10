@@ -65,6 +65,8 @@
 #include "keyactions.h"
 #include "keys.h"
 #include "mouse.h"
+#include "Modern_movement_speed.h"
+#include "Modern_keyboard_movement.h"
 #include "palette.h"
 #include "party.h"
 #include "sdlrwopsistream.h"
@@ -224,6 +226,27 @@ static int                  left_down_x = 0, left_down_y = 0;
 static int                  joy_aim_x = 0, joy_aim_y = 0;
 Mouse::Avatar_Speed_Factors joy_speed_factor  = Mouse::medium_speed_factor;
 static Uint32               last_speed_cursor = 0;    // When we last updated the mouse cursor
+
+// Shared runtime speed for all optional movement providers (Fast by default).
+static Modern_movement_speed modern_movement_speed;
+#include "Modern_speed_feedback.inc"
+
+static bool is_keyboard_movement_scancode(SDL_Scancode scancode) {
+	switch (scancode) {
+	case SDL_SCANCODE_W:
+	case SDL_SCANCODE_A:
+	case SDL_SCANCODE_S:
+	case SDL_SCANCODE_D:
+	case SDL_SCANCODE_UP:
+	case SDL_SCANCODE_DOWN:
+	case SDL_SCANCODE_LEFT:
+	case SDL_SCANCODE_RIGHT:
+		return true;
+	default:
+		return false;
+	}
+}
+
 #if defined _WIN32
 void do_cleanup_output() {
 	cleanup_output("std");
@@ -1424,6 +1447,9 @@ static void Handle_events() {
 			show_items_clicked = false;
 		}
 
+		// Optional continuous WASD/arrow movement; classic input is unaffected.
+		update_modern_keyboard_movement(*gwin, modern_movement_speed.is_medium());
+
 		if (joy_aim_x != 0 || joy_aim_y != 0) {
 			// Calculate the player speed
 			const int speed = 200 * gwin->get_std_delay() / static_cast<int>(joy_speed_factor);
@@ -2097,18 +2123,42 @@ static void Handle_event(SDL_Event& event) {
 		gwin->get_focus();
 		break;
 	case SDL_EVENT_WINDOW_FOCUS_LOST:
+		modern_movement_speed.cancel_pending_taps();
 		gwin->lose_focus();
 		break;
 	case SDL_EVENT_QUIT:
 		gwin->get_gump_man()->okay_to_quit();
 		break;
 	case SDL_EVENT_KEY_DOWN:    // Keystroke.
-	case SDL_EVENT_KEY_UP:
-		if (!dragging &&    // ESC while dragging causes crashes.
-			!gwin->get_gump_man()->handle_kbd_event(&event)) {
+	case SDL_EVENT_KEY_UP: {
+		const bool modern_keyboard = gwin->is_modern_keyboard_enabled();
+		const bool left_shift = event.key.scancode == SDL_SCANCODE_LSHIFT;
+		const bool right_shift = event.key.scancode == SDL_SCANCODE_RSHIFT;
+		if (modern_keyboard) {
+			const auto key = left_shift ? Modern_movement_speed::Key::left_shift
+					: right_shift ? Modern_movement_speed::Key::right_shift
+						: Modern_movement_speed::Key::other;
+			if (event.type == SDL_EVENT_KEY_DOWN) {
+				modern_movement_speed.key_down(key, event.key.repeat);
+			} else if (modern_movement_speed.key_up(key)) {
+				show_keyboard_speed_feedback();
+			}
+		} else {
+			modern_movement_speed.cancel_pending_taps();
+		}
+		// Do not also dispatch plain held movement keys to Exult's old
+		// keybinder. Modified keys retain all original shortcuts.
+		const SDL_Keymod movement_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL
+				| SDL_KMOD_ALT | SDL_KMOD_GUI;
+		const bool plain_movement_key = modern_keyboard
+				&& is_keyboard_movement_scancode(event.key.scancode)
+				&& (event.key.mod & movement_mods) == 0;
+		if (!plain_movement_key && !dragging
+				&& !gwin->get_gump_man()->handle_kbd_event(&event)) {
 			keybinder->HandleEvent(event);
 		}
 		break;
+	}
 	case SDL_EVENT_DROP_TEXT:
 	case SDL_EVENT_DROP_FILE: {
 #ifdef USE_EXULTSTUDIO
