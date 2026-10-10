@@ -67,6 +67,7 @@
 #include "keys.h"
 #include "mouse.h"
 #include "Modern_movement_speed.h"
+#include "Modern_keyboard_direction.h"
 #include "palette.h"
 #include "party.h"
 #include "sdlrwopsistream.h"
@@ -1530,17 +1531,19 @@ static void Handle_events() {
 			const SDL_Keymod move_mods = SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
 			const bool plain_movement_keys = (SDL_GetModState() & move_mods) == 0;
 			const bool* key_state = SDL_GetKeyboardState(nullptr);
-			int keyboard_dx = 0;
-			int keyboard_dy = 0;
-			if (plain_movement_keys) {
-				keyboard_dx += (key_state[SDL_SCANCODE_D] || key_state[SDL_SCANCODE_RIGHT]) ? 1 : 0;
-				keyboard_dx -= (key_state[SDL_SCANCODE_A] || key_state[SDL_SCANCODE_LEFT]) ? 1 : 0;
-				keyboard_dy += (key_state[SDL_SCANCODE_S] || key_state[SDL_SCANCODE_DOWN]) ? 1 : 0;
-				keyboard_dy -= (key_state[SDL_SCANCODE_W] || key_state[SDL_SCANCODE_UP]) ? 1 : 0;
-			}
-			keyboard_dx = std::clamp(keyboard_dx, -1, 1);
-			keyboard_dy = std::clamp(keyboard_dy, -1, 1);
-
+			const Modern_keyboard_keys keys{
+				key_state[SDL_SCANCODE_W] != 0,
+				key_state[SDL_SCANCODE_A] != 0,
+				key_state[SDL_SCANCODE_S] != 0,
+				key_state[SDL_SCANCODE_D] != 0,
+				key_state[SDL_SCANCODE_UP] != 0,
+				key_state[SDL_SCANCODE_LEFT] != 0,
+				key_state[SDL_SCANCODE_DOWN] != 0,
+				key_state[SDL_SCANCODE_RIGHT] != 0
+			};
+			const auto direction = modern_keyboard_direction(keys, plain_movement_keys);
+			const int keyboard_dx = direction.dx;
+			const int keyboard_dy = direction.dy;
 			if (keyboard_dx != 0 || keyboard_dy != 0) {
 				if (keyboard_dx != keyboard_walk_dx || keyboard_dy != keyboard_walk_dy || !gwin->is_moving()) {
 					const int keyboard_speed_params[] = {modern_movement_speed.is_medium() ? 1 : 0};
