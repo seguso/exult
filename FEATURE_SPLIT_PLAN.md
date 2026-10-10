@@ -129,3 +129,13 @@ Current status: analysis complete, code extraction/integration not yet implement
 - Commit `64c771f601b68e0b64aa4080043da94fc9f724c4` corrects `exult.cc` so Shift speed toggling is active when either modern keyboard **or** modern mouse target is enabled. This fixes mouse-only mode, without maintaining the old bug.
 - This is the minimal integration hotfix; it is **not** yet the final common-module refactoring. `Modern_movement_speed.h` exists on `feature/common`, but event wiring, focus reset, and integration tests are still outstanding. Do not falsely claim this is completed merely because both branches contain related code.
 - The final extraction should substitute the shared class for the local state and candidate flags in `devmix` and preserve mouse-only behavior. The feature branches must consume that shared class, not each other's code.
+
+
+## Shift shared runtime integration tranche (2026-10-10)
+
+Published on `devmix`:
+- `ae216dea519ace0cf5292ea32c6ec2f5314fc276`: imports the identical `Modern_movement_speed.h` shared state machine from `feature/common`.
+- `d4fe2199cc251ba10e6596575299782abfe96edc`: rewires modern keyboard and A* mouse paths to `modern_movement_speed.is_medium()`, replaces local Shift candidate flags with shared key-down/up processing, and cancels pending taps on focus loss or when neither consumer is enabled.
+- Static comparison from `64c771f` to current `devmix`: exactly the new header and `exult.cc` changed, in two commits. Old speed state and candidate variables no longer occur.
+
+**Important**: no build or live gameplay run has been completed. Validate Debug/Release compilation and the complete state matrix (WASD only, mouse target only, both, neither; standalone left/right Shift, modifiers, focus loss, repeat). The common header still requires explicit test coverage. Do not make the mouse feature depend on the keyboard feature.
