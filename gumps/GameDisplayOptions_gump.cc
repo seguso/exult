@@ -480,105 +480,11 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 		this, &GameDisplayOptions_gump::open_readable_fonts, "Set...",
 		get_button_pos_for_label("Readable fonts:"), yForRow(++y_index), small_size);
 	}
-	if (page == Page::movement) {
-
-	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
-			get_button_pos_for_label(Strings::Modernsmoothscrolling_()), yForRow(++y_index), small_size);
-	buttons[id_smooth_avatar_walk] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_smooth_avatar_walk,
-			yesNo, smooth_avatar_walk,
-			get_button_pos_for_label("Smooth avatar walk:"), yForRow(++y_index), small_size);
-
-	std::vector<std::string> tau_text;
-	for (int value : modern_tau_values) {
-		tau_text.emplace_back(std::to_string(value) + " ms");
-	}
-	buttons[id_modern_tau] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_modern_tau,
-			std::move(tau_text), modern_tau,
-			get_button_pos_for_label(Strings::Smoothcameratau_()), yForRow(++y_index), small_size);
-
-
-	}
-	if (page == Page::crt) {
-buttons[id_crt_enabled] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_crt_enabled, yesNo, crt_enabled,
-			get_button_pos_for_label("CRT filter:"), yForRow(++y_index), small_size);
-
-	buttons[id_crt_horizontal_strength] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_crt_horizontal_strength,
-			std::to_string(crt_horizontal_strength) + "%",
-			get_button_pos_for_label("CRT horizontal scanlines:"), yForRow(++y_index), small_size);
-	buttons[id_crt_vertical_strength] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_crt_vertical_strength,
-			(std::to_string(crt_vertical_strength / 2) + (crt_vertical_strength % 2 ? ".5%" : "%")),
-			get_button_pos_for_label("CRT vertical mask:"), yForRow(++y_index), small_size);
-
-	buttons[id_crt_brightness_compensation] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_crt_brightness_compensation,
-			std::to_string(crt_brightness_compensation) + "%",
-			get_button_pos_for_label("CRT brightness comp:"), yForRow(++y_index), small_size);
-
-	std::vector<std::string> crt_width_text;
-	for (const int value : crt_width_values) {
-		crt_width_text.emplace_back(std::to_string(value) + " px");
-	}
-	buttons[id_crt_horizontal_width] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_crt_horizontal_width, crt_width_text, crt_horizontal_width,
-			get_button_pos_for_label("CRT H line width:"), yForRow(++y_index), small_size);
-	buttons[id_crt_vertical_width] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_crt_vertical_width, std::move(crt_width_text), crt_vertical_width,
-			get_button_pos_for_label("CRT V mask width:"), yForRow(++y_index), small_size);
-
-	buttons[id_crt_beam_sigma] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_crt_sigma,
-			std::to_string(crt_beam_sigma / 100.0f).substr(0, 4),
-			get_button_pos_for_label("CRT beam sigma:"), yForRow(++y_index), small_size);
-	}
-	if (page == Page::rotation) {
-buttons[id_rotate_world] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_rotate_world, yesNo, rotate_world,
-			get_button_pos_for_label(Strings::Rotateworld45deg_()), yForRow(++y_index), small_size);
-
-	std::vector<std::string> rotate_quality_text = {
-			"2x / 4 samples", "3x / 4 samples", "3x / 9 samples"};
-#ifdef USE_HQ3X_SCALER
-	rotate_quality_text.emplace_back("HQ3x / 9 samples");
-	rotate_quality_text.emplace_back("HQ3x / 4 samples");
-	rotate_quality_text.emplace_back("Forward weighted triplets");
-	rotate_quality_text.emplace_back("Forward weighted pairs");
-	rotate_quality_text.emplace_back("Forward weighted quadruplets");
-#endif
-	buttons[id_rotate_sampling_mode] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_rotate_sampling_mode,
-			std::move(rotate_quality_text), rotate_sampling_mode,
-			get_button_pos_for_label(Strings::Rotatequality_()), yForRow(++y_index), large_size);
-	}
-	if (page == Page::fonts) {
-buttons[id_conversation_font] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_conversation_font, yesNo, conversation_font,
-			get_button_pos_for_label(Strings::Readableconversationfont_()), yForRow(++y_index), small_size);
-
-	buttons[id_conversation_font_size] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_conversation_font_size,
-			std::to_string(conversation_font_size) + " px",
-			get_button_pos_for_label(Strings::Conversationfontsize_()), yForRow(++y_index), small_size);
-	buttons[id_conversation_font_tracking] = std::make_unique<GameDisplayTextToggle>(
-			this, &GameDisplayOptions_gump::toggle_conversation_font_tracking,
-			std::vector<std::string>{"Normal", "+1 px"},
-			conversation_font_tracking, get_button_pos_for_label("Character spacing:"),
-			yForRow(++y_index), small_size);
-	buttons[id_conversation_font_file] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_conversation_font_file,
-			"Browse...", get_button_pos_for_label("TTF / OTF file:"), yForRow(++y_index), 65);
-	buttons[id_conversation_system_font] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::choose_installed_conversation_font,
-			"Browse...", get_button_pos_for_label("Installed fonts:"), yForRow(++y_index), 65);
-	buttons[id_conversation_font_reset] = std::make_unique<GameDisplayOptions_button>(
-			this, &GameDisplayOptions_gump::reset_conversation_font,
-			"Reset", get_button_pos_for_label("Restore automatic font:"), yForRow(++y_index), 65);
-	}
+	// Individually maintained optional-feature pages.
+#include "Modern_camera_options_page.inc"
+#include "Crt_options_page.inc"
+#include "Rotate_options_page.inc"
+#include "Readable_fonts_options_page.inc"
 	constexpr int margin = 4;
 	const int footer_row = page == Page::display ? 14 :
 		page == Page::movement ? 5 : page == Page::crt ? 9 : page == Page::fonts ? 7 : 4;
