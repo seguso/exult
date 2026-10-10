@@ -36,6 +36,14 @@ private:
 	std::vector<std::string> sc_outline_txt;
 	int                      text_bg;
 	int                      smooth_scrolling;
+	int crt_enabled = 0;
+	int crt_horizontal_strength = 8;
+	int crt_vertical_strength = 8;
+	int crt_brightness_compensation = 100;
+	int crt_horizontal_width = 1;
+	int crt_vertical_width = 1;
+	int crt_beam_sigma = 30;
+	bool crt_page = false;
 	bool                     usecode_intro;
 	bool                     extended_intro;
 	bool                     menu_intro;
@@ -55,6 +63,15 @@ private:
 		id_sb_hide_missing,
 		id_text_bg,
 		id_smooth_scrolling,
+		id_crt_settings,
+		id_crt_back,
+		id_crt_enabled,
+		id_crt_horizontal_strength,
+		id_crt_vertical_strength,
+		id_crt_brightness_compensation,
+		id_crt_horizontal_width,
+		id_crt_vertical_width,
+		id_crt_beam_sigma,
 		id_menu_intro,
 		id_usecode_intro,
 		id_extended_intro,
@@ -76,6 +93,20 @@ public:
 	void close() override;
 
 	void build_buttons();
+	void open_crt_settings();
+	void close_crt_settings();
+	void preview_crt();
+	void choose_crt_sigma();
+	void update_crt_sigma_button();
+	void choose_crt_brightness_compensation();
+	void update_crt_compensation_button();
+	void choose_crt_horizontal_strength();
+	void choose_crt_vertical_strength();
+	void update_crt_strength_buttons();
+	void toggle_crt_enabled(int state) { crt_enabled = state; preview_crt(); }
+	void toggle_crt_horizontal_width(int state) { crt_horizontal_width = state; preview_crt(); }
+	void toggle_crt_vertical_width(int state) { crt_vertical_width = state; preview_crt(); }
+
 
 	void load_settings();
 	void save_settings();
