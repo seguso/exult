@@ -186,6 +186,10 @@ void InputOptions_gump::build_buttons() {
 			this, &InputOptions_gump::toggle_touch_pathfind, yesNo, touch_pathfind,
 			get_button_pos_for_label(Strings::PathfindwithLongTouch_()), yForRow(++y_index), 44);
 
+	buttons[id_modern_keyboard] = std::make_unique<InputTextToggle>(
+			this, &InputOptions_gump::toggle_modern_keyboard, yesNo, modern_keyboard,
+			get_button_pos_for_label("WASD / diagonal keyboard movement:"), yForRow(++y_index), 44);
+
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
 
@@ -206,20 +210,21 @@ void InputOptions_gump::load_settings() {
 	item_menu        = gwin->get_item_menu();
 	dpad_location    = gwin->get_dpad_location();
 	touch_pathfind   = gwin->get_touch_pathfind();
+	modern_keyboard = gwin->is_modern_keyboard_enabled();
 }
 
 InputOptions_gump::InputOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(14)), -1);
 
 	load_settings();
 
 	// Ok
-	buttons[id_ok] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::close, Strings::OK(), 25, yForRow(12), 50);
+	buttons[id_ok] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::close, Strings::OK(), 25, yForRow(13), 50);
 	// Help
-	buttons[id_help] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+	buttons[id_help] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::help, Strings::HELP(), 50, yForRow(13), 50);
 	// Cancel
 	buttons[id_cancel]
-			= std::make_unique<InputOptions_button>(this, &InputOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			= std::make_unique<InputOptions_button>(this, &InputOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(13), 50);
 
 	build_buttons();
 }
@@ -254,6 +259,8 @@ void InputOptions_gump::save_settings() {
 	gwin->set_touch_pathfind(touch_pathfind != 0);
 	config->set("config/touch/touch_pathfind", touch_pathfind ? "yes" : "no", false);
 
+	gwin->set_modern_keyboard_enabled(modern_keyboard);
+
 	config->write_back();
 
 	if (touchui != nullptr) {
@@ -283,6 +290,7 @@ void InputOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Itemhelpermenu_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::DPadscreenlocation_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::PathfindwithLongTouch_(), x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "WASD / diagonal keyboard movement:", x + label_margin, y + yForRow(++y_index) + 1);
 
 	gwin->set_painted();
 }
