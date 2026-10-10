@@ -29,6 +29,7 @@ Boston, MA  02111-1307, USA.
 #endif
 
 #include "imagewin.h"
+#include "Crt_filter_pass.h"
 
 #include "BilinearScaler.h"
 #include "Configuration.h"
@@ -1274,6 +1275,20 @@ void Image_window::set_title(const char* title) {
 	SDL_SetWindowTitle(screen_window, title);
 }
 
+void Image_window::set_crt_filter(
+		bool enabled, int horizontal_strength, int vertical_strength,
+		int horizontal_compensation, int vertical_compensation,
+		int horizontal_width, int vertical_width, int beam_sigma) {
+	crt_enabled = enabled;
+	crt_horizontal_strength = std::clamp(horizontal_strength, 0, 20);
+	crt_vertical_strength = std::clamp(vertical_strength, 0, 40);
+	crt_horizontal_compensation = std::clamp(horizontal_compensation, 0, 200);
+	crt_vertical_compensation = std::clamp(vertical_compensation, 0, 200);
+	crt_horizontal_width = std::clamp(horizontal_width, 1, 6);
+	crt_vertical_width = std::clamp(vertical_width, 1, 6);
+	crt_beam_sigma = std::clamp(beam_sigma, 10, 100);
+}
+
 void Image_window::screen_to_game(int sx, int sy, bool fast, int& gx, int& gy) {
 	// While a full-screen scene layer owns the display, map through it so mouse
 	// hit-testing lines up with widgets drawn in the (scaled) scene.
@@ -2167,6 +2182,15 @@ void Image_window::composite_layers() {
 	}
 }
 
+void Image_window::apply_crt_filter(const SDL_FRect& content_rect) {
+    const Crt_filter_settings settings{
+        crt_enabled, display_width, display_height, scale,
+        crt_horizontal_strength, crt_vertical_strength,
+        crt_horizontal_compensation, crt_vertical_compensation,
+        crt_horizontal_width, crt_vertical_width, crt_beam_sigma};
+    render_crt_filter_pass(screen_renderer, content_rect, settings);
+}
+
 void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool for_screenshot) {
 	auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__);
 
@@ -2209,6 +2233,9 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool fo
 
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
+	// Apply CRT at the very end, after all world and UI layers.
+	apply_crt_filter(*fullRect);
+
 	if (!for_screenshot) {
 		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
 		if (!SDL_RenderPresent(screen_renderer)) {
