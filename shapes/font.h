@@ -52,7 +52,11 @@ class Font {
 private:
 	int                         hor_lead = 0;
 	int                         ver_lead = 0;
+	int                         extra_tracking_halves = 0;
 	std::unique_ptr<Shape_file> font_shapes;
+	// Optional fill-only glyphs, with identical dimensions/origins to the
+	// outlined shapes. Render these after all outlined glyphs.
+	std::unique_ptr<Shape_file> fill_only_shapes;
 	int                         highest = 0, lowest = 0;
 
 	void calc_highlow();
@@ -60,9 +64,14 @@ private:
 	int  load_internal(IDataSource& data, int hlead, int vlead);
 
 public:
+	// 0 = normal, 1 = half-pixel tighter (alternating integer advances),
+	// 2 = one pixel tighter. Only applied to generated conversation fonts.
+	void set_extra_tracking_halves(int halves) { extra_tracking_halves = halves; }
+	void set_fill_only_shapes(std::unique_ptr<Shape_file> shapes) { fill_only_shapes = std::move(shapes); }
 	Font();
 	Font(const File_spec& fname0, int index, int hlead = 0, int vlead = 1);
 	Font(const File_spec& fname0, const File_spec& fname1, int index, int hlead = 0, int vlead = 1);
+	Font(std::unique_ptr<Shape_file> shapes, int hlead = 0, int vlead = 0);
 	Font(Font&&) noexcept            = default;
 	Font& operator=(Font&&) noexcept = default;
 	~Font() noexcept                 = default;
