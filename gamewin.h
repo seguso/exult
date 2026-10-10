@@ -766,6 +766,7 @@ public:
 	void paint_map_at_tile(int x, int y, int w, int h, int toptx, int topty, int skip_above = 31);
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
+	void paint_current_view();
 
 	void paint(TileRect& r) {
 		paint(r.x, r.y, r.w, r.h);
@@ -981,10 +982,41 @@ private:
 	int avposx_ld, avposy_ld;
 	// Is lerping enabled
 	int lerping_enabled;
+	// Optional visual camera and independent actor/follower interpolation.
+	bool modern_movement_enabled = false;
+	bool smooth_avatar_walk_enabled = false;
+	int modern_movement_tau_ms = 90;
+	double smooth_cam_stage1_x = 0.0, smooth_cam_stage1_y = 0.0;
+	double smooth_cam_stage2_x = 0.0, smooth_cam_stage2_y = 0.0;
+	double smooth_cam_x = 0.0, smooth_cam_y = 0.0;
+	uint32 smooth_cam_last_ticks = 0;
+	bool smooth_cam_valid = false;
+	bool painting_smooth_view = false;
+	int avatar_walk_last_tx = -1, avatar_walk_last_ty = -1;
+	uint32 avatar_walk_step_ticks = 0;
+	int avatar_walk_from_dx = 0, avatar_walk_from_dy = 0;
+	struct Party_walk_visual {
+		const Actor* actor = nullptr;
+		int last_tx = -1, last_ty = -1;
+		uint32 step_ticks = 0;
+		int from_dx = 0, from_dy = 0;
+		int offset_x = 0, offset_y = 0;
+	};
+	std::map<int, Party_walk_visual> party_walk_visuals;
 
 public:
 	// Reset (well update really) saved lerp scroll positions
 	void lerp_reset();
+	bool paint_velocity_camera(uint32 ticks);
+	bool update_smooth_avatar_walk(uint32 ticks);
+	void reset_velocity_camera();
+	bool is_modern_movement_enabled() const { return modern_movement_enabled; }
+	bool is_smooth_avatar_walk_enabled() const { return smooth_avatar_walk_enabled; }
+	void set_smooth_avatar_walk_enabled(bool enabled);
+	void set_smooth_scrolling_enabled(bool enabled);
+	int get_modern_movement_tau_ms() const { return modern_movement_tau_ms; }
+	void set_modern_movement_tau_ms(int ms);
+
 
 	// (Re)paint the entire screen using a lerp factor 0-0x10000
 	void paint_lerped(int factor);
