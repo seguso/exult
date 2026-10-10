@@ -384,6 +384,8 @@ Game_window::Game_window(
 	walk_in_formation = str != "no";
 	config->set("config/gameplay/formation", walk_in_formation ? "yes" : "no", false);
 
+	config->value("config/gameplay/modern_keyboard", modern_keyboard_enabled, false);
+	config->set("config/gameplay/modern_keyboard", modern_keyboard_enabled ? "yes" : "no", false);
 	config->value("config/gameplay/smooth_scrolling", lerping_enabled, 0);
 	config->set("config/gameplay/smooth_scrolling", lerping_enabled, false);
 	config->value("config/gameplay/alternate_drop", str, "no");
@@ -627,6 +629,11 @@ void Game_window::init_files(bool cycle) {
 /*
  *  Read any map. (This is for "multimap" games, not U7.)
  */
+
+void Game_window::set_modern_keyboard_enabled(bool enabled) {
+	modern_keyboard_enabled = enabled;
+	config->set("config/gameplay/modern_keyboard", enabled ? "yes" : "no", true);
+}
 
 Game_map* Game_window::get_map(int num    // Should be > 0.
 ) {
