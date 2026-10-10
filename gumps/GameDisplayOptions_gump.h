@@ -178,7 +178,6 @@ public:
 
 	void toggle_modern_smooth(int state) {
 		modern_smooth = state;
-		update_legacy_smooth_button();
 	}
 
 	void toggle_modern_tau(int state) {
