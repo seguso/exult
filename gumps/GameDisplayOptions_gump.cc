@@ -403,7 +403,6 @@ auto fonts_txt    = std::vector<std::string>{Strings::Original(), Strings::Serif
 		get_button_pos_for_label("Readable font settings:"), yForRow(++y_index), 100);
 	}
 	if (page == Page::movement) {
-update_legacy_smooth_button();
 
 	buttons[id_modern_smooth] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_modern_smooth, yesNo, modern_smooth,
