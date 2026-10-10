@@ -356,6 +356,16 @@ protected:
 	// it to be bigger.
 	constexpr static int guard_band = 4;
 
+	// Optional CRT post-process (off by default).
+	bool crt_enabled = false;
+	int crt_horizontal_strength = 8;
+	int crt_vertical_strength = 8;
+	int crt_horizontal_compensation = 100;
+	int crt_vertical_compensation = 100;
+	int crt_horizontal_width = 2;
+	int crt_vertical_width = 2;
+	int crt_beam_sigma = 30;
+
 	FillMode fill_mode;
 	int      fill_scaler;
 
@@ -429,6 +439,8 @@ protected:
 
 	// (Re)upload a layer's 8-bit pixels into its texture, using the palette.
 	// Overridden by the palettized 8-bit window.
+	void apply_crt_filter(const SDL_FRect& content_rect);
+
 	virtual void refresh_layer(Layer& layer) {
 		ignore_unused_variable_warning(layer);
 	}
@@ -616,6 +628,10 @@ public:
 
 	// Set title.
 	void set_title(const char* title);
+
+	void set_crt_filter(bool enabled, int horizontal_strength, int vertical_strength,
+		int horizontal_compensation, int vertical_compensation,
+		int horizontal_width, int vertical_width, int beam_sigma);
 
 	Image_buffer* get_ibuf() {
 		return ibuf;
