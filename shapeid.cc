@@ -31,6 +31,7 @@
 #include "data/exult_si_flx.h"
 #include "exceptions.h"
 #include "fnames.h"
+#include "fontgen.h"
 #include "fontvga.h"
 #include "game.h"
 #include "gamewin.h"
