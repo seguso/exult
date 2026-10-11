@@ -39,6 +39,7 @@
 #include "ignore_unused_variable_warning.h"
 #include "objiter.h"
 #include "perf.h"
+#include "party.h"
 
 #include <algorithm>
 #include <cmath>
