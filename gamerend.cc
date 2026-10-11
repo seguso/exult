@@ -319,6 +319,23 @@ int Game_render::get_light_strength(const Game_object* obj, const Game_object* a
 	return Get_light_strength(obj, av, info.get_object_light(obj->get_framenum()));
 }
 
+void Game_window::update_lighting(int light_sources) {
+	if (!main_actor) {
+		return;
+	}
+	Actor* party[9];
+	const int cnt = get_party(party, 1);
+	int carried_light = 0;
+	for (int i = 0; i < cnt; ++i) {
+		carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
+	}
+	if (special_light && clock->get_total_minutes() > special_light) {
+		special_light = 0;
+		clock->set_palette();
+	}
+	clock->set_light_source(carried_light + light_sources, in_dungeon);
+}
+
 void Game_render::increment_bbox_index() {
 	int  bbox_indices[] = {15, 0, 22, 38, 5, 64, 80, 94, -1};
 	auto start          = bbox_indices;
@@ -407,21 +424,7 @@ void Game_window::paint(
 
 	// Complete repaint?
 	if (!gx && !gy && gw == get_width() && gh == get_height() && main_actor) {
-		// Look for lights.
-		Actor*    party[9];    // Get party, including Avatar.
-		const int cnt           = get_party(party, 1);
-		int       carried_light = 0;
-		for (int i = 0; i < cnt; i++) {
-			carried_light += Get_light_strength(party[i], main_actor, party[i]->get_light_source());
-		}
-		// Also check light spell.
-		if (special_light && clock->get_total_minutes() > special_light) {
-			// Just expired.
-			special_light = 0;
-			clock->set_palette();
-		}
-		// Set palette for lights.
-		clock->set_light_source(carried_light + light_sources, in_dungeon);
+		update_lighting(light_sources);
 	}
 
 	win->EndPaintIntoGuardBand();

@@ -780,6 +780,7 @@ public:
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
 	void paint_rotated(int x, int y, int w, int h);
+	void update_lighting(int light_sources);
 	void resize_rotate_scene();
 	bool is_rotate_world_enabled() const { return rotate_world; }
 	void set_rotate_world_enabled(bool enabled);
