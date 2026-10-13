@@ -42,6 +42,7 @@ extern bool g_waiting_for_click;
 
 // Optional Modern Mouse Target on-screen failure feedback.
 void show_modern_mouse_unreachable();
+void set_modern_mouse_unreachable_feedback_enabled(bool enabled);
 void clear_modern_mouse_unreachable();
 
 extern bool Get_click(

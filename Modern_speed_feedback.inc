@@ -3,6 +3,7 @@ static int keyboard_speed_layer = -1;
 static Uint32 keyboard_speed_feedback_until = 0;
 static int mouse_unreachable_layer = -1;
 static Uint32 mouse_unreachable_until = 0;
+static bool mouse_unreachable_feedback_enabled = false;
 
 static void hide_feedback_layer(int& layer, Uint32& until) {
     if (layer >= 0 && gwin) gwin->destroy_layer(layer);
@@ -58,13 +59,19 @@ static void show_keyboard_speed_feedback() {
 }
 
 // Exported to the MMT path code in gamewin.cc.
+void set_modern_mouse_unreachable_feedback_enabled(bool enabled) {
+    mouse_unreachable_feedback_enabled = enabled;
+}
+
 void show_modern_mouse_unreachable() {
-    // Every failed request must be visible, including a fresh click after
-    // an earlier notification expired. Holding RMB refreshes the same layer.
+    // Display only for an explicit RMB down/up probe, never for held
+    // mouse retargets. The route computation itself is unchanged.
+    if (!mouse_unreachable_feedback_enabled) return;
     paint_feedback_layer(mouse_unreachable_layer, mouse_unreachable_until,
                          "Mouse target unreachable", "Can't reach", true);
 }
 
 void clear_modern_mouse_unreachable() {
-    // No latch: the timed overlay is refreshed on each failed path request.
+    // Any successful path, including during RMB hold, dismisses it immediately.
+    hide_feedback_layer(mouse_unreachable_layer, mouse_unreachable_until);
 }

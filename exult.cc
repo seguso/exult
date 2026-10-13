@@ -1910,9 +1910,12 @@ static void Handle_event(SDL_Event& event) {
 				if (!(gwin->is_modern_mouse_target_enabled())) {
 					gwin->get_tqueue()->remove(gwin->get_main_actor());
 				}
+				// Only an actual RMB down may display a failed-target message.
+				set_modern_mouse_unreachable_feedback_enabled(gwin->is_modern_mouse_target_enabled());
 				gwin->start_actor_from_display(x, y,
 						(gwin->is_modern_mouse_target_enabled() && gwin->is_modern_mouse_target_shift_speed())
 							? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
+				set_modern_mouse_unreachable_feedback_enabled(false);
 			}
 		}
 		break;
@@ -1994,9 +1997,15 @@ static void Handle_event(SDL_Event& event) {
 					right_on_gump = false;
 				}
 			} else if (gwin->is_modern_mouse_target_enabled()) {
-				// Releasing the right button freezes the most recently
-				// calculated A* destination; the actor continues walking.
-				// No double-right-click detection in this optional mode.
+				// Probe the release pixel for feedback ONLY. Do not call
+				// start_actor or retarget the walking action: the existing
+				// destination, animation and time queue remain untouched.
+				set_modern_mouse_unreachable_feedback_enabled(true);
+				if (gwin->modern_mouse_destination_reachable_from_display(x, y))
+					clear_modern_mouse_unreachable();
+				else
+					show_modern_mouse_unreachable();
+				set_modern_mouse_unreachable_feedback_enabled(false);
 			} else if (avatar_can_act) {
 				// Last right click not within .5 secs (not a doubleclick or
 				// rapid right clicking)?
