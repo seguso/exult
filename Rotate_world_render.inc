@@ -41,6 +41,10 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	rotate_scene->clear_clip();
 	pop_render_target(previous);
 
+	// Lighting can change the effective palette after painting the scene.
+	// Update it before converting any world pixels from RGB back to indices.
+	if (main_actor) update_lighting(light_sources);
+
 	// The world is repainted in full for this first implementation.
 	int gx = 0;
 	int gy = 0;
@@ -49,6 +53,11 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->BeginPaintIntoGuardBand(&gx, &gy, &gw, &gh);
 	win->set_clip(gx, gy, gw, gh);
 	win->fill8(pal->get_border_index());
+
+	// Cross-fades, light, gamma and palette cycling can update Image_window8
+	// without updating Game_window::pal1. Sample the actual displayed colors.
+	const Rotate_live_palette live_palette(win->get_palette());
+	const Rotate_live_palette* sample_pal = &live_palette;
 
 	// Reconstruct the scene with a pixel-art-aware scaler before rotation.
 	// Mode 0 deliberately keeps the clean2 Scale2x + 4-sample path bit-for-bit
@@ -148,7 +157,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 						= scene_pixel(scene_x + sx, scene_y + sy);
 			}
 		}
-		Rotate_hq3x_rgb_manip manip(pal);
+		Rotate_hq3x_rgb_manip manip(sample_pal);
 		Scale_Hq3x<uint32, Rotate_hq3x_rgb_manip>(
 				source8.data(), 0, 0, scene_size, scene_size,
 				scene_size, scene_size, rotate_scene_hq3x.data(),
@@ -167,7 +176,7 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 				| (static_cast<unsigned int>(b) << 12);
 		unsigned char& cached = rotate_blend_cache[key];
 		if (cached == 255) {
-			cached = static_cast<unsigned char>(pal->find_color(r, g, b));
+			cached = static_cast<unsigned char>(sample_pal->find_color(r, g, b));
 		}
 		return cached;
 	};
@@ -190,9 +199,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		const int hi_size = scene_size * 3;
 		if (sx < 0 || sx >= hi_size || sy < 0 || sy >= hi_size) {
 			const unsigned char border = static_cast<unsigned char>(pal->get_border_index());
-			return (static_cast<uint32>(pal->get_red(border) << 2) << 16)
-					| (static_cast<uint32>(pal->get_green(border) << 2) << 8)
-					| static_cast<uint32>(pal->get_blue(border) << 2);
+			return (static_cast<uint32>(sample_pal->get_red(border) << 2) << 16)
+					| (static_cast<uint32>(sample_pal->get_green(border) << 2) << 8)
+					| static_cast<uint32>(sample_pal->get_blue(border) << 2);
 		}
 		return rotate_scene_hq3x[static_cast<size_t>(sy) * hi_size + sx];
 	};
@@ -231,9 +240,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		if (a == b && a == c0 && a == d) {
 			return a;
 		}
-		const int r = (pal->get_red(a) + pal->get_red(b) + pal->get_red(c0) + pal->get_red(d) + 2) / 4;
-		const int g = (pal->get_green(a) + pal->get_green(b) + pal->get_green(c0) + pal->get_green(d) + 2) / 4;
-		const int blue = (pal->get_blue(a) + pal->get_blue(b) + pal->get_blue(c0) + pal->get_blue(d) + 2) / 4;
+		const int r = (sample_pal->get_red(a) + sample_pal->get_red(b) + sample_pal->get_red(c0) + sample_pal->get_red(d) + 2) / 4;
+		const int g = (sample_pal->get_green(a) + sample_pal->get_green(b) + sample_pal->get_green(c0) + sample_pal->get_green(d) + 2) / 4;
+		const int blue = (sample_pal->get_blue(a) + sample_pal->get_blue(b) + sample_pal->get_blue(c0) + sample_pal->get_blue(d) + 2) / 4;
 		return quantize_rgb(r, g, blue);
 	};
 	const auto blend9 = [&](const std::array<unsigned char, 9>& samples) {
@@ -251,9 +260,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		int g = 0;
 		int b = 0;
 		for (const unsigned char sample : samples) {
-			r += pal->get_red(sample);
-			g += pal->get_green(sample);
-			b += pal->get_blue(sample);
+			r += sample_pal->get_red(sample);
+			g += sample_pal->get_green(sample);
+			b += sample_pal->get_blue(sample);
 		}
 		return quantize_rgb((r + 4) / 9, (g + 4) / 9, (b + 4) / 9);
 	};
@@ -286,9 +295,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		std::array<int, 256> pal_g;
 		std::array<int, 256> pal_b;
 		for (int pi = 0; pi < 256; ++pi) {
-			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
-			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
-			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+			pal_r[pi] = sample_pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = sample_pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = sample_pal->get_blue(static_cast<unsigned char>(pi));
 		}
 
 		// Per channel A-3B+3C-D is in [-252,252], so squared RGB magnitude is
@@ -507,9 +516,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		std::array<int, 256> pal_g;
 		std::array<int, 256> pal_b;
 		for (int pi = 0; pi < 256; ++pi) {
-			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
-			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
-			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+			pal_r[pi] = sample_pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = sample_pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = sample_pal->get_blue(static_cast<unsigned char>(pi));
 		}
 
 		// RGB pair distance is in [0, sqrt(3*63^2)]. Precompute the exact
@@ -687,9 +696,9 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 		std::array<int, 256> pal_g;
 		std::array<int, 256> pal_b;
 		for (int pi = 0; pi < 256; ++pi) {
-			pal_r[pi] = pal->get_red(static_cast<unsigned char>(pi));
-			pal_g[pi] = pal->get_green(static_cast<unsigned char>(pi));
-			pal_b[pi] = pal->get_blue(static_cast<unsigned char>(pi));
+			pal_r[pi] = sample_pal->get_red(static_cast<unsigned char>(pi));
+			pal_g[pi] = sample_pal->get_green(static_cast<unsigned char>(pi));
+			pal_b[pi] = sample_pal->get_blue(static_cast<unsigned char>(pi));
 		}
 
 		// A-2B+C is in [-126,126] for 6-bit palette channels. The confidence
@@ -964,7 +973,4 @@ void Game_window::paint_rotated(int x, int y, int w, int h) {
 	win->EndPaintIntoGuardBand();
 	win->clear_clip();
 
-	if (main_actor) {
-		update_lighting(light_sources);
-	}
 }
