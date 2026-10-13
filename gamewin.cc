@@ -31,6 +31,7 @@
 #include "gamewin.h"
 
 #include "Astar.h"
+#include "Modern_mouse_surface_geometry.h"
 #include "Audio.h"
 #include "AudioMixer.h"
 #include "Configuration.h"
@@ -1749,6 +1750,8 @@ Gump* Game_window::get_dragging_gump() {
  *  Alternative start actor function
  *  Placed in an alternative function to prevent breaking barges
  */
+#include "Modern_mouse_surfaces.inc"
+
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed,             // Msecs. between frames.
@@ -1776,6 +1779,8 @@ void Game_window::start_actor_alt(
 	dir = Get_direction_NoWrap(ay - winy, winx - ax);
 	const bool modern_mouse_steering = mouse_steering && modern_mouse_target_enabled;
 
+#include "Modern_mouse_path.inc"
+
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
 	} else if (blocked[dir] && !blocked[(dir + 7) % 8]) {
@@ -1797,8 +1802,7 @@ void Game_window::start_actor_alt(
 		}
 	}
 
-	// A* retargeting owns only the optional mouse movement branch.
-#include "Modern_mouse_path.inc"
+
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.

@@ -906,6 +906,7 @@ public:
 	void view_up();       // Move view up.
 	// Start moving actor.
 	void start_actor_alt(int winx, int winy, int speed, bool mouse_steering = false);
+	std::vector<Tile_coord> modern_mouse_surface_targets(int winx, int winy);
 	void start_actor(int winx, int winy, int speed = 125, bool mouse_steering = false);
 	void start_actor_along_path(int winx, int winy, int speed = 125);
 	void stop_actor();    // Stop main actor.
