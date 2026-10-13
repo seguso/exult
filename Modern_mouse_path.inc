@@ -28,6 +28,7 @@
 			break;
 		}
 		if (!routed) {
+			show_modern_mouse_unreachable();
 			std::cerr << "[MMT/A*] no reachable clicked surface: from=("
 				<< current.tx << ',' << current.ty << ',' << current.tz
 				<< ") screen=(" << winx << ',' << winy
@@ -35,6 +36,7 @@
 				<< "; old route kept if retargeting.\n";
 			return;
 		}
+		clear_modern_mouse_unreachable();
 		if (attempts > 1) {
 			std::cerr << "[MMT/A*] surface fallback: from=("
 				<< current.tx << ',' << current.ty << ',' << current.tz

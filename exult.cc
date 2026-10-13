@@ -1400,6 +1400,8 @@ static void Handle_events() {
 		if (keyboard_speed_layer >= 0 && ticks >= keyboard_speed_feedback_until) {
 			hide_keyboard_speed_feedback();
 		}
+        if (mouse_unreachable_layer >= 0 && ticks >= mouse_unreachable_until)
+            hide_feedback_layer(mouse_unreachable_layer, mouse_unreachable_until);
 #if defined(_WIN32) && defined(USE_EXULTSTUDIO)
 		if (ticks - Game::get_ticks() < 10) {
 			// Reducing processor usage with a slight delay.

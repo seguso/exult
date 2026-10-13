@@ -40,6 +40,10 @@ class TouchUI;
  */
 extern bool g_waiting_for_click;
 
+// Optional Modern Mouse Target on-screen failure feedback.
+void show_modern_mouse_unreachable();
+void clear_modern_mouse_unreachable();
+
 extern bool Get_click(
 		int& x, int& y,                                 // Location returned (if not ESC).
 		Mouse::Mouse_shapes shape,                      // Mouse shape to use.
