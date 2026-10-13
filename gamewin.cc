@@ -1861,18 +1861,6 @@ Gump* Game_window::get_dragging_gump() {
  */
 #include "Modern_mouse_surfaces.inc"
 
-bool Game_window::modern_mouse_destination_reachable_from_display(int x, int y) {
-	display_to_world(x, y);
-	const Tile_coord current = main_actor->get_tile();
-	for (const Tile_coord& target : modern_mouse_surface_targets(x, y)) {
-		if (target == current) return true;
-		Astar candidate;
-		Actor_pathfinder_client cost(main_actor, 0, false);
-		if (candidate.NewPath(current, target, &cost)) return true;
-	}
-	return false;
-}
-
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed,             // Msecs. between frames.

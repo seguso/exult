@@ -1997,15 +1997,7 @@ static void Handle_event(SDL_Event& event) {
 					right_on_gump = false;
 				}
 			} else if (gwin->is_modern_mouse_target_enabled()) {
-				// Probe the release pixel for feedback ONLY. Do not call
-				// start_actor or retarget the walking action: the existing
-				// destination, animation and time queue remain untouched.
-				set_modern_mouse_unreachable_feedback_enabled(true);
-				if (gwin->modern_mouse_destination_reachable_from_display(x, y))
-					clear_modern_mouse_unreachable();
-				else
-					show_modern_mouse_unreachable();
-				set_modern_mouse_unreachable_feedback_enabled(false);
+				// On RMB up retain the last A* destination; no feedback probe.
 			} else if (avatar_can_act) {
 				// Last right click not within .5 secs (not a doubleclick or
 				// rapid right clicking)?

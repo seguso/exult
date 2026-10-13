@@ -993,8 +993,6 @@ public:
 	void start_actor_alt(int winx, int winy, int speed, bool mouse_steering = false);
 	// 3D clicked-surface priorities for the optional Modern Mouse Target.
 	std::vector<Tile_coord> modern_mouse_surface_targets(int winx, int winy);
-	// Read-only RMB-up reachability probe: must never retarget walking.
-	bool modern_mouse_destination_reachable_from_display(int x, int y);
 	void start_actor(int winx, int winy, int speed = 125, bool mouse_steering = false);
 	int get_mouse_walk_visual_dir() const {
 		return mouse_walk_visual_dir;
