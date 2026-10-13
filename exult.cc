@@ -1415,8 +1415,6 @@ static void Handle_events() {
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
 				if (modern_mouse_target.should_retarget(gwin->is_modern_mouse_target_enabled(), ticks)) {
 					const bool use_astar = gwin->is_modern_mouse_target_enabled();
-					set_modern_mouse_unreachable_feedback_enabled(use_astar);
-				set_modern_mouse_unreachable_feedback_enabled(false);
 				gwin->start_actor(x, y, use_astar ? modern_mouse_walk_speed()
 							: Mouse::mouse()->avatar_speed, use_astar);
 					modern_mouse_target.retargeted(ticks);
@@ -1886,8 +1884,10 @@ static void Handle_event(SDL_Event& event) {
 				// Keep the live A* action in the time queue during retargeting.
 				const bool use_astar = gwin->is_modern_mouse_target_enabled();
 				if (!use_astar) gwin->get_tqueue()->remove(gwin->get_main_actor());
+				set_modern_mouse_unreachable_feedback_enabled(gwin->is_modern_mouse_target_enabled());
 				gwin->start_actor(x, y, use_astar ? modern_mouse_walk_speed()
 						: Mouse::mouse()->avatar_speed, use_astar);
+				set_modern_mouse_unreachable_feedback_enabled(false);
 				if (use_astar) modern_mouse_target.retargeted(SDL_GetTicks());
 			}
 		}
