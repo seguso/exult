@@ -39,6 +39,7 @@
 #include "Gump_button.h"
 #include "Gump_manager.h"
 #include "InputOptions_gump.h"
+#include "Option_row_fader.h"
 #include "GameDisplayOptions_gump.h"
 #include "Gump_manager.h"
 #include "Text_button.h"
@@ -136,6 +137,7 @@ void InputOptions_gump::help() {
 Gump_button* InputOptions_gump::on_button(int mx, int my) {
 	for (size_t i = 0; i < buttons.size(); ++i) {
 		auto& btn = buttons[i];
+		if (i == id_modern_mouse_target_shift_speed && !modern_mouse_target) continue;
 		auto found = btn ? btn->on_button(mx, my) : nullptr;
 		if (found) {
 			return found;
@@ -199,6 +201,9 @@ void InputOptions_gump::build_buttons() {
 	buttons[id_modern_mouse_target] = std::make_unique<InputTextToggle>(
 			this, &InputOptions_gump::toggle_modern_mouse_target, yesNo, modern_mouse_target,
 			get_button_pos_for_label("Modern mouse target:"), yForRow(++y_index), 44);
+	buttons[id_modern_mouse_target_shift_speed] = std::make_unique<InputTextToggle>(
+			this, &InputOptions_gump::toggle_modern_mouse_target_shift_speed, yesNo, modern_mouse_target_shift_speed,
+			get_button_pos_for_label("  Shift controls MMT speed:"), yForRow(++y_index), 44);
 
 	// Risize to fit all
 	ResizeWidthToFitWidgets(tcb::span(buttons.data() + id_first, id_count));
@@ -222,20 +227,21 @@ void InputOptions_gump::load_settings() {
 	touch_pathfind   = gwin->get_touch_pathfind();
 	modern_keyboard = gwin->is_modern_keyboard_enabled();
 	modern_mouse_target = gwin->is_modern_mouse_target_enabled();
+	modern_mouse_target_shift_speed = gwin->is_modern_mouse_target_shift_speed();
 }
 
 InputOptions_gump::InputOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(15)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(16)), -1);
 
 	load_settings();
 
 	// Ok
-	buttons[id_ok] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::close, Strings::OK(), 25, yForRow(14), 50);
+	buttons[id_ok] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::close, Strings::OK(), 25, yForRow(15), 50);
 	// Help
-	buttons[id_help] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::help, Strings::HELP(), 50, yForRow(14), 50);
+	buttons[id_help] = std::make_unique<InputOptions_button>(this, &InputOptions_gump::help, Strings::HELP(), 50, yForRow(15), 50);
 	// Cancel
 	buttons[id_cancel]
-			= std::make_unique<InputOptions_button>(this, &InputOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(14), 50);
+			= std::make_unique<InputOptions_button>(this, &InputOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(15), 50);
 
 	build_buttons();
 }
@@ -272,6 +278,7 @@ void InputOptions_gump::save_settings() {
 
 	gwin->set_modern_keyboard_enabled(modern_keyboard);
 	gwin->set_modern_mouse_target_enabled(modern_mouse_target);
+	gwin->set_modern_mouse_target_shift_speed(modern_mouse_target_shift_speed);
 
 	config->write_back();
 
@@ -282,12 +289,18 @@ void InputOptions_gump::save_settings() {
 
 void InputOptions_gump::paint() {
 	Modal_gump::paint();
-	for (auto& btn : buttons) {
-		if (btn) {
-			btn->paint();
-		}
-	}
 	Image_window8* iwin    = gwin->get_win();
+	std::unique_ptr<Option_row_fader> faded_speed_row;
+	if (!modern_mouse_target && buttons[id_modern_mouse_target_shift_speed]) {
+		const int row_height = yForRow(1) - yForRow(0);
+		faded_speed_row = std::make_unique<Option_row_fader>(
+				*iwin->get_ib8(), x + label_margin,
+				y + buttons[id_modern_mouse_target_shift_speed]->get_y(),
+				get_rect().w - label_margin - 4, row_height);
+	}
+	for (auto& btn : buttons) {
+		if (btn) btn->paint();
+	}
 	int            y_index = 0;
 	font->paint_text(iwin->get_ib8(), Strings::DoubleclickclosesGumps_(), x + label_margin, y + yForRow(y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::RightclickclosesGumps_(), x + label_margin, y + yForRow(++y_index) + 1);
@@ -304,6 +317,10 @@ void InputOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::PathfindwithLongTouch_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Modernkeyboardmovement_(), x + label_margin, y + yForRow(++y_index) + 1);
 	font->paint_text(iwin->get_ib8(), "Modern mouse target:", x + label_margin, y + yForRow(++y_index) + 1);
+	font->paint_text(iwin->get_ib8(), "  Shift controls MMT speed:", x + label_margin, y + yForRow(++y_index) + 1);
+	if (faded_speed_row) {
+		if (const Palette* pal = gwin->get_pal()) faded_speed_row->fade_after_paint(*pal);
+	}
 
 
 	gwin->set_painted();

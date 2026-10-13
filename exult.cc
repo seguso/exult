@@ -1440,7 +1440,7 @@ static void Handle_events() {
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
 				if (modern_mouse_target.should_retarget(gwin->is_modern_mouse_target_enabled(), ticks)) {
 					gwin->start_actor_from_display(x, y,
-							gwin->is_modern_mouse_target_enabled()
+							(gwin->is_modern_mouse_target_enabled() && gwin->is_modern_mouse_target_shift_speed())
 								? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
 					modern_mouse_target.retargeted(ticks);
 				}
@@ -1909,7 +1909,7 @@ static void Handle_event(SDL_Event& event) {
 					gwin->get_tqueue()->remove(gwin->get_main_actor());
 				}
 				gwin->start_actor_from_display(x, y,
-						gwin->is_modern_mouse_target_enabled()
+						(gwin->is_modern_mouse_target_enabled() && gwin->is_modern_mouse_target_shift_speed())
 							? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
 			}
 		}

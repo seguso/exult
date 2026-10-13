@@ -1079,6 +1079,7 @@ private:
 	bool modern_movement_enabled;
 	bool smooth_avatar_walk_enabled = false;
 	bool modern_mouse_target_enabled = false;
+	bool modern_mouse_target_shift_speed = true;
 	// Optional WASD/simultaneous-arrow keyboard movement. Off preserves the
 	// original Exult keymap and event-driven cardinal movement semantics.
 	bool modern_keyboard_enabled;
@@ -1140,6 +1141,11 @@ public:
 	}
 
 	bool is_modern_mouse_target_enabled() const { return modern_mouse_target_enabled; }
+	bool is_modern_mouse_target_shift_speed() const { return modern_mouse_target_shift_speed; }
+	void set_modern_mouse_target_shift_speed(bool enabled) {
+		modern_mouse_target_shift_speed = enabled;
+		config->set("config/gameplay/modern_mouse_target_shift_speed", enabled ? "yes" : "no", true);
+	}
 	void set_modern_mouse_target_enabled(bool enabled);
 	bool is_smooth_avatar_walk_enabled() const { return smooth_avatar_walk_enabled; }
 	void set_smooth_avatar_walk_enabled(bool enabled);

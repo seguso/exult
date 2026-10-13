@@ -21,13 +21,22 @@
 			// walking action, animation frame or time-queue entry.
 			main_actor->set_frame_time(speed);
 			// A failed replan leaves the existing path and animation intact.
-			current_action->retarget_smart_path(main_actor, target);
+			const bool replan_ok = current_action->retarget_smart_path(main_actor, target);
+			if (!replan_ok) {
+				std::cerr << "[MMT/A*] retarget failed; preserving old path. from=("
+					<< current.tx << ',' << current.ty << ',' << current.tz << ") target=("
+					<< target.tx << ',' << target.ty << ",any lift). "
+					<< "A* could not find a traversable path, or the current action refused replanning (door/subaction).\n";
+			}
 			routed = true;
 		} else {
 			// Initial press: create a walking action only once.
 			routed = main_actor->walk_path_to_tile(target, speed) != 0;
 		}
 		if (!routed) {
+			std::cerr << "[MMT/A*] initial path failed: from=(" << current.tx << ',' << current.ty
+				<< ',' << current.tz << ") target=(" << target.tx << ',' << target.ty
+				<< ",any lift). A* returned no route; check collision, lift, and target reachability.\n";
 			return;
 		}
 		if (walk_in_formation && main_actor->get_action()) {

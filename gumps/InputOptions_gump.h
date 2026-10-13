@@ -41,6 +41,7 @@ private:
 	bool touch_pathfind;
 	bool modern_keyboard;
 	bool modern_mouse_target;
+	bool modern_mouse_target_shift_speed;
 
 	enum button_ids {
 		id_first = 0,
@@ -59,6 +60,7 @@ private:
 		id_touch_pathfind,
 		id_modern_keyboard,
 		id_modern_mouse_target,
+		id_modern_mouse_target_shift_speed,
 		id_count
 	};
 
@@ -115,7 +117,8 @@ public:
 		touch_pathfind = state;
 	}
 
-	void toggle_modern_mouse_target(int state) { modern_mouse_target = state != 0; }
+	void toggle_modern_mouse_target(int state) { modern_mouse_target = state != 0; paint(); }
+	void toggle_modern_mouse_target_shift_speed(int state) { modern_mouse_target_shift_speed = state != 0; }
 	void toggle_modern_keyboard(int state) {
 		modern_keyboard = state;
 	}
