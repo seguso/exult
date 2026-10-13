@@ -85,6 +85,7 @@
 #include "version.h"
 #include "virstone.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cassert>
 #include <cstdio>
@@ -1857,6 +1858,8 @@ Gump* Game_window::get_dragging_gump() {
  *  Alternative start actor function
  *  Placed in an alternative function to prevent breaking barges
  */
+#include "Modern_mouse_surfaces.inc"
+
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed,             // Msecs. between frames.

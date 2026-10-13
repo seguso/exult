@@ -1,52 +1,53 @@
-// A* mouse-target path runs before the legacy direct-steering collision gate.
+// A* mouse target follows the highest reachable 3D surface under the cursor.
 	if (modern_mouse_steering && modern_mouse_target_enabled) {
-		const int lift = main_actor->get_lift();
-		const int liftpixels = 4 * lift;
-		const int tx = (get_scrolltx() + (winx + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
-		const int ty = (get_scrollty() + (winy + liftpixels) / c_tilesize + c_num_tiles) % c_num_tiles;
 		const Tile_coord current = main_actor->get_tile();
-		if (tx == current.tx && ty == current.ty) {
-			stop_actor();
-			return;
-		}
-		// Astar's Actor_pathfinder_client adjusts tz as each step climbs or
-		// descends. A fixed destination lift would incorrectly require the
-		// clicked tile to be reachable at the Avatar's starting elevation.
-		// -1 means accept the naturally reached elevation at these x/y coords.
-		const Tile_coord target(tx, ty, -1);
+		const std::vector<Tile_coord> candidates = modern_mouse_surface_targets(winx, winy);
 		Actor_action* current_action = main_actor->get_action();
+		const bool replan = current_action && current_action->following_smart_path();
 		bool routed = false;
-		if (current_action && current_action->following_smart_path()) {
-			// Match the currently selected Shift speed without restarting the
-			// walking action, animation frame or time-queue entry.
-			main_actor->set_frame_time(speed);
-			// A failed replan leaves the existing path and animation intact.
-			const bool replan_ok = current_action->retarget_smart_path(main_actor, target);
-			if (!replan_ok) {
-				std::cerr << "[MMT/A*] retarget failed; preserving old path. from=("
-					<< current.tx << ',' << current.ty << ',' << current.tz << ") target=("
-					<< target.tx << ',' << target.ty << ",any lift). "
-					<< "A* could not find a traversable path, or the current action refused replanning (door/subaction).\n";
+		Tile_coord chosen;
+		std::size_t attempts = 0;
+		for (const Tile_coord& target : candidates) {
+			++attempts;
+			if (target == current) {
+				stop_actor();
+				return;
+			}
+			if (replan) {
+				// A failed replan leaves the old A* action, time queue, walk
+				// phase and path intact. Try the next lower surface.
+				if (!current_action->retarget_smart_path(main_actor, target))
+					continue;
+				main_actor->set_frame_time(speed);
+			} else {
+				if (!main_actor->walk_path_to_tile(target, speed))
+					continue;
 			}
 			routed = true;
-		} else {
-			// Initial press: create a walking action only once.
-			routed = main_actor->walk_path_to_tile(target, speed) != 0;
+			chosen = target;
+			break;
 		}
 		if (!routed) {
-			std::cerr << "[MMT/A*] initial path failed: from=(" << current.tx << ',' << current.ty
-				<< ',' << current.tz << ") target=(" << target.tx << ',' << target.ty
-				<< ",any lift). A* returned no route; check collision, lift, and target reachability.\n";
+			std::cerr << "[MMT/A*] no reachable clicked surface: from=("
+				<< current.tx << ',' << current.ty << ',' << current.tz
+				<< ") screen=(" << winx << ',' << winy
+				<< ") tested=" << attempts
+				<< "; old route kept if retargeting.\n";
 			return;
 		}
-		// Attach the visual heading state to the ACTION, not to the pathfinder.
-		// A successful 500 ms replan replaces Astar but keeps this state intact.
-		if (main_actor->get_action()) main_actor->get_action()->enable_modern_mouse_heading();
-		if (walk_in_formation && main_actor->get_action()) {
-			main_actor->get_action()->set_get_party(true);
-		} else {
-			main_actor->get_followers();
+		if (attempts > 1) {
+			std::cerr << "[MMT/A*] surface fallback: from=("
+				<< current.tx << ',' << current.ty << ',' << current.tz
+				<< ") selected=(" << chosen.tx << ',' << chosen.ty << ','
+				<< chosen.tz << ") after " << attempts << " candidates.\n";
 		}
+		// The route-heading state is owned by the ACTION, so it survives
+		// 500-ms A* recalculations without resetting the walking frame.
+		if (main_actor->get_action())
+			main_actor->get_action()->enable_modern_mouse_heading();
+		if (walk_in_formation && main_actor->get_action())
+			main_actor->get_action()->set_get_party(true);
+		else
+			main_actor->get_followers();
 		return;
 	}
-
