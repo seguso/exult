@@ -128,6 +128,8 @@ private:
 	int              original_dir;                // From src. to dest. (0-7).
 	bool             modern_mouse_heading_enabled = false;
 	Modern_mouse_heading modern_mouse_heading;
+	// Read the actual past + upcoming A* tiles without affecting walk timing.
+	int sample_modern_mouse_heading(Actor* actor, const Tile_coord* next_step = nullptr);
 	int              speed          = 0;          // Time between frames.
 	bool             from_offscreen = false;      // Walking from offscreen.
 	Actor_action*    subseq         = nullptr;    // For opening doors.

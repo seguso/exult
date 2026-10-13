@@ -2,16 +2,15 @@
  * Copyright (C) 2026 The Exult Team
  * GPL-2.0-or-later
  *
- * Visual-only heading for Modern Mouse Target.  This samples a smoothed
- * version of the ACTUAL A* route, never a straight line to its destination.
- * There are no changes to the walkable tiles or to animation step timing.
+ * Visual-only facing from the local smoothed A* route for Modern Mouse Target.
+ * The movement path and walking animation phase remain untouched.
  */
 #ifndef EXULT_MODERN_MOUSE_HEADING_H
 #define EXULT_MODERN_MOUSE_HEADING_H
 
 #include <algorithm>
-#include <cstddef>
 #include <cmath>
+#include <cstddef>
 #include <vector>
 
 class Modern_mouse_heading {
@@ -21,136 +20,134 @@ public:
         double y;
     };
 
-    // Exult has only four walking-art directions (0, 2, 4, 6).
     int direction() const { return facing; }
 
-    void reset() {
-        facing = -1;
-        pending = -1;
-        pending_steps = 0;
-        smooth_x = smooth_y = 0.0;
-        initialized = false;
+    void reset() { walked.clear(); facing = -1; }
+
+    // Only actual traversed tiles enter the history, not planned A* points.
+    void remember(Point current, int world_size) {
+        if (!walked.empty()) {
+            const Point last = walked.back();
+            const double dx = wrapped_delta(current.x, last.x, world_size);
+            const double dy = wrapped_delta(current.y, last.y, world_size);
+            const double d = std::hypot(dx, dy);
+            if (d < 0.01) return;
+            // A teleport/new unrelated movement must not join the old curve.
+            if (d > 1.6) walked.clear();
+        }
+        walked.push_back(current);
+        // Only the recent past affects a local Chaikin tangent; bound work
+        // during long walks while keeping history across every A* replan.
+        constexpr std::size_t max_walked = 24;
+        if (walked.size() > max_walked)
+            walked.erase(walked.begin(), walked.begin() + (walked.size() - max_walked));
     }
 
-    // Called only when an actual A* walking step is about to be performed.
-    // Future points start with the tile about to be entered and continue
-    // along the unconsumed path (up to eight tiles).
-    int advance(Point current, const std::vector<Point>& future, int world_size) {
+    // Computes the tangent at the CURRENT position. No temporal filtering,
+    // no hysteresis, and no modification to movement or animation indices.
+    // future[0] is the next tile to be walked into, not the final target.
+    int calculate(Point current, const std::vector<Point>& future, int world_size) const {
         if (future.empty()) return facing;
-        std::vector<Point> route;
-        route.reserve(future.size() + 1);
-        route.push_back(current);
-        for (const Point& next : future) {
-            const Point& prev = route.back();
-            // The U7 map wraps; unwrap adjacent steps into a local plane.
-            auto delta = [world_size](double n, double p) {
-                double d = n - p;
-                if (world_size > 0) {
-                    const double half = world_size * 0.5;
-                    if (d > half) d -= world_size;
-                    if (d < -half) d += world_size;
-                }
-                return d;
-            };
-            const Point p{prev.x + delta(next.x, prev.x), prev.y + delta(next.y, prev.y)};
-            if (std::hypot(p.x - prev.x, p.y - prev.y) > 0.01) route.push_back(p);
-        }
-        if (route.size() < 2) return facing;
-
-        // Two rounds of Chaikin corner cutting: smooth the route for VISUAL
-        // tangent estimation only. It must never be used for actual motion
-        // (which would cut corners through walls).
-        for (int pass = 0; pass < 2 && route.size() < 100; ++pass) {
-            std::vector<Point> finer;
-            finer.reserve(route.size() * 2);
-            finer.push_back(route.front());
-            for (std::size_t i = 1; i < route.size(); ++i) {
-                const Point a = route[i - 1], b = route[i];
-                finer.push_back({0.75 * a.x + 0.25 * b.x, 0.75 * a.y + 0.25 * b.y});
-                finer.push_back({0.25 * a.x + 0.75 * b.x, 0.25 * a.y + 0.75 * b.y});
+        struct Sample { Point p; double index; };
+        std::vector<Sample> curve;
+        curve.reserve(walked.size() + future.size() + 1);
+        auto append = [&](Point raw) {
+            if (curve.empty()) {
+                curve.push_back({raw, 0.0});
+                return;
             }
-            finer.push_back(route.back());
-            route.swap(finer);
-        }
+            const Point prev = curve.back().p;
+            const double dx = wrapped_delta(raw.x, prev.x, world_size);
+            const double dy = wrapped_delta(raw.y, prev.y, world_size);
+            if (std::hypot(dx, dy) > 0.01)
+                curve.push_back({{prev.x + dx, prev.y + dy}, static_cast<double>(curve.size())});
+        };
+        for (const Point& p : walked) append(p);
+        append(current);
+        if (curve.empty()) return facing;
+        const double current_index = curve.back().index;
+        for (const Point& p : future) append(p);
+        if (curve.size() < 2) return facing;
 
-        const auto along = [&](double distance) {
-            Point p = route.front();
-            for (std::size_t i = 1; i < route.size(); ++i) {
-                const double dx = route[i].x - p.x, dy = route[i].y - p.y;
-                const double length = std::hypot(dx, dy);
-                if (length >= distance && length > 0.0001)
-                    return Point{p.x + dx * distance / length, p.y + dy * distance / length};
-                distance -= length;
-                p = route[i];
+        // The attached index tracks the current waypoint through smoothing,
+        // so a U-shaped path cannot accidentally project onto the wrong leg.
+        for (int pass = 0; pass < 2; ++pass) {
+            std::vector<Sample> refined;
+            refined.reserve(2 * curve.size());
+            refined.push_back(curve.front());
+            for (std::size_t i = 1; i < curve.size(); ++i) {
+                const Sample& a = curve[i - 1];
+                const Sample& b = curve[i];
+                const auto mix = [](const Sample& a, const Sample& b, double t) -> Sample {
+                    return {{a.p.x + (b.p.x - a.p.x) * t,
+                             a.p.y + (b.p.y - a.p.y) * t},
+                            a.index + (b.index - a.index) * t};
+                };
+                refined.push_back(mix(a, b, 0.25));
+                refined.push_back(mix(a, b, 0.75));
             }
-            return route.back();
+            refined.push_back(curve.back());
+            curve.swap(refined);
+        }
+
+        std::vector<double> distance(curve.size(), 0.0);
+        for (std::size_t i = 1; i < curve.size(); ++i)
+            distance[i] = distance[i - 1] + std::hypot(
+                curve[i].p.x - curve[i - 1].p.x,
+                curve[i].p.y - curve[i - 1].p.y);
+
+        // Arc-length coordinate of the current waypoint on the smoothed curve.
+        double at = distance.back();
+        for (std::size_t i = 1; i < curve.size(); ++i) {
+            if (curve[i].index >= current_index) {
+                const double dt = curve[i].index - curve[i - 1].index;
+                const double t = dt > 0.0 ? std::clamp(
+                    (current_index - curve[i - 1].index) / dt, 0.0, 1.0) : 0.0;
+                at = distance[i - 1] + t * (distance[i] - distance[i - 1]);
+                break;
+            }
+        }
+        const auto sample = [&](double arc) -> Point {
+            arc = std::clamp(arc, 0.0, distance.back());
+            auto it = std::lower_bound(distance.begin(), distance.end(), arc);
+            if (it == distance.begin()) return curve.front().p;
+            if (it == distance.end()) return curve.back().p;
+            const std::size_t i = static_cast<std::size_t>(it - distance.begin());
+            const double length = distance[i] - distance[i - 1];
+            if (length <= 0.0001) return curve[i].p;
+            const double t = (arc - distance[i - 1]) / length;
+            return {curve[i - 1].p.x + t * (curve[i].p.x - curve[i - 1].p.x),
+                    curve[i - 1].p.y + t * (curve[i].p.y - curve[i - 1].p.y)};
         };
-        const Point near_point = along(1.0);
-        const Point far_point = along(2.2);
-        double dx = (near_point.x - current.x) * 0.70 + (far_point.x - current.x) * 0.30;
-        double dy = (near_point.y - current.y) * 0.70 + (far_point.y - current.y) * 0.30;
-        const double length = std::hypot(dx, dy);
-        if (length < 0.001) return facing;
-        dx /= length;
-        dy /= length;
 
-        // This state belongs to the walking action, NOT to the A* instance.
-        // A new path every 500 ms retains the previous smoothed heading.
-        if (!initialized) {
-            smooth_x = dx;
-            smooth_y = dy;
-            initialized = true;
-        } else {
-            const double blend = 0.48;
-            smooth_x = (1.0 - blend) * smooth_x + blend * dx;
-            smooth_y = (1.0 - blend) * smooth_y + blend * dy;
-            const double s = std::hypot(smooth_x, smooth_y);
-            if (s > 0.0001) { smooth_x /= s; smooth_y /= s; }
-        }
-
-        const Point dirs[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
-        const auto score = [&](int dir) {
-            const Point d = dirs[dir / 2];
-            return smooth_x * d.x + smooth_y * d.y;
-        };
-        int best = 0;
-        for (int d = 2; d <= 6; d += 2)
-            if (score(d) > score(best)) best = d;
-        if (facing < 0) {
-            facing = best;
-            return facing;
-        }
-        if (best == facing) {
-            pending = -1;
-            pending_steps = 0;
-            return facing;
-        }
-
-        // Hysteresis prevents switching at every NE/NW tile correction.
-        // A genuine strong turn changes promptly; borderline changes must
-        // persist through two walking steps. Retarget events aren't steps.
-        const double advantage = score(best) - score(facing);
-        if (advantage < 0.18) {
-            pending = -1;
-            pending_steps = 0;
-            return facing;
-        }
-        if (best == pending) ++pending_steps;
-        else { pending = best; pending_steps = 1; }
-        if (advantage > 0.72 || pending_steps >= 2) {
-            facing = best;
-            pending = -1;
-            pending_steps = 0;
-        }
-        return facing;
+        // Symmetric tangent: include the incoming and outgoing geometry,
+        // avoiding the directional lag caused by pure forward lookahead.
+        constexpr double half_window = 1.8;
+        const Point before = sample(at - half_window);
+        const Point after = sample(at + half_window);
+        const double dx = after.x - before.x;
+        const double dy = after.y - before.y;
+        if (std::hypot(dx, dy) < 0.0001) return facing;
+        // Four cardinal sprite directions: N=0, E=2, S=4, W=6.
+        if (std::abs(dx) > std::abs(dy)) return dx > 0.0 ? 2 : 6;
+        return dy > 0.0 ? 4 : 0;
     }
+
+    void set_direction(int dir) { if (dir >= 0) facing = dir; }
 
 private:
+    static double wrapped_delta(double next, double prev, int world_size) {
+        double diff = next - prev;
+        if (world_size > 0) {
+            const double half = world_size / 2.0;
+            if (diff > half) diff -= world_size;
+            else if (diff < -half) diff += world_size;
+        }
+        return diff;
+    }
+
+    std::vector<Point> walked;
     int facing = -1;
-    int pending = -1;
-    int pending_steps = 0;
-    double smooth_x = 0, smooth_y = 0;
-    bool initialized = false;
 };
 
 #endif

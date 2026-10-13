@@ -202,6 +202,24 @@ Path_walking_actor_action* Path_walking_actor_action::create_path(
  *  @return     0 if done with this action, else delay for next frame.
  */
 
+
+int Path_walking_actor_action::sample_modern_mouse_heading(Actor* actor, const Tile_coord* next_step) {
+    if (!modern_mouse_heading_enabled || !actor || !path || !path->following_smart_path())
+        return -1;
+    const Tile_coord current = actor->get_tile();
+    modern_mouse_heading.remember(
+            {static_cast<double>(current.tx), static_cast<double>(current.ty)}, c_num_tiles);
+    std::vector<Tile_coord> upcoming;
+    if (next_step) upcoming.push_back(*next_step);
+    static_cast<Astar*>(path)->peek_next_steps(upcoming, 12);
+    std::vector<Modern_mouse_heading::Point> future;
+    future.reserve(upcoming.size());
+    for (const Tile_coord& t : upcoming)
+        future.push_back({static_cast<double>(t.tx), static_cast<double>(t.ty)});
+    return modern_mouse_heading.calculate(
+            {static_cast<double>(current.tx), static_cast<double>(current.ty)}, future, c_num_tiles);
+}
+
 int Path_walking_actor_action::handle_event(Actor* actor) {
 	if (subseq) {    // Going through a door?
 		const int delay = subseq->handle_event(actor);
@@ -296,16 +314,10 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 	int              visual_dir = newdir;
 	Game_window*     gwin       = Game_window::get_instance();
 	if (actor == gwin->get_main_actor()) {
-			if (modern_mouse_heading_enabled && path->following_smart_path()) {
-			// The current tile has already been consumed by GetNextStep().
-			// Read the next few A* steps without advancing the real path.
-			std::vector<Tile_coord> upcoming{tile};
-			static_cast<Astar*>(path)->peek_next_steps(upcoming, 8);
-			std::vector<Modern_mouse_heading::Point> points;
-			points.reserve(upcoming.size());
-			for (const Tile_coord& t : upcoming) points.push_back({static_cast<double>(t.tx), static_cast<double>(t.ty)});
-			const int heading = modern_mouse_heading.advance(
-					{static_cast<double>(cur.tx), static_cast<double>(cur.ty)}, points, c_num_tiles);
+		if (modern_mouse_heading_enabled && path->following_smart_path()) {
+			// The actual travelled route is retained by the action across replans.
+			// Tangent comes from the whole local past+future curve, no time filter.
+			const int heading = sample_modern_mouse_heading(actor, &tile);
 			if (heading >= 0) visual_dir = heading;
 		} else {
 			const int mouse_dir = gwin->get_mouse_walk_visual_dir();
@@ -325,6 +337,11 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 		actor->move(tile.tx, tile.ty, tile.tz);
 		return cur_speed;
 	} else if (actor->step(tile, frame)) {    // Successful.
+		if (modern_mouse_heading_enabled) {
+			modern_mouse_heading.remember(
+					{static_cast<double>(tile.tx), static_cast<double>(tile.ty)}, c_num_tiles);
+			modern_mouse_heading.set_direction(visual_dir);
+		}
 		if (deleted) {
 			return 0;
 		}
@@ -542,6 +559,17 @@ bool Path_walking_actor_action::retarget_smart_path(Actor* actor, const Tile_coo
 	from_offscreen = false;
 	const Tile_coord src = actor->get_tile();
 	original_dir = static_cast<int>(Get_direction4(src.ty - dest.ty, dest.tx - src.tx));
+	if (modern_mouse_heading_enabled) {
+		// Recalculate immediately on this new path, preserving the travelled
+		// history and the existing animation phase/step index.
+		const int heading = sample_modern_mouse_heading(actor);
+		if (heading >= 0) {
+			modern_mouse_heading.set_direction(heading);
+			const int current_frame = actor->get_framenum();
+			const int oriented_frame = actor->get_dir_framenum(heading, current_frame);
+			if (oriented_frame != current_frame) actor->change_frame(oriented_frame);
+		}
+	}
 	return true;
 }
 
