@@ -1893,7 +1893,8 @@ void Game_window::start_actor_alt(
 	// pre-existing modern-camera path exactly, but allow this steering input
 	// when using classic camera scrolling (with or without legacy lerping).
 	const bool modern_mouse_steering = mouse_steering && (modern_movement_enabled || modern_mouse_target_enabled);
-	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
+	mouse_walk_visual_dir = modern_mouse_steering && !modern_mouse_target_enabled
+		? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
 	// Smart mouse pathfinding must run before the legacy one-step collision
 	// avoidance. Otherwise a wall beside the Avatar prevents A* from

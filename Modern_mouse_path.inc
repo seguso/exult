@@ -39,6 +39,9 @@
 				<< ",any lift). A* returned no route; check collision, lift, and target reachability.\n";
 			return;
 		}
+		// Attach the visual heading state to the ACTION, not to the pathfinder.
+		// A successful 500 ms replan replaces Astar but keeps this state intact.
+		if (main_actor->get_action()) main_actor->get_action()->enable_modern_mouse_heading();
 		if (walk_in_formation && main_actor->get_action()) {
 			main_actor->get_action()->set_get_party(true);
 		} else {

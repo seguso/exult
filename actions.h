@@ -22,6 +22,7 @@
 #define ACTIONS_H 1
 
 #include "ignore_unused_variable_warning.h"
+#include "Modern_mouse_heading.h"
 #include "tiles.h"
 
 #include <memory>
@@ -89,6 +90,8 @@ public:
 	virtual bool following_smart_path() const {
 		return false;
 	}
+	// Visual-only route heading; only supported by the modern mouse A* action.
+	virtual void enable_modern_mouse_heading() {}
 
 	virtual If_else_path_actor_action* as_usecode_path() {
 		return nullptr;
@@ -123,6 +126,8 @@ protected:
 	bool        deleted = false;        // True if the action has been killed.
 private:
 	int              original_dir;                // From src. to dest. (0-7).
+	bool             modern_mouse_heading_enabled = false;
+	Modern_mouse_heading modern_mouse_heading;
 	int              speed          = 0;          // Time between frames.
 	bool             from_offscreen = false;      // Walking from offscreen.
 	Actor_action*    subseq         = nullptr;    // For opening doors.
@@ -156,6 +161,7 @@ public:
 	bool retarget_smart_path(Actor* actor, const Tile_coord& dest) override;
 	// Check for Astar.
 	bool following_smart_path() const override;
+	void enable_modern_mouse_heading() override { modern_mouse_heading_enabled = true; }
 
 	int get_speed() const override {
 		return speed;

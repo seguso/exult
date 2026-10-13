@@ -296,9 +296,20 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 	int              visual_dir = newdir;
 	Game_window*     gwin       = Game_window::get_instance();
 	if (actor == gwin->get_main_actor()) {
-		const int mouse_dir = gwin->get_mouse_walk_visual_dir();
-		if (mouse_dir >= 0) {
-			visual_dir = mouse_dir;
+			if (modern_mouse_heading_enabled && path->following_smart_path()) {
+			// The current tile has already been consumed by GetNextStep().
+			// Read the next few A* steps without advancing the real path.
+			std::vector<Tile_coord> upcoming{tile};
+			static_cast<Astar*>(path)->peek_next_steps(upcoming, 8);
+			std::vector<Modern_mouse_heading::Point> points;
+			points.reserve(upcoming.size());
+			for (const Tile_coord& t : upcoming) points.push_back({static_cast<double>(t.tx), static_cast<double>(t.ty)});
+			const int heading = modern_mouse_heading.advance(
+					{static_cast<double>(cur.tx), static_cast<double>(cur.ty)}, points, c_num_tiles);
+			if (heading >= 0) visual_dir = heading;
+		} else {
+			const int mouse_dir = gwin->get_mouse_walk_visual_dir();
+			if (mouse_dir >= 0) visual_dir = mouse_dir;
 		}
 	}
 	Frames_sequence* frames     = actor->get_frames(visual_dir);
@@ -432,7 +443,9 @@ void Path_walking_actor_action::stop(Actor* actor) {
 	// Don't set slimes.
 	if (!actor->get_info().has_strange_movement() && actor->can_act()) {
 		// ++++For now, just use original dir.
-		Frames_sequence* frames = actor->get_frames(original_dir);
+		const int heading = modern_mouse_heading_enabled && modern_mouse_heading.direction() >= 0
+				? modern_mouse_heading.direction() : original_dir;
+		Frames_sequence* frames = actor->get_frames(heading);
 		actor->change_frame(frames->get_resting());
 	}
 }

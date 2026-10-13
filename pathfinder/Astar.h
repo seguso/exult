@@ -44,6 +44,13 @@ public:
 	}
 
 	int get_num_steps() override;    // # of steps left to take.
+
+	// Inspect upcoming A* tiles without consuming steps or changing the path.
+	void peek_next_steps(std::vector<Tile_coord>& into, size_t limit) const {
+		for (int i = next_index; i != stop && into.size() < limit; i += dir) {
+			into.push_back(path[i]);
+		}
+	}
 };
 
 #endif
