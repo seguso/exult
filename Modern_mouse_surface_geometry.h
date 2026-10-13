@@ -12,6 +12,7 @@
 #include "tiles.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <vector>
 
 class Modern_mouse_surface_geometry {
