@@ -32,6 +32,7 @@
 #include <iostream>
 
 #include "Astar.h"
+#include "Modern_mouse_surface_geometry.h"
 #include "Audio.h"
 #include "AudioMixer.h"
 #include "Configuration.h"
