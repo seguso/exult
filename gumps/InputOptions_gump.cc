@@ -279,6 +279,7 @@ void InputOptions_gump::save_settings() {
 	gwin->set_modern_keyboard_enabled(modern_keyboard);
 	gwin->set_modern_mouse_target_enabled(modern_mouse_target);
 	gwin->set_modern_mouse_target_shift_speed(modern_mouse_target_shift_speed);
+	config->set("config/gameplay/modern_mouse_target_shift_speed", modern_mouse_target_shift_speed ? "yes" : "no", false);
 
 	config->write_back();
 

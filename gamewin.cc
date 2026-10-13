@@ -29,6 +29,7 @@
 #endif
 
 #include "gamewin.h"
+#include <iostream>
 
 #include "Astar.h"
 #include "Audio.h"
