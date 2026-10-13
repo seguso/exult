@@ -47,7 +47,7 @@ public:
     // no hysteresis, and no modification to movement or animation indices.
     // future[0] is the next tile to be walked into, not the final target.
     int calculate(Point current, const std::vector<Point>& future, int world_size) const {
-        if (future.empty()) return facing;
+        if (future.empty() && walked.empty()) return facing;
         struct Sample { Point p; double index; };
         std::vector<Sample> curve;
         curve.reserve(walked.size() + future.size() + 1);

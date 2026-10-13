@@ -209,15 +209,23 @@ int Path_walking_actor_action::sample_modern_mouse_heading(Actor* actor, const T
     const Tile_coord current = actor->get_tile();
     modern_mouse_heading.remember(
             {static_cast<double>(current.tx), static_cast<double>(current.ty)}, c_num_tiles);
+
+    // Frames are drawn AFTER actor->step(). When selecting this step's sprite,
+    // sample the tangent at its destination, not one tile behind. The trial
+    // copy lets blocked steps leave the real history unchanged.
+    Modern_mouse_heading predicted = modern_mouse_heading;
+    const Tile_coord sample_at = next_step ? *next_step : current;
+    if (next_step)
+        predicted.remember(
+                {static_cast<double>(sample_at.tx), static_cast<double>(sample_at.ty)}, c_num_tiles);
     std::vector<Tile_coord> upcoming;
-    if (next_step) upcoming.push_back(*next_step);
     static_cast<Astar*>(path)->peek_next_steps(upcoming, 12);
     std::vector<Modern_mouse_heading::Point> future;
     future.reserve(upcoming.size());
     for (const Tile_coord& t : upcoming)
         future.push_back({static_cast<double>(t.tx), static_cast<double>(t.ty)});
-    return modern_mouse_heading.calculate(
-            {static_cast<double>(current.tx), static_cast<double>(current.ty)}, future, c_num_tiles);
+    return predicted.calculate(
+            {static_cast<double>(sample_at.tx), static_cast<double>(sample_at.ty)}, future, c_num_tiles);
 }
 
 int Path_walking_actor_action::handle_event(Actor* actor) {
