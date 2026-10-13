@@ -31,6 +31,7 @@
 #include "gamewin.h"
 
 #include "Astar.h"
+#include "Modern_mouse_surface_geometry.h"
 #include "Audio.h"
 #include "AudioMixer.h"
 #include "Configuration.h"
@@ -1854,6 +1855,8 @@ Gump* Game_window::get_dragging_gump() {
  *  Alternative start actor function
  *  Placed in an alternative function to prevent breaking barges
  */
+#include "Modern_mouse_surfaces.inc"
+
 void Game_window::start_actor_alt(
 		int winx, int winy,    // Mouse position to aim for.
 		int speed,             // Msecs. between frames.
@@ -1890,7 +1893,9 @@ void Game_window::start_actor_alt(
 	// pre-existing modern-camera path exactly, but allow this steering input
 	// when using classic camera scrolling (with or without legacy lerping).
 	const bool modern_mouse_steering = mouse_steering && (modern_movement_enabled || modern_mouse_target_enabled);
-	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
+	mouse_walk_visual_dir = modern_mouse_steering && !modern_mouse_target_enabled ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
+
+#include "Modern_mouse_path.inc"
 
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
@@ -1918,7 +1923,7 @@ void Game_window::start_actor_alt(
 	// Only the temporary walking goal changes; diagonal/Bresenham stepping,
 	// formation and the normal double-right-click pathfinder stay untouched.
 	// Mouse A* target handling, isolated from ordinary Exult walking.
-#include "Modern_mouse_path.inc"
+
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.

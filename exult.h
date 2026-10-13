@@ -39,6 +39,9 @@ class TouchUI;
  *      Chr gets keyboard char., or 0 if it's was a mouse click.
  */
 extern bool g_waiting_for_click;
+void show_modern_mouse_unreachable();
+void clear_modern_mouse_unreachable();
+void set_modern_mouse_unreachable_feedback_enabled(bool enabled);
 
 extern bool Get_click(
 		int& x, int& y,                                 // Location returned (if not ESC).
