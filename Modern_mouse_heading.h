@@ -84,10 +84,10 @@ public:
             }
             return route.back();
         };
-        const Point near = along(1.0);
-        const Point far = along(2.2);
-        double dx = (near.x - current.x) * 0.70 + (far.x - current.x) * 0.30;
-        double dy = (near.y - current.y) * 0.70 + (far.y - current.y) * 0.30;
+        const Point near_point = along(1.0);
+        const Point far_point = along(2.2);
+        double dx = (near_point.x - current.x) * 0.70 + (far_point.x - current.x) * 0.30;
+        double dy = (near_point.y - current.y) * 0.70 + (far_point.y - current.y) * 0.30;
         const double length = std::hypot(dx, dy);
         if (length < 0.001) return facing;
         dx /= length;
