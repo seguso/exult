@@ -40,6 +40,7 @@
 #include "objiter.h"
 #include "perf.h"
 #include "palette.h"
+#include "Rotate_live_palette.h"
 #include "party.h"
 
 #ifdef USE_HQ3X_SCALER

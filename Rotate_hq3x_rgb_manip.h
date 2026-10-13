@@ -9,16 +9,16 @@
 #ifndef EXULT_ROTATE_HQ3X_RGB_MANIP_H
 #define EXULT_ROTATE_HQ3X_RGB_MANIP_H
 
-#include "palette.h"
+#include "Rotate_live_palette.h"
 #include <cstdint>
 
 // Pixel-channel adapter for rotated HQ3x sampling.
 // Independent of the camera, dialog options and world coordinate transforms.
 class Rotate_hq3x_rgb_manip {
-    const Palette* palette;
+    const Rotate_live_palette* palette;
 
 public:
-    explicit Rotate_hq3x_rgb_manip(const Palette* p) : palette(p) {}
+    explicit Rotate_hq3x_rgb_manip(const Rotate_live_palette* p) : palette(p) {}
 
     void split_source(unsigned char pix, unsigned int& r, unsigned int& g, unsigned int& b) const {
         // Exult uses six-bit palette channels; HQ3x interpolation expects
