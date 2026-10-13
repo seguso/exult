@@ -808,10 +808,14 @@ bool Dragging_info::drop_on_map(
 		posy = y;
 	}
 	gwin->display_to_world(posx, posy);
+	std::cerr << "[ExultWorldDrop] cursor=(" << x << "," << y << ") paintDisplay=(" << paintx << "," << painty << ") paintWorld=(" << posx << "," << posy << ") grabWorld=(" << world_grab_dx << "," << world_grab_dy << ") oldLift=" << old_lift << " maxLift=" << max_lift << " shape=" << to_drop->get_shapenum() << std::endl;
 	int lift;
 	// Was it dropped on something?
 	Game_object* found   = gwin->find_object_from_display(x, y);
 	int          dropped = 0;    // 1 when dropped.
+	std::cerr << "[ExultWorldDrop] cursorHitShape=" << (found ? found->get_shapenum() : -1) << " hitIsDragged=" << (found == obj.get());
+	if (found) { const Tile_coord t = found->get_tile(); std::cerr << " hitTile=(" << t.tx << "," << t.ty << "," << t.tz << ") hitHeight=" << found->get_info().get_3d_height(); }
+	std::cerr << std::endl;
 	if (found && found != obj.get()) {
 		if (!Check_weight(gwin, to_drop, found)) {
 			return false;
@@ -822,7 +826,9 @@ bool Dragging_info::drop_on_map(
 		}
 		// Try to place on 'found'.
 		else if ((lift = found->get_lift() + found->get_info().get_3d_height()) <= max_lift) {
+			std::cerr << "[ExultWorldDrop] phase=surface requestedLift=" << lift << std::endl;
 			dropped = gwin->drop_at_lift(to_drop, posx, posy, lift);
+			std::cerr << "[ExultWorldDrop] phase=surface result=" << dropped << std::endl;
 		} else if (
 				// Object is too tall to drop on.
 				(lift = found->get_info().get_3d_height()) > max_lift) {
@@ -839,7 +845,9 @@ bool Dragging_info::drop_on_map(
 	// Find where to drop it, but stop if
 	//   it will end up hidden (-1).
 	for (lift = old_lift; !dropped && lift <= max_lift; lift++) {
+		std::cerr << "[ExultWorldDrop] phase=fallback requestedLift=" << lift << std::endl;
 		dropped = gwin->drop_at_lift(to_drop, posx, posy, lift);
+		std::cerr << "[ExultWorldDrop] phase=fallback result=" << dropped << std::endl;
 	}
 
 	if (dropped <= 0) {
@@ -1013,6 +1021,7 @@ int Game_window::drop_at_lift(
 	y += at_lift * 4 - 1;
 	const int         tx    = (scrolltx + x / c_tilesize) % c_num_tiles;
 	const int         ty    = (scrollty + y / c_tilesize) % c_num_tiles;
+	std::cerr << "[ExultWorldDrop] drop_at_lift requested=" << at_lift << " tile=(" << tx << "," << ty << ") pixel=(" << x << "," << y << ")" << std::endl;
 	const int         cx    = tx / c_tiles_per_chunk;
 	const int         cy    = ty / c_tiles_per_chunk;
 	Map_chunk*        chunk = map->get_chunk(cx, cy);
@@ -1037,8 +1046,10 @@ int Game_window::drop_at_lift(
 	}
 	if (Map_chunk::is_blocked(
 				info.get_3d_height(), at_lift, tx - xtiles + 1, ty - ytiles + 1, xtiles, ytiles, lift, move_flags, max_drop)) {
+		std::cerr << "[ExultWorldDrop] collision=blocked size=" << xtiles << "x" << ytiles << std::endl;
 		return 0;
 	}
+	std::cerr << "[ExultWorldDrop] collision=clear lift=" << lift << " size=" << xtiles << "x" << ytiles << std::endl;
 
 	// Needs to be reachable, except when it is just lower, so the object can
 	// fall down.
@@ -1068,6 +1079,7 @@ int Game_window::drop_at_lift(
 	cout << "Dropping object at (" << tx << ", " << ty << ", " << lift << ")" << endl;
 #endif
 	// On an egg?
+	std::cerr << "[ExultWorldDrop] success tile=(" << tx << "," << ty << "," << lift << ")" << std::endl;
 	chunk->activate_eggs(to_drop, tx, ty, lift, tx, ty);
 
 	if (to_drop == main_actor) {
