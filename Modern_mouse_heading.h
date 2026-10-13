@@ -10,6 +10,7 @@
 #define EXULT_MODERN_MOUSE_HEADING_H
 
 #include <algorithm>
+#include <cstddef>
 #include <cmath>
 #include <vector>
 
@@ -63,7 +64,7 @@ public:
             std::vector<Point> finer;
             finer.reserve(route.size() * 2);
             finer.push_back(route.front());
-            for (size_t i = 1; i < route.size(); ++i) {
+            for (std::size_t i = 1; i < route.size(); ++i) {
                 const Point a = route[i - 1], b = route[i];
                 finer.push_back({0.75 * a.x + 0.25 * b.x, 0.75 * a.y + 0.25 * b.y});
                 finer.push_back({0.25 * a.x + 0.75 * b.x, 0.25 * a.y + 0.75 * b.y});
@@ -74,7 +75,7 @@ public:
 
         const auto along = [&](double distance) {
             Point p = route.front();
-            for (size_t i = 1; i < route.size(); ++i) {
+            for (std::size_t i = 1; i < route.size(); ++i) {
                 const double dx = route[i].x - p.x, dy = route[i].y - p.y;
                 const double length = std::hypot(dx, dy);
                 if (length >= distance && length > 0.0001)
