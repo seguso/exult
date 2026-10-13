@@ -1441,8 +1441,6 @@ static void Handle_events() {
 			const int ms = SDL_GetMouseState(nullptr, nullptr);
 			if ((SDL_BUTTON_RMASK & ms) && !right_on_gump) {
 				if (modern_mouse_target.should_retarget(gwin->is_modern_mouse_target_enabled(), ticks)) {
-					set_modern_mouse_unreachable_feedback_enabled(gwin->is_modern_mouse_target_enabled());
-				set_modern_mouse_unreachable_feedback_enabled(false);
 				gwin->start_actor_from_display(x, y,
 							gwin->is_modern_mouse_target_enabled()
 								? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
@@ -1912,9 +1910,11 @@ static void Handle_event(SDL_Event& event) {
 				if (!(gwin->is_modern_mouse_target_enabled())) {
 					gwin->get_tqueue()->remove(gwin->get_main_actor());
 				}
+				set_modern_mouse_unreachable_feedback_enabled(gwin->is_modern_mouse_target_enabled());
 				gwin->start_actor_from_display(x, y,
 						gwin->is_modern_mouse_target_enabled()
 							? modern_mouse_walk_speed() : Mouse::mouse()->avatar_speed);
+				set_modern_mouse_unreachable_feedback_enabled(false);
 			}
 		}
 		break;
