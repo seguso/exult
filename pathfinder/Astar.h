@@ -21,6 +21,7 @@
 
 #include "PathFinder.h"
 
+#include <cstddef>
 #include <vector>
 
 class Astar : public PathFinder {
@@ -43,7 +44,10 @@ public:
 		return true;
 	}
 
-	int get_num_steps() override;    // # of steps left to take.
+	int get_num_steps() override;
+	void peek_next_steps(std::vector<Tile_coord>& into, std::size_t limit) const {
+		for (int i = next_index; i != stop && into.size() < limit; i += dir) into.push_back(path[i]);
+	}    // # of steps left to take.
 };
 
 #endif
