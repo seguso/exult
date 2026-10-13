@@ -3,7 +3,6 @@ static int keyboard_speed_layer = -1;
 static Uint32 keyboard_speed_feedback_until = 0;
 static int mouse_unreachable_layer = -1;
 static Uint32 mouse_unreachable_until = 0;
-static bool mouse_unreachable_reported = false;
 
 static void hide_feedback_layer(int& layer, Uint32& until) {
     if (layer >= 0 && gwin) gwin->destroy_layer(layer);
@@ -60,15 +59,12 @@ static void show_keyboard_speed_feedback() {
 
 // Exported to the MMT path code in gamewin.cc.
 void show_modern_mouse_unreachable() {
-    // A continuously held right button retargets every 500ms. Show only once
-    // per failure streak instead of resetting the 1.5-second timer forever.
-    if (mouse_unreachable_reported) return;
-    mouse_unreachable_reported = true;
+    // Every failed request must be visible, including a fresh click after
+    // an earlier notification expired. Holding RMB refreshes the same layer.
     paint_feedback_layer(mouse_unreachable_layer, mouse_unreachable_until,
-                         "Mouse target unreachable", "can't reach", true);
+                         "Mouse target unreachable", "Can't reach", true);
 }
 
 void clear_modern_mouse_unreachable() {
-    // Re-arm for the next failure without prematurely removing the message.
-    mouse_unreachable_reported = false;
+    // No latch: the timed overlay is refreshed on each failed path request.
 }
