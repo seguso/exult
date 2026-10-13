@@ -1895,6 +1895,11 @@ void Game_window::start_actor_alt(
 	const bool modern_mouse_steering = mouse_steering && (modern_movement_enabled || modern_mouse_target_enabled);
 	mouse_walk_visual_dir = modern_mouse_steering ? static_cast<int>(Get_direction4(-aim_dy, aim_dx)) : -1;
 
+	// Smart mouse pathfinding must run before the legacy one-step collision
+	// avoidance. Otherwise a wall beside the Avatar prevents A* from
+	// considering the simple route around that wall.
+#include "Modern_mouse_path.inc"
+
 	if (blocked[dir] && !blocked[(dir + 1) % 8]) {
 		dir = (dir + 1) % 8;
 	} else if (blocked[dir] && !blocked[(dir + 7) % 8]) {
@@ -1920,13 +1925,6 @@ void Game_window::start_actor_alt(
 			return;
 		}
 	}
-
-	// Optional screen-anchored target mode: the cursor's world tile changes
-	// as the smooth camera moves, even with a stationary screen cursor.
-	// Only the temporary walking goal changes; diagonal/Bresenham stepping,
-	// formation and the normal double-right-click pathfinder stay untouched.
-	// Mouse A* target handling, isolated from ordinary Exult walking.
-#include "Modern_mouse_path.inc"
 
 	const int delta = step_tile_delta * c_tilesize;    // Bigger # here avoids jerkiness,
 	// but causes probs. with followers.

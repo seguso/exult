@@ -1,4 +1,4 @@
-// A* mouse-target replan path inside Game_window::start_actor_alt.
+// A* mouse-target path runs before the legacy direct-steering collision gate.
 	if (modern_mouse_steering && modern_mouse_target_enabled) {
 		const int lift = main_actor->get_lift();
 		const int liftpixels = 4 * lift;
