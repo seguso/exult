@@ -1914,11 +1914,6 @@ void Game_window::start_actor_alt(
 		// We already know the blocking object isn't the avatar, so don't
 		// double check it here.
 		if (!block || !block->move_aside(main_actor, dir)) {
-			if (modern_mouse_steering && modern_mouse_target_enabled) {
-				std::cerr << "[MMT/A*] direct steering blocked before A* attempt: avatar=("
-					<< start.tx << ',' << start.ty << ',' << start.tz << ") requested_dir="
-					<< requested_dir << ", adjacent candidates also blocked; move_aside failed.\n";
-			}
 			stop_actor();
 			if (main_actor->get_lift() % 5) {    // Up on something?
 				// See if we're stuck in the air.

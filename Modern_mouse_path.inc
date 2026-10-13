@@ -5,10 +5,7 @@
 		Actor_action* current_action = main_actor->get_action();
 		const bool replan = current_action && current_action->following_smart_path();
 		bool routed = false;
-		Tile_coord chosen;
-		std::size_t attempts = 0;
 		for (const Tile_coord& target : candidates) {
-			++attempts;
 			if (target == current) {
 				stop_actor();
 				return;
@@ -24,25 +21,13 @@
 					continue;
 			}
 			routed = true;
-			chosen = target;
 			break;
 		}
 		if (!routed) {
 			show_modern_mouse_unreachable();
-			std::cerr << "[MMT/A*] no reachable clicked surface: from=("
-				<< current.tx << ',' << current.ty << ',' << current.tz
-				<< ") screen=(" << winx << ',' << winy
-				<< ") tested=" << attempts
-				<< "; old route kept if retargeting.\n";
 			return;
 		}
 		clear_modern_mouse_unreachable();
-		if (attempts > 1) {
-			std::cerr << "[MMT/A*] surface fallback: from=("
-				<< current.tx << ',' << current.ty << ',' << current.tz
-				<< ") selected=(" << chosen.tx << ',' << chosen.ty << ','
-				<< chosen.tz << ") after " << attempts << " candidates.\n";
-		}
 		// The route-heading state is owned by the ACTION, so it survives
 		// 500-ms A* recalculations without resetting the walking frame.
 		if (main_actor->get_action())
