@@ -326,9 +326,6 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 			// Tangent comes from the whole local past+future curve, no time filter.
 			const int heading = sample_modern_mouse_heading(actor, &tile);
 			if (heading >= 0) visual_dir = heading;
-		} else {
-			const int mouse_dir = gwin->get_mouse_walk_visual_dir();
-			if (mouse_dir >= 0) visual_dir = mouse_dir;
 		}
 	}
 	Frames_sequence* frames     = actor->get_frames(visual_dir);

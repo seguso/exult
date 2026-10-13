@@ -11,7 +11,7 @@ static void show_keyboard_speed_feedback() {
 // This branch intentionally predates devmix's overlay-layer API. Keep the
 // movement backport independent of unrelated renderer changes.
 static bool modern_mouse_unreachable_on_down = false;
-static void set_modern_mouse_unreachable_feedback_enabled(bool on) {
+void set_modern_mouse_unreachable_feedback_enabled(bool on) {
     modern_mouse_unreachable_on_down = on;
 }
 void show_modern_mouse_unreachable() {
