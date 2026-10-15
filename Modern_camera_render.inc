@@ -352,6 +352,9 @@ void Game_render::paint_chunk_flat_rles(
 int Game_render::paint_chunk_objects(
 		int cx, int cy    // Chunk coords (0 - 12*16).
 ) {
+	if (diagnostic_chunk_visit) {
+		diagnostic_chunk_visit(cx, cy);
+	}
 	Game_object*      obj;
 	Game_window*      gwin          = Game_window::get_instance();
 	Map_chunk*        olist         = gwin->map->get_chunk(cx, cy);
@@ -395,6 +398,9 @@ void Game_render::paint_object(Game_object* obj) {
 		if (dep && dep->render_seq != render_seq) {
 			paint_object(dep);
 		}
+	}
+	if (diagnostic_object_visit) {
+		diagnostic_object_visit(obj);
 	}
 	int bbox_x, bbox_y;
 	Game_window::get_instance()->get_shape_location(obj, bbox_x, bbox_y);

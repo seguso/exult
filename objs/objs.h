@@ -105,6 +105,7 @@ public:
 	friend class T_Flat_object_iterator<Game_object, Map_chunk*>;
 	friend class T_Object_iterator_backwards<Game_object, Map_chunk*>;
 	friend class Map_chunk;
+	friend class World_ordering_lifecycle_harness;
 
 	Game_object(int shapenum, int framenum, unsigned int tilex, unsigned int tiley, unsigned int lft = 0)
 			: ShapeID(shapenum, framenum), tx(tilex), ty(tiley), lift(lft), quality(0) {}

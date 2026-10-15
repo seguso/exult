@@ -143,6 +143,10 @@ public:
  *  bottom, left-to-right.
  */
 class Map_chunk : public Game_singletons {
+	friend class World_ordering_lifecycle_harness;
+	using Ordering_comparison_callback = void (*)(Map_chunk*, Game_object*, Game_object*, int, int);
+	static Ordering_comparison_callback ordering_comparison_callback;
+
 	Game_map*      map;        // Map we're a part of.
 	Chunk_terrain* terrain;    // Flat landscape tiles.
 	// ->first in list of all objs.  'Flat'

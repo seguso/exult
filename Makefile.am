@@ -56,6 +56,8 @@ EXULTSOURCES =	\
 	effects.h	\
 	headers/exceptions.h	\
 	exult.cc	\
+	tests/world_ordering_lifecycle_harness.cc \
+	tests/world_ordering_lifecycle_harness.h \
 	exult.h		\
 	exulticon.h	\
 	exultmenu.cc	\

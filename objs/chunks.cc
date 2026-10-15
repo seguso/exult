@@ -49,6 +49,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 using std::rand;
 using std::vector;
 
+Map_chunk::Ordering_comparison_callback Map_chunk::ordering_comparison_callback = nullptr;
+
 /*
  *  Create the cached data storage for a chunk.
  */
@@ -754,6 +756,7 @@ void Map_chunk::add_dependencies(
 		// cout << "Here " << __LINE__ << " " << obj << endl;
 		/* Compare returns -1 if lt, 0 if dont_care, 1 if gt. */
 		int cmp = Game_object::compare(newinfo, obj);
+		const int compared_result = cmp;
 		// TODO: Fix this properly, instead of with an ugly hack.
 		// This fixes relative ordering between the Y depression and the Y
 		// shapes in SI. Done so in a way that the depression is not clickable.
@@ -854,6 +857,9 @@ void Map_chunk::add_dependencies(
 					}
 				}
 			}
+		}
+		if (ordering_comparison_callback) {
+			ordering_comparison_callback(this, newobj, obj, compared_result, cmp);
 		}
 		if (cmp == 1) {    // Bigger than this object?
 			newobj->dependencies.insert(obj);

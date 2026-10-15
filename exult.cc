@@ -74,6 +74,7 @@
 #include "sdlrwopsistream.h"
 #include "sdlrwopsostream.h"
 #include "touchui.h"
+#include "tests/world_ordering_lifecycle_harness.h"
 #include "u7drag.h"
 #include "ucmachine.h"
 #include "utils.h"
@@ -207,6 +208,8 @@ static bool   run_sib      = false;        // skip menu and run sib
 static string arg_gamename = "default";    // cmdline arguments
 static string arg_modname  = "default";    // cmdline arguments
 static string arg_configfile;
+static string arg_world_ordering_fixture;
+static string arg_world_ordering_output;
 static int    arg_buildmap     = -1;
 static int    arg_mapnum       = -1;
 static bool   arg_nomenu       = false;
@@ -340,6 +343,8 @@ int main(int argc, char* argv[]) {
 	parameters.declare("--mapnum", &arg_mapnum, -1);
 	parameters.declare("--nocrc", &ignore_crc, true);
 	parameters.declare("-c", &arg_configfile, "");
+	parameters.declare("--world-ordering-fixture", &arg_world_ordering_fixture, "");
+	parameters.declare("--world-ordering-output", &arg_world_ordering_output, "");
 	parameters.declare("--edit", &arg_edit_mode, true);
 	parameters.declare("--write-xml", &arg_write_xml, true);
 	parameters.declare("--reset-video", &arg_reset_video, true);
@@ -368,6 +373,7 @@ int main(int argc, char* argv[]) {
 				"[--mod <mod>]"
 			 << endl
 			 << "             [--nomenu] [--buildmap 0|1|2] [--mapnum <num>]" << endl
+				 << "             [--world-ordering-fixture <jsonl> --world-ordering-output <jsonl>]" << endl
 			 << "             [--nocrc] [--edit] [--write-xml] [--reset-video]" << endl
 			 << "--help\t\tShow this information" << endl
 			 << "--version\tShow version info" << endl
@@ -458,6 +464,13 @@ int main(int argc, char* argv[]) {
 		exit(-1);
 	}
 #endif
+	if (arg_world_ordering_fixture.empty() != arg_world_ordering_output.empty()) {
+		cerr << "Error: --world-ordering-fixture and --world-ordering-output must be used together." << endl;
+		exit(1);
+	} else if (!arg_world_ordering_fixture.empty() && gameparam == 0) {
+		cerr << "Error: world-ordering diagnostics require an explicit game selection." << endl;
+		exit(1);
+	}
 
 	if (arg_mapnum >= 0 && arg_buildmap < 0) {
 		cerr << "Error: '--mapnum' requires '--buildmap'!" << endl;
@@ -1145,7 +1158,9 @@ static void Init() {
 		// Make sure we have a proper palette before playing the intro.
 		gwin->get_pal()->load(BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX), EXULT_FLX_EXULT0_PAL);
 		gwin->get_pal()->apply();
-		if ((!skip_splash && !force_skip_splash) && (Game::get_game_type() != EXULT_DEVEL_GAME || U7exists(INTRO_DAT))) {
+		// A world-ordering fixture needs the initialized game world, not the
+		// interactive intro. Keep the diagnostic runner silent and deterministic.
+		if (arg_world_ordering_fixture.empty() && (!skip_splash && !force_skip_splash) && (Game::get_game_type() != EXULT_DEVEL_GAME || U7exists(INTRO_DAT))) {
 			if (midi) {
 				midi->set_timbre_lib(MyMidiPlayer::TIMBRE_LIB_INTRO);
 			}
@@ -1188,17 +1203,22 @@ static void Init() {
  */
 
 static int Play() {
-	do {
-		quitting_time = QUIT_TIME_NO;
-		Handle_events();
-		if (quitting_time == QUIT_TIME_RESTART) {
-			Mouse::mouse()->hide();    // Turn off mouse.
-			gwin->read();              // Restart
-									   /////gwin->setup_game();
-									   //// setup_game is already being called from inside
-									   //// of gwin->read(), so no need to call it here, I hope...
-		}
-	} while (quitting_time == QUIT_TIME_RESTART);
+	int result = 0;
+	if (!arg_world_ordering_fixture.empty()) {
+		result = World_ordering_lifecycle_harness::run(gwin, arg_world_ordering_fixture, arg_world_ordering_output);
+	} else {
+		do {
+			quitting_time = QUIT_TIME_NO;
+			Handle_events();
+			if (quitting_time == QUIT_TIME_RESTART) {
+				Mouse::mouse()->hide();    // Turn off mouse.
+				gwin->read();              // Restart
+								/////gwin->setup_game();
+								//// setup_game is already being called from inside
+								//// of gwin->read(), so no need to call it here, I hope...
+				}
+		} while (quitting_time == QUIT_TIME_RESTART);
+	}
 
 	delete gwin;
 
@@ -1208,7 +1228,7 @@ static int Play() {
 	Free_text();
 	fontManager.reset();
 	delete game;
-	return 0;
+	return result;
 }
 
 #ifdef USE_EXULTSTUDIO    // Shift-click means 'paint'.
