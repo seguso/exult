@@ -42,6 +42,8 @@
 
 namespace {
 
+constexpr const char* kExultSourceCommit = "0a9b64a6c4f02aafb552fe98d591e9e7d96c8815";
+
 struct Fixture_object {
 	std::string id;
 	int         shape{};
@@ -307,7 +309,8 @@ int World_ordering_lifecycle_harness::run(Game_window* window, const std::string
 		render->diagnostic_chunk_visit  = &World_ordering_lifecycle_harness::on_paint_chunk;
 		render->diagnostic_object_visit = &World_ordering_lifecycle_harness::on_paint_object;
 
-		output << "{\"schemaVersion\":1,\"type\":\"header\",\"exultCommit\":" << json_string(GIT_REVISION)
+		output << "{\"schemaVersion\":1,\"type\":\"header\",\"exultCommit\":" << json_string(kExultSourceCommit)
+			   << ",\"harnessCommit\":" << json_string(GIT_REVISION)
 			   << ",\"game\":";
 		output << json_string(Game::get_game_type() == SERPENT_ISLE ? "si" : "bg") << "}\n";
 

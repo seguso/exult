@@ -59,8 +59,8 @@ they require native runtime Actor/Barge setup rather than static fixture objects
 
 ## Output
 
-The first trace row records the Exult commit and game. Each following step
-records the current object list and non-flat insertion order for inspected
+The first trace row records the Exult source commit, the harness/build commit,
+and game. Each following step records the current object list and non-flat insertion order for inspected
 chunks, both dependency directions, added/removed edges since the previous
 operation, from_below/from_right/from_below_right counters, the actual
 Game_object::compare calls made inside Map_chunk::add_dependencies, the
