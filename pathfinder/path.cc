@@ -371,8 +371,11 @@ static std::vector<std::string> mmt_profile_lines;
 bool mmt_profiling_enabled() { return mmt_profile_enabled; }
 void set_mmt_profiling_enabled(bool enabled) { mmt_profile_enabled = enabled; }
 void append_mmt_profile_line(const std::string& line) {
-    if (mmt_profile_enabled)
-        {\n        if (mmt_profile_lines.size() >= 20000)\n            mmt_profile_lines.erase(mmt_profile_lines.begin());\n        mmt_profile_lines.push_back(line);\n    }
+    if (mmt_profile_enabled) {
+        if (mmt_profile_lines.size() >= 20000)
+            mmt_profile_lines.erase(mmt_profile_lines.begin());
+        mmt_profile_lines.push_back(line);
+    }
 }
 
 std::string save_mmt_profile_log() {
@@ -390,9 +393,9 @@ std::string save_mmt_profile_log() {
     if (!file)
         return {};
     file << "# Exult devmix MMT A* profiling; attempt durations include search only; "
-            "retarget durations include all surface attempts.\\n";
+            "retarget durations include all surface attempts.\n";
     for (const auto& line : mmt_profile_lines)
-        file << line << '\\n';
+        file << line << '\n';
     if (!file.good())
         return {};
     mmt_profile_lines.clear();
