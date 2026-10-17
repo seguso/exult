@@ -41,6 +41,7 @@ private:
 	int                      cheats;
 	int                      feeding;
 	int                      enhancements;
+	bool                     mmt_profiling;
 
 	enum button_ids {
 		id_first = 0,
@@ -59,6 +60,8 @@ private:
 		id_cheats,
 		id_feeding,
 		id_enhancements,
+		id_mmt_profiling,
+		id_save_mmt_profile,
 		id_count
 	};
 
@@ -121,6 +124,9 @@ public:
 	void toggle_feeding(int state) {
 		feeding = state;
 	}
+
+	void toggle_mmt_profiling(int state) { mmt_profiling = state != 0; }
+	void save_mmt_profile();
 
 	void toggle_enhancements(int state) {
 		enhancements = state;
