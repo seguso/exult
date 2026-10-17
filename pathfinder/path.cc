@@ -362,10 +362,12 @@ static bool tracing = false;
 // remains the authoritative source of node counts (including failed routes).
 static thread_local bool mmt_diag_active = false;
 static thread_local Mmt_astar_diagnostics mmt_diag;
+static thread_local int mmt_diag_open_count = 0;
 static thread_local std::chrono::steady_clock::time_point mmt_diag_start;
 
 void begin_mmt_astar_diagnostics() {
     mmt_diag = {};
+    mmt_diag_open_count = 0;
     mmt_diag_active = true;
     mmt_diag_start = std::chrono::steady_clock::now();
 }
@@ -394,12 +396,12 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 	int          max_cost = client->estimate_cost(start, goal);
 	// Create start node.
 	nodes.add(new Search_node(start, 0, max_cost, nullptr));
-	if (mmt_diag_active) { mmt_diag.nodes_generated = 1; mmt_diag.maximum_open = 1; }
+	if (mmt_diag_active) { mmt_diag.nodes_generated = 1; mmt_diag_open_count = 1; mmt_diag.maximum_open = 1; }
 	// Figure when to give up.
 	max_cost = client->get_max_cost(max_cost);
 	Search_node* node;    // Try 'best' node each iteration.
 	while ((node = nodes.pop()) != nullptr) {
-		if (mmt_diag_active) ++mmt_diag.nodes_expanded;
+		if (mmt_diag_active) { ++mmt_diag.nodes_expanded; --mmt_diag_open_count; }
 		if (tracing) {
 			cout << "Goal: (" << goal.tx << ", " << goal.ty << ", " << goal.tz << "), Node: (" << node->get_tile().tx << ", "
 				 << node->get_tile().ty << ", " << node->get_tile().tz << ")" << endl;
@@ -438,13 +440,17 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 			if (!next) {    // Create if necessary.
 				next = new Search_node(ntile, new_cost, new_goal_cost, node);
 				nodes.add(next);
-				if (mmt_diag_active) ++mmt_diag.nodes_generated;
+				if (mmt_diag_active) { ++mmt_diag.nodes_generated; ++mmt_diag_open_count; }
 			} else {
 				// It's going to move.
+				const bool was_open = next->is_open();
 				nodes.remove_from_open(next);
+				if (mmt_diag_active && !was_open) ++mmt_diag_open_count;
 				next->update(new_cost, new_goal_cost, node);
 				nodes.add_back(next);
 			}
+			if (mmt_diag_active && mmt_diag_open_count > mmt_diag.maximum_open)
+				mmt_diag.maximum_open = mmt_diag_open_count;
 		}
 	}
 	// Failed if here.
