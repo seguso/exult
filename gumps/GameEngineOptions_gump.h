@@ -64,6 +64,7 @@ private:
 		id_enhancements,
 		id_mmt_profiling,
 		id_save_mmt_profile,
+		id_reset_mmt_profile,
 		id_mmt_limited_search,
 		id_auto_path_doors,
 		id_count
@@ -133,6 +134,7 @@ public:
 	void toggle_auto_path_doors(int state) { auto_path_doors = state != 0; }
 	void toggle_mmt_profiling(int state) { mmt_profiling = state != 0; }
 	void save_mmt_profile();
+	void reset_mmt_profile();
 
 	void toggle_enhancements(int state) {
 		enhancements = state;
