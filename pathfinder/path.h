@@ -21,6 +21,7 @@
 
 #include "tiles.h"
 
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -36,6 +37,10 @@ struct Mmt_astar_diagnostics {
     int result_steps = 0;
     double elapsed_ms = 0.0;
 };
+bool mmt_profiling_enabled();
+void set_mmt_profiling_enabled(bool enabled);
+void append_mmt_profile_line(const std::string& line);
+std::string save_mmt_profile_log();
 void begin_mmt_astar_diagnostics();
 Mmt_astar_diagnostics end_mmt_astar_diagnostics();
 
