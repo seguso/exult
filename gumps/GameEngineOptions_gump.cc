@@ -263,6 +263,9 @@ void GameEngineOptions_gump::build_buttons() {
 	buttons[id_mmt_budget_slider] = std::make_unique<GameEngineOptions_button>(
 		this, &GameEngineOptions_gump::choose_mmt_budget, "Set node limit",
 		get_button_pos_for_label("MMT off-lift node limit"), yForRow(17), large_size);
+	buttons[id_mmt_final_retry] = std::make_unique<GameEngineTextToggle>(
+		this, &GameEngineOptions_gump::toggle_mmt_final_retry, yesNo,
+		mmt_final_retry, get_button_pos_for_label("MMT final full retry"), yForRow(18), small_size);
 	buttons[id_mmt_limited_search] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_mmt_limited_search, yesNo,
 		mmt_limited_search, get_button_pos_for_label("MMT short off-lift A*"), yForRow(12), small_size);
@@ -341,22 +344,23 @@ void GameEngineOptions_gump::load_settings() {
 	feeding = int(cheat.GetFoodUse(true));
 	mmt_profiling = mmt_profiling_enabled();
 	mmt_limited_search = mmt_limited_search_enabled();
+	mmt_final_retry = mmt_final_retry_enabled();
 	mmt_offlift_budget = mmt_offlift_node_limit();
 	auto_path_doors = automatic_path_doors_enabled();
 }
 
 GameEngineOptions_gump::GameEngineOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(22)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(23)), -1);
 
 	// Ok
 	buttons[id_ok]
-			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::close, Strings::OK(), 25, yForRow(20), 50);
+			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::close, Strings::OK(), 25, yForRow(21), 50);
 	// Help
 	buttons[id_help]
-			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(20), 50);
+			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(21), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameEngineOptions_button>(
-			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(20), 50);
+			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(21), 50);
 
 	load_settings();
 	build_buttons();
@@ -388,6 +392,7 @@ void GameEngineOptions_gump::save_settings() {
 	config->set("config/gameplay/gumps_dont_pause_game", gumps_pause ? "no" : "yes", false);
 	set_mmt_profiling_enabled(mmt_profiling);
 	set_mmt_limited_search_enabled(mmt_limited_search);
+	set_mmt_final_retry_enabled(mmt_final_retry);
 	set_mmt_offlift_node_limit(mmt_offlift_budget);
 	set_automatic_path_doors_enabled(auto_path_doors);
 	config->write_back();
@@ -421,5 +426,6 @@ void GameEngineOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), "MMT profile file", x + label_margin, y + yForRow(15) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT reset statistics", x + label_margin, y + yForRow(16) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT off-lift node limit", x + label_margin, y + yForRow(17) + 1);
+	font->paint_text(iwin->get_ib8(), "MMT final full retry", x + label_margin, y + yForRow(18) + 1);
 	gwin->set_painted();
 }
