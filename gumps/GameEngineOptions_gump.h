@@ -43,6 +43,7 @@ private:
 	int                      enhancements;
 	bool                     mmt_profiling;
 	bool                     mmt_limited_search;
+	bool                     mmt_final_retry;
 	int                      mmt_offlift_budget;
 	bool                     auto_path_doors;
 
@@ -67,6 +68,7 @@ private:
 		id_save_mmt_profile,
 		id_reset_mmt_profile,
 		id_mmt_limited_search,
+		id_mmt_final_retry,
 		id_mmt_budget_slider,
 		id_auto_path_doors,
 		id_count
@@ -132,6 +134,7 @@ public:
 		feeding = state;
 	}
 
+	void toggle_mmt_final_retry(int state) { mmt_final_retry = state != 0; }
 	void toggle_mmt_limited_search(int state) { mmt_limited_search = state != 0; }
 	void toggle_auto_path_doors(int state) { auto_path_doors = state != 0; }
 	void toggle_mmt_profiling(int state) { mmt_profiling = state != 0; }
