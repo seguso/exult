@@ -36,6 +36,7 @@
 #include "Configuration.h"
 #include "Enabled_button.h"
 #include "GameEngineOptions_gump.h"
+#include "Slider_gump.h"
 #include "Gump_ToggleButton.h"
 #include "Gump_button.h"
 #include "Gump_manager.h"
@@ -165,6 +166,14 @@ void GameEngineOptions_gump::close() {
 	done = true;
 }
 
+void GameEngineOptions_gump::choose_mmt_budget() {
+    Slider_gump slider(0, 1000, 25, mmt_offlift_budget, true);
+    gwin->get_gump_man()->do_modal_gump(&slider, Mouse::hand);
+    mmt_offlift_budget = slider.get_val();
+    build_buttons();
+    gwin->set_all_dirty();
+}
+
 void GameEngineOptions_gump::reset_mmt_profile() {
     reset_mmt_profile_log();
     std::cout << "MMT profiling statistics reset.\n";
@@ -251,9 +260,12 @@ void GameEngineOptions_gump::build_buttons() {
 	buttons[id_mmt_profiling] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_mmt_profiling, yesNo,
 		mmt_profiling, get_button_pos_for_label("MMT profiling"), yForRow(14), small_size);
+	buttons[id_mmt_budget_slider] = std::make_unique<GameEngineOptions_button>(
+		this, &GameEngineOptions_gump::choose_mmt_budget, "Set node limit",
+		get_button_pos_for_label("MMT off-lift node limit"), yForRow(17), large_size);
 	buttons[id_mmt_limited_search] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_mmt_limited_search, yesNo,
-		mmt_limited_search, get_button_pos_for_label("MMT short off-lift A* (1000)"), yForRow(12), small_size);
+		mmt_limited_search, get_button_pos_for_label("MMT short off-lift A*"), yForRow(12), small_size);
 	buttons[id_auto_path_doors] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_auto_path_doors, yesNo,
 		auto_path_doors, get_button_pos_for_label("Auto-open path doors"), yForRow(13), small_size);
@@ -329,21 +341,22 @@ void GameEngineOptions_gump::load_settings() {
 	feeding = int(cheat.GetFoodUse(true));
 	mmt_profiling = mmt_profiling_enabled();
 	mmt_limited_search = mmt_limited_search_enabled();
+	mmt_offlift_budget = mmt_offlift_node_limit();
 	auto_path_doors = automatic_path_doors_enabled();
 }
 
 GameEngineOptions_gump::GameEngineOptions_gump() : Modal_gump(nullptr, -1) {
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(21)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(22)), -1);
 
 	// Ok
 	buttons[id_ok]
-			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::close, Strings::OK(), 25, yForRow(19), 50);
+			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::close, Strings::OK(), 25, yForRow(20), 50);
 	// Help
 	buttons[id_help]
-			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(19), 50);
+			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(20), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameEngineOptions_button>(
-			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(19), 50);
+			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(20), 50);
 
 	load_settings();
 	build_buttons();
@@ -375,6 +388,7 @@ void GameEngineOptions_gump::save_settings() {
 	config->set("config/gameplay/gumps_dont_pause_game", gumps_pause ? "no" : "yes", false);
 	set_mmt_profiling_enabled(mmt_profiling);
 	set_mmt_limited_search_enabled(mmt_limited_search);
+	set_mmt_offlift_node_limit(mmt_offlift_budget);
 	set_automatic_path_doors_enabled(auto_path_doors);
 	config->write_back();
 }
@@ -406,5 +420,6 @@ void GameEngineOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), "MMT profiling", x + label_margin, y + yForRow(14) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT profile file", x + label_margin, y + yForRow(15) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT reset statistics", x + label_margin, y + yForRow(16) + 1);
+	font->paint_text(iwin->get_ib8(), "MMT off-lift node limit", x + label_margin, y + yForRow(17) + 1);
 	gwin->set_painted();
 }
