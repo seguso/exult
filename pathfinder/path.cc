@@ -369,12 +369,22 @@ static bool mmt_profile_enabled = false;
 static bool mmt_limit_enabled = false;
 static bool auto_path_doors_enabled = true;
 static thread_local bool mmt_path_search_active = false;
+static thread_local int mmt_path_expansion_limit = 0;
+static thread_local bool mmt_budget_exhausted = false;
 bool mmt_limited_search_enabled() { return mmt_limit_enabled; }
 void set_mmt_limited_search_enabled(bool enabled) { mmt_limit_enabled = enabled; }
 bool automatic_path_doors_enabled() { return auto_path_doors_enabled; }
 void set_automatic_path_doors_enabled(bool enabled) { auto_path_doors_enabled = enabled; }
-void begin_mmt_path_search() { mmt_path_search_active = true; }
-void end_mmt_path_search() { mmt_path_search_active = false; }
+void begin_mmt_path_search(int expansion_limit) {
+    mmt_path_search_active = true;
+    mmt_path_expansion_limit = expansion_limit;
+    mmt_budget_exhausted = false;
+}
+bool mmt_path_search_budget_exhausted() { return mmt_budget_exhausted; }
+void end_mmt_path_search() {
+    mmt_path_search_active = false;
+    mmt_path_expansion_limit = 0;
+}
 static std::vector<std::string> mmt_profile_lines;
 
 bool mmt_profiling_enabled() { return mmt_profile_enabled; }
@@ -457,8 +467,11 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 	while ((node = nodes.pop()) != nullptr) {
 		// Experimental MMT-only bounded work. Non-MMT Find_path is unchanged.
 		// A failed smart-path replan retains the previous action.
-		if (mmt_path_search_active && mmt_limit_enabled && ++mmt_expanded > 2500)
+		if (mmt_path_search_active && mmt_limit_enabled &&
+			mmt_path_expansion_limit > 0 && ++mmt_expanded > mmt_path_expansion_limit) {
+			mmt_budget_exhausted = true;
 			return {{}, false};
+		}
 		if (mmt_diag_active) { ++mmt_diag.nodes_expanded; --mmt_diag_open_count; }
 		if (tracing) {
 			cout << "Goal: (" << goal.tx << ", " << goal.ty << ", " << goal.tz << "), Node: (" << node->get_tile().tx << ", "
