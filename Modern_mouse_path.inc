@@ -4,12 +4,7 @@
 		const std::vector<Tile_coord> candidates = modern_mouse_surface_targets(winx, winy);
 		Actor_action* current_action = main_actor->get_action();
 		const bool replan = current_action && current_action->following_smart_path();
-		// Explicit, disabled-by-default comparison with Ult SpikeCapture.
-		// Enable with EXULT_MMT_ASTAR_LOG=1 before starting Exult.
-		static const bool mmt_log = []() {
-			const char* value = std::getenv("EXULT_MMT_ASTAR_LOG");
-			return value && value[0] == '1' && value[1] == '\0';
-		}();
+		const bool mmt_log = mmt_profiling_enabled();
 		const auto mmt_begin = std::chrono::steady_clock::now();
 		int attempt = 0;
 		bool routed = false;
@@ -30,7 +25,8 @@
 			}
 			if (mmt_log) {
 				const auto diag = end_mmt_astar_diagnostics();
-				std::cerr << "[MMT_ASTAR] attempt=" << ++attempt
+				std::ostringstream mmt_line;
+				mmt_line << "[MMT_ASTAR] attempt=" << ++attempt
 					<< " start=(" << current.tx << "," << current.ty << "," << current.tz << ")"
 					<< " goal=(" << target.tx << "," << target.ty << "," << target.tz << ")"
 					<< " replan=" << replan << " success=" << accepted
@@ -40,7 +36,8 @@
 					<< " max_open=" << diag.maximum_open
 					<< " neighbor_checks=" << diag.neighbor_checks
 					<< " steps=" << diag.result_steps
-					<< " ms=" << diag.elapsed_ms << '\n';
+					<< " ms=" << diag.elapsed_ms;
+				append_mmt_profile_line(mmt_line.str());
 			}
 			if (!accepted) continue;
 			routed = true;
@@ -52,7 +49,8 @@
 			std::cerr << "[MMT_RETARGET] start=(" << current.tx << ","
 				<< current.ty << "," << current.tz << ")"
 				<< " candidates=" << candidates.size() << " attempts=" << attempt
-				<< " success=" << routed << " ms=" << elapsed << '\n';
+				<< " success=" << routed << " ms=" << elapsed;
+			append_mmt_profile_line(mmt_line.str());
 		}
 		if (!routed) {
 			show_modern_mouse_unreachable();
