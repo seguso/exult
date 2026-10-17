@@ -38,6 +38,12 @@ struct Mmt_astar_diagnostics {
     double elapsed_ms = 0.0;
 };
 bool mmt_profiling_enabled();
+bool mmt_limited_search_enabled();
+void set_mmt_limited_search_enabled(bool enabled);
+bool automatic_path_doors_enabled();
+void set_automatic_path_doors_enabled(bool enabled);
+void begin_mmt_path_search();
+void end_mmt_path_search();
 void set_mmt_profiling_enabled(bool enabled);
 void append_mmt_profile_line(const std::string& line);
 std::string save_mmt_profile_log();
