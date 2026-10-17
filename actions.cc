@@ -37,6 +37,7 @@
 #include "monstinf.h"
 #include "party.h"
 #include "paths.h"
+#include "pathfinder/path.h"
 #include "ucmachine.h"
 
 #include <cstdlib>
@@ -371,7 +372,7 @@ int Path_walking_actor_action::handle_event(Actor* actor) {
 	reached_end = false;
 	frames->decrement(step_index);    // We didn't take the step.
 	// Blocked by a door?
-	if (actor->distance(tile) <= 2 && !cheat.in_map_editor() &&    // And NOT map-editing?
+	if (automatic_path_doors_enabled() && actor->distance(tile) <= 2 && !cheat.in_map_editor() &&    // And NOT map-editing?
 		actor->is_sentient()) {
 		Game_object* door = Game_object::find_door(tile);
 		if (door != nullptr && door->is_closed_door() &&
