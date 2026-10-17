@@ -75,6 +75,8 @@
 #include "objiter.h"
 #include "party.h"
 #include "paths.h"
+#include "pathfinder/path.h"
+#include <chrono>
 #include "scene_layer.h"
 #include "schedule.h"
 #include "spellbook.h"
