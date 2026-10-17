@@ -61,7 +61,7 @@
 		// A distant raised platform may be the only reachable destination.
 		// Retry the first budget-truncated higher/lower surface with the
 		// original unbounded A* policy, only after all lower picks fail.
-		if (!routed && has_deferred)
+		if (!routed && has_deferred && mmt_final_retry_enabled())
 			routed = attempt_route(deferred_target, true);
 		if (mmt_log) {
 			const auto elapsed = std::chrono::duration<double, std::milli>(
