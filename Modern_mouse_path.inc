@@ -8,22 +8,21 @@
 		const auto mmt_begin = std::chrono::steady_clock::now();
 		int attempt = 0;
 		bool routed = false;
-		for (const Tile_coord& target : candidates) {
-			if (target == current) {
-				stop_actor();
-				return;
-			}
-			begin_mmt_path_search();
+		bool has_deferred = false;
+		Tile_coord deferred_target;
+		auto attempt_route = [&](const Tile_coord& target, bool full_retry) {
+			const int limit = !full_retry && target.tz != current.tz ? 1000 : 0;
+			begin_mmt_path_search(limit);
 			if (mmt_log) begin_mmt_astar_diagnostics();
 			bool accepted = false;
 			if (replan) {
-				// A failed replan leaves the old A* action, time queue, walk
-				// phase and path intact. Try the next lower surface.
+				// Failed replans retain the existing path and walk phase.
 				accepted = current_action->retarget_smart_path(main_actor, target);
 				if (accepted) main_actor->set_frame_time(speed);
 			} else {
 				accepted = main_actor->walk_path_to_tile(target, speed);
 			}
+			const bool budget_exhausted = mmt_path_search_budget_exhausted();
 			if (mmt_log) {
 				const auto diag = end_mmt_astar_diagnostics();
 				std::ostringstream mmt_line;
@@ -37,14 +36,33 @@
 					<< " max_open=" << diag.maximum_open
 					<< " neighbor_checks=" << diag.neighbor_checks
 					<< " steps=" << diag.result_steps
+					<< " limit=" << (mmt_limited_search_enabled() ? limit : 0)
+					<< " budget_exhausted=" << budget_exhausted
+					<< " final_retry=" << full_retry
 					<< " ms=" << diag.elapsed_ms;
 				append_mmt_profile_line(mmt_line.str());
 			}
 			end_mmt_path_search();
-			if (!accepted) continue;
+			if (!accepted && budget_exhausted && !has_deferred) {
+				has_deferred = true;
+				deferred_target = target;
+			}
+			return accepted;
+		};
+		for (const Tile_coord& target : candidates) {
+			if (target == current) {
+				stop_actor();
+				return;
+			}
+			if (!attempt_route(target, false)) continue;
 			routed = true;
 			break;
 		}
+		// A distant raised platform may be the only reachable destination.
+		// Retry the first budget-truncated higher/lower surface with the
+		// original unbounded A* policy, only after all lower picks fail.
+		if (!routed && has_deferred)
+			routed = attempt_route(deferred_target, true);
 		if (mmt_log) {
 			const auto elapsed = std::chrono::duration<double, std::milli>(
 				std::chrono::steady_clock::now() - mmt_begin).count();
