@@ -387,6 +387,8 @@ void append_mmt_profile_line(const std::string& line) {
     }
 }
 
+void reset_mmt_profile_log() { mmt_profile_lines.clear(); }
+
 std::string save_mmt_profile_log() {
     const auto now = std::time(nullptr);
     std::tm stamp{};
