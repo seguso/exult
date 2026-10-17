@@ -372,7 +372,7 @@ bool mmt_profiling_enabled() { return mmt_profile_enabled; }
 void set_mmt_profiling_enabled(bool enabled) { mmt_profile_enabled = enabled; }
 void append_mmt_profile_line(const std::string& line) {
     if (mmt_profile_enabled)
-        mmt_profile_lines.push_back(line);
+        {\n        if (mmt_profile_lines.size() >= 20000)\n            mmt_profile_lines.erase(mmt_profile_lines.begin());\n        mmt_profile_lines.push_back(line);\n    }
 }
 
 std::string save_mmt_profile_log() {
