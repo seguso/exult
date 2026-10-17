@@ -47,6 +47,7 @@ void end_mmt_path_search();
 void set_mmt_profiling_enabled(bool enabled);
 void append_mmt_profile_line(const std::string& line);
 std::string save_mmt_profile_log();
+void reset_mmt_profile_log();
 void begin_mmt_astar_diagnostics();
 Mmt_astar_diagnostics end_mmt_astar_diagnostics();
 
