@@ -37,6 +37,7 @@
 					<< " search_found=" << diag.found
 					<< " expanded=" << diag.nodes_expanded
 					<< " generated=" << diag.nodes_generated
+					<< " max_open=" << diag.maximum_open
 					<< " neighbor_checks=" << diag.neighbor_checks
 					<< " steps=" << diag.result_steps
 					<< " ms=" << diag.elapsed_ms << '\n';
