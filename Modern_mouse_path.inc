@@ -13,6 +13,7 @@
 				stop_actor();
 				return;
 			}
+			begin_mmt_path_search();
 			if (mmt_log) begin_mmt_astar_diagnostics();
 			bool accepted = false;
 			if (replan) {
@@ -39,6 +40,7 @@
 					<< " ms=" << diag.elapsed_ms;
 				append_mmt_profile_line(mmt_line.str());
 			}
+			end_mmt_path_search();
 			if (!accepted) continue;
 			routed = true;
 			break;
