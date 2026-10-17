@@ -253,7 +253,7 @@ void GameEngineOptions_gump::build_buttons() {
 		mmt_profiling, get_button_pos_for_label("MMT profiling"), yForRow(14), small_size);
 	buttons[id_mmt_limited_search] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_mmt_limited_search, yesNo,
-		mmt_limited_search, get_button_pos_for_label("MMT limit A* to 2500 nodes"), yForRow(12), small_size);
+		mmt_limited_search, get_button_pos_for_label("MMT short off-lift A* (1000)"), yForRow(12), small_size);
 	buttons[id_auto_path_doors] = std::make_unique<GameEngineTextToggle>(
 		this, &GameEngineOptions_gump::toggle_auto_path_doors, yesNo,
 		auto_path_doors, get_button_pos_for_label("Auto-open path doors"), yForRow(13), small_size);
@@ -401,7 +401,7 @@ void GameEngineOptions_gump::paint() {
 	if (buttons[id_feeding]) {
 		font->paint_text(iwin->get_ib8(), Strings::Feeding_(), x + label_margin, y + yForRow(++y_index) + 1);
 	}
-	font->paint_text(iwin->get_ib8(), "MMT limit A* to 2500 nodes", x + label_margin, y + yForRow(12) + 1);
+	font->paint_text(iwin->get_ib8(), "MMT short off-lift A* (1000)", x + label_margin, y + yForRow(12) + 1);
 	font->paint_text(iwin->get_ib8(), "Auto-open path doors", x + label_margin, y + yForRow(13) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT profiling", x + label_margin, y + yForRow(14) + 1);
 	font->paint_text(iwin->get_ib8(), "MMT profile file", x + label_margin, y + yForRow(15) + 1);
