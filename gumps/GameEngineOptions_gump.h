@@ -42,6 +42,8 @@ private:
 	int                      feeding;
 	int                      enhancements;
 	bool                     mmt_profiling;
+	bool                     mmt_limited_search;
+	bool                     auto_path_doors;
 
 	enum button_ids {
 		id_first = 0,
@@ -62,6 +64,8 @@ private:
 		id_enhancements,
 		id_mmt_profiling,
 		id_save_mmt_profile,
+		id_mmt_limited_search,
+		id_auto_path_doors,
 		id_count
 	};
 
@@ -125,6 +129,8 @@ public:
 		feeding = state;
 	}
 
+	void toggle_mmt_limited_search(int state) { mmt_limited_search = state != 0; }
+	void toggle_auto_path_doors(int state) { auto_path_doors = state != 0; }
 	void toggle_mmt_profiling(int state) { mmt_profiling = state != 0; }
 	void save_mmt_profile();
 
