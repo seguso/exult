@@ -39,6 +39,8 @@ struct Mmt_astar_diagnostics {
 };
 bool mmt_profiling_enabled();
 bool mmt_limited_search_enabled();
+bool mmt_final_retry_enabled();
+void set_mmt_final_retry_enabled(bool enabled);
 int mmt_offlift_node_limit();
 void set_mmt_offlift_node_limit(int value);
 void set_mmt_limited_search_enabled(bool enabled);
