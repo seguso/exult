@@ -11,7 +11,7 @@
 		bool has_deferred = false;
 		Tile_coord deferred_target;
 		auto attempt_route = [&](const Tile_coord& target, bool full_retry) {
-			const int limit = !full_retry && target.tz != current.tz ? 1000 : 0;
+			const int limit = !full_retry && target.tz != current.tz ? mmt_offlift_node_limit() : 0;
 			begin_mmt_path_search(limit);
 			if (mmt_log) begin_mmt_astar_diagnostics();
 			bool accepted = false;
