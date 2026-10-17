@@ -46,7 +46,8 @@
 		if (mmt_log) {
 			const auto elapsed = std::chrono::duration<double, std::milli>(
 				std::chrono::steady_clock::now() - mmt_begin).count();
-			std::cerr << "[MMT_RETARGET] start=(" << current.tx << ","
+			std::ostringstream mmt_line;
+			mmt_line << "[MMT_RETARGET] start=(" << current.tx << ","
 				<< current.ty << "," << current.tz << ")"
 				<< " candidates=" << candidates.size() << " attempts=" << attempt
 				<< " success=" << routed << " ms=" << elapsed;
