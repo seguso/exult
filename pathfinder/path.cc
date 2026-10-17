@@ -29,6 +29,11 @@
 #include "hash_utils.h"
 
 #include <chrono>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <string>
 #include <iostream>
 #include <vector>
 
@@ -360,6 +365,40 @@ static bool tracing = false;
 
 // Only enabled around an explicit Modern Mouse Target attempt. The search
 // remains the authoritative source of node counts (including failed routes).
+static bool mmt_profile_enabled = false;
+static std::vector<std::string> mmt_profile_lines;
+
+bool mmt_profiling_enabled() { return mmt_profile_enabled; }
+void set_mmt_profiling_enabled(bool enabled) { mmt_profile_enabled = enabled; }
+void append_mmt_profile_line(const std::string& line) {
+    if (mmt_profile_enabled)
+        mmt_profile_lines.push_back(line);
+}
+
+std::string save_mmt_profile_log() {
+    const auto now = std::time(nullptr);
+    std::tm stamp{};
+#if defined(_WIN32)
+    localtime_s(&stamp, &now);
+#else
+    localtime_r(&now, &stamp);
+#endif
+    std::ostringstream filename;
+    filename << "exult-mmt-profile-" << std::put_time(&stamp, "%Y%m%d-%H%M%S")
+             << ".txt";
+    std::ofstream file(filename.str(), std::ios::out | std::ios::trunc);
+    if (!file)
+        return {};
+    file << "# Exult devmix MMT A* profiling; attempt durations include search only; "
+            "retarget durations include all surface attempts.\\n";
+    for (const auto& line : mmt_profile_lines)
+        file << line << '\\n';
+    if (!file.good())
+        return {};
+    mmt_profile_lines.clear();
+    return filename.str();
+}
+
 static thread_local bool mmt_diag_active = false;
 static thread_local Mmt_astar_diagnostics mmt_diag;
 static thread_local int mmt_diag_open_count = 0;
