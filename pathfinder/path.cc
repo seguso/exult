@@ -367,12 +367,15 @@ static bool tracing = false;
 // remains the authoritative source of node counts (including failed routes).
 static bool mmt_profile_enabled = false;
 static bool mmt_limit_enabled = false;
+static bool mmt_final_retry_enabled_value = true;
 static int mmt_offlift_limit = 1000;
 static bool auto_path_doors_enabled = true;
 static thread_local bool mmt_path_search_active = false;
 static thread_local int mmt_path_expansion_limit = 0;
 static thread_local bool mmt_budget_exhausted = false;
 bool mmt_limited_search_enabled() { return mmt_limit_enabled; }
+bool mmt_final_retry_enabled() { return mmt_final_retry_enabled_value; }
+void set_mmt_final_retry_enabled(bool enabled) { mmt_final_retry_enabled_value = enabled; }
 int mmt_offlift_node_limit() { return mmt_offlift_limit; }
 void set_mmt_offlift_node_limit(int value) { mmt_offlift_limit = value < 0 ? 0 : (value > 1000 ? 1000 : value); }
 void set_mmt_limited_search_enabled(bool enabled) { mmt_limit_enabled = enabled; }
