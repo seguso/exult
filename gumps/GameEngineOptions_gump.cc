@@ -50,6 +50,7 @@
 #include "gamewin.h"
 #include "pathfinder/path.h"
 #include "items.h"
+#include "mouse.h"
 
 #include <array>
 #include <cstring>
@@ -170,7 +171,6 @@ void GameEngineOptions_gump::choose_mmt_budget() {
     Slider_gump slider(0, 1000, 25, mmt_offlift_budget, true);
     gwin->get_gump_man()->do_modal_gump(&slider, Mouse::hand);
     mmt_offlift_budget = slider.get_val();
-    build_buttons();
     gwin->set_all_dirty();
 }
 
