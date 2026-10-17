@@ -43,6 +43,7 @@ private:
 	int                      enhancements;
 	bool                     mmt_profiling;
 	bool                     mmt_limited_search;
+	int                      mmt_offlift_budget;
 	bool                     auto_path_doors;
 
 	enum button_ids {
@@ -66,6 +67,7 @@ private:
 		id_save_mmt_profile,
 		id_reset_mmt_profile,
 		id_mmt_limited_search,
+		id_mmt_budget_slider,
 		id_auto_path_doors,
 		id_count
 	};
@@ -135,6 +137,7 @@ public:
 	void toggle_mmt_profiling(int state) { mmt_profiling = state != 0; }
 	void save_mmt_profile();
 	void reset_mmt_profile();
+	void choose_mmt_budget();
 
 	void toggle_enhancements(int state) {
 		enhancements = state;
