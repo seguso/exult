@@ -26,6 +26,19 @@
 
 class Pathfinder_client;
 
+// Opt-in, synchronous MMT A* diagnostics; no effect on route selection.
+struct Mmt_astar_diagnostics {
+    bool found = false;
+    int nodes_generated = 0;
+    int nodes_expanded = 0;
+    int maximum_open = 0;
+    int neighbor_checks = 0;
+    int result_steps = 0;
+    double elapsed_ms = 0.0;
+};
+void begin_mmt_astar_diagnostics();
+Mmt_astar_diagnostics end_mmt_astar_diagnostics();
+
 std::pair<std::vector<Tile_coord>, bool> Find_path(const Tile_coord&, const Tile_coord&, const Pathfinder_client* client);
 
 #endif
