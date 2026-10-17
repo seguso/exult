@@ -324,10 +324,10 @@ GameEngineOptions_gump::GameEngineOptions_gump() : Modal_gump(nullptr, -1) {
 			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::close, Strings::OK(), 25, yForRow(16), 50);
 	// Help
 	buttons[id_help]
-			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(12), 50);
+			= std::make_unique<GameEngineOptions_button>(this, &GameEngineOptions_gump::help, Strings::HELP(), 50, yForRow(16), 50);
 	// Cancel
 	buttons[id_cancel] = std::make_unique<GameEngineOptions_button>(
-			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(12), 50);
+			this, &GameEngineOptions_gump::cancel, Strings::CANCEL(), 75, yForRow(16), 50);
 
 	load_settings();
 	build_buttons();
@@ -384,6 +384,6 @@ void GameEngineOptions_gump::paint() {
 		font->paint_text(iwin->get_ib8(), Strings::Feeding_(), x + label_margin, y + yForRow(++y_index) + 1);
 	}
 	font->paint_text(iwin->get_ib8(), "MMT profiling", x + label_margin, y + yForRow(12) + 1);
-	font->paint_text(iwin->get_ib8(), "MMT profile file", x + label_margin, y + yForRow(12) + 1);
+	font->paint_text(iwin->get_ib8(), "MMT profile file", x + label_margin, y + yForRow(13) + 1);
 	gwin->set_painted();
 }
