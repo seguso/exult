@@ -28,6 +28,7 @@
 #include "exult_constants.h"
 #include "hash_utils.h"
 
+#include <chrono>
 #include <iostream>
 #include <vector>
 
@@ -357,6 +358,27 @@ public:
 
 static bool tracing = false;
 
+// Only enabled around an explicit Modern Mouse Target attempt. The search
+// remains the authoritative source of node counts (including failed routes).
+static thread_local bool mmt_diag_active = false;
+static thread_local Mmt_astar_diagnostics mmt_diag;
+static thread_local std::chrono::steady_clock::time_point mmt_diag_start;
+
+void begin_mmt_astar_diagnostics() {
+    mmt_diag = {};
+    mmt_diag_active = true;
+    mmt_diag_start = std::chrono::steady_clock::now();
+}
+
+Mmt_astar_diagnostics end_mmt_astar_diagnostics() {
+    if (mmt_diag_active) {
+        mmt_diag.elapsed_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - mmt_diag_start).count();
+    }
+    mmt_diag_active = false;
+    return mmt_diag;
+}
+
 /*
  *  First cut at using the A* pathfinding algorithm.
  *
@@ -372,10 +394,12 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 	int          max_cost = client->estimate_cost(start, goal);
 	// Create start node.
 	nodes.add(new Search_node(start, 0, max_cost, nullptr));
+	if (mmt_diag_active) { mmt_diag.nodes_generated = 1; mmt_diag.maximum_open = 1; }
 	// Figure when to give up.
 	max_cost = client->get_max_cost(max_cost);
 	Search_node* node;    // Try 'best' node each iteration.
 	while ((node = nodes.pop()) != nullptr) {
+		if (mmt_diag_active) ++mmt_diag.nodes_expanded;
 		if (tracing) {
 			cout << "Goal: (" << goal.tx << ", " << goal.ty << ", " << goal.tz << "), Node: (" << node->get_tile().tx << ", "
 				 << node->get_tile().ty << ", " << node->get_tile().tz << ")" << endl;
@@ -383,12 +407,15 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 		const Tile_coord curtile = node->get_tile();
 		if (client->at_goal(curtile, goal)) {
 			// Success.
-			return {node->create_path(), true};
+			auto path = node->create_path();
+			if (mmt_diag_active) { mmt_diag.found = true; mmt_diag.result_steps = static_cast<int>(path.size()); }
+			return {std::move(path), true};
 		}
 		// Go through surrounding tiles.
 		Neighbor_iterator get_next(curtile);
 		Tile_coord        ntile(0, 0, 0);
 		while (get_next(ntile)) {
+			if (mmt_diag_active) ++mmt_diag.neighbor_checks;
 			// Get cost to next tile.
 			const int step_cost = client->get_step_cost(curtile, ntile);
 			// Blocked?
@@ -411,6 +438,7 @@ std::pair<std::vector<Tile_coord>, bool> Find_path(
 			if (!next) {    // Create if necessary.
 				next = new Search_node(ntile, new_cost, new_goal_cost, node);
 				nodes.add(next);
+				if (mmt_diag_active) ++mmt_diag.nodes_generated;
 			} else {
 				// It's going to move.
 				nodes.remove_from_open(next);
