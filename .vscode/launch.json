@@ -2,6 +2,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Exult Studio (connect to running Exult)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/exult_studio.exe",
+            "args": [
+                "-c",
+                "${env:LOCALAPPDATA}/Exult/exult.cfg",
+                "-g",
+                "blackgate"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false
+        },
+        {
             "name": "Launch Ultima 6 Release (No Debugger)",
             "type": "cppvsdbg",
             "request": "launch",
