@@ -32,6 +32,7 @@
 #include "vgafile.h"
 
 #include <array>
+#include <cmath>
 #include <memory>
 #include <string>    // STL string
 #include <vector>
