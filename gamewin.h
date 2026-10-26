@@ -862,6 +862,25 @@ public:
 			int horizontal_compensation, int vertical_compensation,
 			int horizontal_width, int vertical_width, int beam_sigma);
 	void display_to_world(int& x, int& y) const;
+	// Convert a click against the ACTUALLY PAINTED smooth-camera frame.
+	// The painter temporarily installs interpolated scroll and restores
+	// logical scroll afterward; regular display_to_world only undoes
+	// the 45-degree projection.
+	void display_to_rendered_world(int& x, int& y) const {
+		display_to_world(x, y);
+		if (!modern_movement_enabled || !smooth_cam_valid) {
+			return;
+		}
+		const int period = c_num_tiles * c_tilesize;
+		auto offset = [period](double difference) {
+			double d = std::fmod(difference, static_cast<double>(period));
+			if (d > period / 2) d -= period;
+			if (d < -period / 2) d += period;
+			return static_cast<int>(std::lround(d));
+		};
+		x -= offset(scrolltx * c_tilesize + scrolltx_lo - smooth_cam_x);
+		y -= offset(scrollty * c_tilesize + scrollty_lo - smooth_cam_y);
+	}
 	void world_to_display(int& x, int& y) const;
 	void get_world_scene_bounds(int& x, int& y, int& w, int& h) const;
 	void start_actor_from_display(int x, int y, int speed = 125);
