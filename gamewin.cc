@@ -2346,7 +2346,7 @@ void Game_window::show_items(
 			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
-		display_to_rendered_world(world_x, world_y);
+		display_to_world(world_x, world_y);
 		obj = find_object(world_x, world_y);
 	}
 
@@ -2500,7 +2500,7 @@ void Game_window::paused_combat_select(
 	if (gump) {
 		return;    // Ignore if clicked on gump.
 	}
-	display_to_rendered_world(x, y);
+	display_to_world(x, y);
 	Game_object* obj = find_object(x, y);
 	Actor*       npc = obj ? obj->as_actor() : nullptr;
 	if (!npc || !npc->is_in_party() || npc->get_flag(Obj_flags::asleep) || npc->is_dead() || npc->get_flag(Obj_flags::paralyzed)
@@ -2517,7 +2517,7 @@ void Game_window::paused_combat_select(
 	if (!Get_click(x, y, Mouse::greenselect, nullptr, true)) {
 		return;
 	}
-	display_to_rendered_world(x, y);
+	display_to_world(x, y);
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {                 // Nothing?  Walk there.
 		// Needs work if lift > 0.
@@ -2587,7 +2587,7 @@ void Game_window::double_clicked(
 
 	// If gump manager didn't handle it, we search the world for an object
 	if (!gump) {
-		display_to_rendered_world(x, y);
+		display_to_world(x, y);
 		obj = find_object(x, y);
 		if (!avatar_can_act && obj && obj->as_actor() && obj->as_actor() == main_actor->as_actor()) {
 			ActionFileGump(nullptr);
